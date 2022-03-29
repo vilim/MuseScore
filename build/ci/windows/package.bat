@@ -16,8 +16,8 @@ SET UPGRADE_UUID="11111111-1111-1111-1111-111111111111"
 :GETOPTS
 IF /I "%1" == "-m" SET BUILD_MODE=%2& SHIFT
 IF /I "%1" == "-b" SET TARGET_PROCESSOR_BITS=%2& SHIFT
-IF /I "%1" == "--signsecret" SET SIGN_CERTIFICATE_ENCRYPT_SECRET=%2& SHIFT
-IF /I "%1" == "--signpass" SET SIGN_CERTIFICATE_PASSWORD=%2& SHIFT
+IF /I "%1" == "--signsecret" SET SIGN_CERTIFICATE_ENCRYPT_SECRET="%2"& SHIFT
+IF /I "%1" == "--signpass" SET SIGN_CERTIFICATE_PASSWORD="%2"& SHIFT
 IF /I "%1" == "--portable" SET BUILD_WIN_PORTABLE=%2& SHIFT
 IF /I "%1" == "--guid" SET UPGRADE_UUID=%2& SHIFT
 SHIFT
@@ -25,6 +25,7 @@ IF NOT "%1" == "" GOTO GETOPTS
 
 : Try get from env
 IF %BUILD_MODE% == "" ( SET /p BUILD_MODE=<%ARTIFACTS_DIR%\env\build_mode.env)
+IF %SIGN_CERTIFICATE_PASSWORD% == "" ( SET /p SIGN_CERTIFICATE_PASSWORD=<win_sign_pass.env)
 
 : Check args
 IF %BUILD_MODE% == "" ( ECHO "error: not set BUILD_MODE" & GOTO END_ERROR)
@@ -135,11 +136,11 @@ GOTO END_SUCCESS
 ECHO "Start msi packing..."
 :: sign dlls and exe files
 IF %DO_SIGN% == ON (
-    7z x -y build\ci\windows\resources\musescore.pfx.enc -obuild\ci\windows\resources\ -p%SIGN_CERTIFICATE_ENCRYPT_SECRET%
+    7z x -y build\ci\windows\resources\musescore.pfx.enc -obuild\ci\windows\resources\ -p"%SIGN_CERTIFICATE_ENCRYPT_SECRET%"
 
     for /f "delims=" %%f in ('dir /a-d /b /s "%INSTALL_DIR%\*.dll" "%INSTALL_DIR%\*.exe"') do (
         ECHO "Signing %%f"
-        %SIGNTOOL% sign /debug /f "build\ci\windows\resources\musescore.pfx" /t http://timestamp.verisign.com/scripts/timstamp.dll /p %SIGN_CERTIFICATE_PASSWORD% "%%f"
+        %SIGNTOOL% sign /debug /f "build\ci\windows\resources\musescore.pfx" /t http://timestamp.verisign.com/scripts/timstamp.dll /p "%SIGN_CERTIFICATE_PASSWORD%" "%%f"
     )
 
 ) ELSE (
