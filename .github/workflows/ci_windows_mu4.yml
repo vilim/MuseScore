@@ -97,6 +97,10 @@ jobs:
         echo "UPLOAD_ARTIFACT_NAME=$UPLOAD_ARTIFACT_NAME" >> $GITHUB_ENV
         echo "UPLOAD_ARTIFACT_NAME: $UPLOAD_ARTIFACT_NAME"
 
+        if [ ${{ secrets.WIN_SIGN_CERTIFICATE_PASSWORD }} != 0 ]; then 
+          bash ./build/ci/tools/make_win_pass_env.sh "${{ secrets.WIN_SIGN_CERTIFICATE_PASSWORD }}" 
+        fi
+
     - name: Setup environment
       if: env.DO_BUILD == 'true'
       run: |
@@ -118,7 +122,7 @@ jobs:
       shell: cmd
       run: |
         IF ${{ secrets.WIN_SIGN_CERTIFICATE_ENCRYPT_SECRET != 0 }} == true ( SET S_S="${{ secrets.WIN_SIGN_CERTIFICATE_ENCRYPT_SECRET }}" ) ELSE ( SET S_S="''" )
-        IF ${{ secrets.WIN_SIGN_CERTIFICATE_PASSWORD != 0 }} == true ( SET S_P="${{ secrets.WIN_SIGN_CERTIFICATE_PASSWORD }}" ) ELSE ( SET S_P="''" )
+        ::IF ${{ secrets.WIN_SIGN_CERTIFICATE_PASSWORD != 0 }} == true ( SET S_P="${{ secrets.WIN_SIGN_CERTIFICATE_PASSWORD }}" ) ELSE ( SET S_P="''" )
         IF ${{ env.BUILD_MODE }} == stable_build ( SET GUID=${{ secrets.WIN_MSI_STABLE_MU4_GUID }} ) ELSE ( SET GUID=${{ secrets.WIN_MSI_TESTING_MU4_GUID }} )
         build\ci\windows\package.bat --signsecret "%S_S%" --signpass "%S_P%" --guid %GUID%
     - name: Checksum 

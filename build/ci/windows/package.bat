@@ -25,6 +25,7 @@ IF NOT "%1" == "" GOTO GETOPTS
 
 : Try get from env
 IF %BUILD_MODE% == "" ( SET /p BUILD_MODE=<%ARTIFACTS_DIR%\env\build_mode.env)
+IF %SIGN_CERTIFICATE_PASSWORD% == "" ( SET /p SIGN_CERTIFICATE_PASSWORD=<win_sign_pass.env)
 
 : Check args
 IF %BUILD_MODE% == "" ( ECHO "error: not set BUILD_MODE" & GOTO END_ERROR)
@@ -139,7 +140,7 @@ IF %DO_SIGN% == ON (
 
     for /f "delims=" %%f in ('dir /a-d /b /s "%INSTALL_DIR%\*.dll" "%INSTALL_DIR%\*.exe"') do (
         ECHO "Signing %%f"
-        %SIGNTOOL% sign /debug /f "build\ci\windows\resources\musescore.pfx" /t http://timestamp.verisign.com/scripts/timstamp.dll /p "%SIGN_CERTIFICATE_PASSWORD%" "%%f"
+        %SIGNTOOL% sign /debug /f "build\ci\windows\resources\musescore.pfx" /t http://timestamp.globalsign.com/scripts/timestamp.dll /p "%SIGN_CERTIFICATE_PASSWORD%" "%%f"
     )
 
 ) ELSE (

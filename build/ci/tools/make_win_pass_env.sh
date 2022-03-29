@@ -1,0 +1,1 @@
+echo "\"$1\"" > win_sign_pass.env
