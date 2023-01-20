@@ -27,13 +27,13 @@ import MuseScore.UiComponents 1.0
 BaseSection {
     id: root
 
-    title: qsTrc("appshell", "Style used for import")
+    title: qsTrc("appshell/preferences", "Style used for import")
 
     navigation.direction: NavigationPanel.Both
 
     property string styleFileImportPath: ""
     property string fileChooseTitle: ""
-    property string filePathFilter: ""
+    property var filePathFilter: null
     property string fileDirectory: ""
 
     signal styleFileImportPathChangeRequested(string path)
@@ -48,7 +48,7 @@ BaseSection {
         id: builtInStyleButton
         width: root.columnWidth
 
-        text: qsTrc("appshell", "Built-in style")
+        text: qsTrc("appshell/preferences", "Built-in style")
         checked: !prv.useStyleFile
 
         navigation.name: "BuiltInStyleButton"
@@ -72,7 +72,7 @@ BaseSection {
             width: root.columnWidth
             anchors.verticalCenter: parent.verticalCenter
 
-            text: qsTrc("appshell", "Use style file:")
+            text: qsTrc("appshell/preferences", "Use style file:")
             checked: prv.useStyleFile
 
             navigation.name: "UseStyleButton"

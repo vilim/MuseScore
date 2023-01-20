@@ -22,6 +22,8 @@
 
 #include "notationstatusbarmodel.h"
 
+#include "types/translatablestring.h"
+
 #include "log.h"
 
 using namespace mu::appshell;
@@ -88,7 +90,9 @@ QVariant NotationStatusBarModel::currentWorkspaceItem()
     item->setId(QString::fromStdString(item->action().code));
 
     UiAction action;
-    action.title = qtrc("appshell", "Workspace: ") + QString::fromStdString(workspaceConfiguration()->currentWorkspaceName());
+    action.title
+        = TranslatableString::untranslatable("%1 %2").arg(TranslatableString("workspace", "Workspace:"),
+                                                          String::fromStdString(workspaceConfiguration()->currentWorkspaceName()));
     item->setAction(action);
 
     return QVariant::fromValue(item);
@@ -107,9 +111,14 @@ QVariant NotationStatusBarModel::currentViewMode()
 {
     ViewMode viewMode = notation() ? notation()->viewMode() : ViewMode::PAGE;
 
-    for (MenuItem* mode : makeAvailableViewModeList()) {
-        if (ALL_MODE_MAP.key(mode->id().toStdString()) == viewMode) {
-            return QVariant::fromValue(mode);
+    for (MenuItem* modeItem : makeAvailableViewModeList()) {
+        if (ALL_MODE_MAP.key(modeItem->id().toStdString()) == viewMode) {
+            if (viewMode == ViewMode::LINE || viewMode == ViewMode::SYSTEM) {
+                // In continuous view, we don't want to see "horizontal" or "vertical" (those should only be visible in the menu)
+                modeItem->setTitle(TranslatableString("notation", "Continuous view"));
+            }
+
+            return QVariant::fromValue(modeItem);
         }
     }
 
@@ -122,18 +131,6 @@ MenuItemList NotationStatusBarModel::makeAvailableViewModeList()
         return {};
     }
 
-    auto correctedTitle = [](ViewMode viewMode, const QString& title) {
-        switch (viewMode) {
-        case ViewMode::PAGE:
-            return title;
-        case ViewMode::LINE:
-        case ViewMode::SYSTEM:
-            return qtrc("appshell", "Continuous view");
-        default:
-            return title;
-        }
-    };
-
     MenuItemList result;
 
     ViewMode currentViewMode = notation()->viewMode();
@@ -142,9 +139,7 @@ MenuItemList NotationStatusBarModel::makeAvailableViewModeList()
         ActionCode code = ALL_MODE_MAP[viewMode];
         UiAction action = actionsRegister()->action(code);
 
-        MenuItem* viewModeItem = new MenuItem(this);
-        action.title = correctedTitle(viewMode, action.title);
-        viewModeItem->setAction(action);
+        MenuItem* viewModeItem = new MenuItem(action, this);
 
         UiActionState state;
         state.enabled = true;
@@ -167,7 +162,11 @@ bool NotationStatusBarModel::zoomEnabled() const
 
 int NotationStatusBarModel::currentZoomPercentage() const
 {
-    return notationConfiguration()->currentZoom().val;
+    if (!notation()) {
+        return 100;
+    }
+
+    return notation()->viewState()->zoomPercentage().val;
 }
 
 void NotationStatusBarModel::setCurrentZoomPercentage(int zoomPercentage)
@@ -176,40 +175,29 @@ void NotationStatusBarModel::setCurrentZoomPercentage(int zoomPercentage)
         return;
     }
 
-    m_currentZoomType = ZoomType::Percentage;
-    dispatch(zoomTypeToActionCode(m_currentZoomType), ActionData::make_arg1<int>(zoomPercentage));
+    dispatch(zoomTypeToActionCode(ZoomType::Percentage), ActionData::make_arg1<int>(zoomPercentage));
+}
+
+ZoomType NotationStatusBarModel::currentZoomType() const
+{
+    if (!notation()) {
+        return ZoomType::Percentage;
+    }
+
+    return notation()->viewState()->zoomType().val;
 }
 
 void NotationStatusBarModel::load()
 {
     TRACEFUNC;
 
-    m_currentZoomType = notationConfiguration()->defaultZoomType();
-
+    onCurrentNotationChanged();
     context()->currentNotationChanged().onNotify(this, [this]() {
-        if (!notation()) {
-            return;
-        }
-
-        emit currentViewModeChanged();
-        emit availableViewModeListChanged();
-        emit zoomEnabledChanged();
-
-        notation()->notationChanged().onNotify(this, [this]() {
-            emit currentViewModeChanged();
-            emit availableViewModeListChanged();
-        });
-
-        listenChangesInAccessibility();
+        onCurrentNotationChanged();
     });
 
     workspaceConfiguration()->currentWorkspaceNameChanged().onReceive(this, [this](const std::string&) {
         emit currentWorkspaceActionChanged();
-    });
-
-    notationConfiguration()->currentZoom().ch.onReceive(this, [this](int) {
-        emit currentZoomPercentageChanged();
-        emit availableZoomListChanged();
     });
 
     actionsRegister()->actionStateChanged().onReceive(this, [this](const ActionCodeList& codeList) {
@@ -223,9 +211,35 @@ void NotationStatusBarModel::load()
             }
         }
     });
+}
 
+void NotationStatusBarModel::onCurrentNotationChanged()
+{
+    emit currentViewModeChanged();
     emit availableViewModeListChanged();
+    emit currentZoomPercentageChanged();
     emit availableZoomListChanged();
+    emit zoomEnabledChanged();
+
+    if (!notation()) {
+        return;
+    }
+
+    notation()->notationChanged().onNotify(this, [this]() {
+        emit currentViewModeChanged();
+        emit availableViewModeListChanged();
+    });
+
+    notation()->viewState()->zoomPercentage().ch.onReceive(this, [this](int) {
+        emit currentZoomPercentageChanged();
+        emit availableZoomListChanged();
+    });
+
+    notation()->viewState()->zoomType().ch.onReceive(this, [this](ZoomType) {
+        emit availableZoomListChanged();
+    });
+
+    listenChangesInAccessibility();
 }
 
 void NotationStatusBarModel::listenChangesInAccessibility()
@@ -258,15 +272,20 @@ void NotationStatusBarModel::setCurrentViewMode(const QString& modeCode)
 
 MenuItemList NotationStatusBarModel::makeAvailableZoomList()
 {
+    if (!notation()) {
+        return {};
+    }
+
     MenuItemList result;
 
     int currZoomPercentage = currentZoomPercentage();
+    ZoomType currZoomType = currentZoomType();
 
     auto zoomPercentageTitle = [](int percentage) {
-        return QString::number(percentage) + "%";
+        return TranslatableString::untranslatable("%1%").arg(percentage);
     };
 
-    auto buildZoomItem = [=](ZoomType type, const QString& title = QString(), int value = 0) {
+    auto buildZoomItem = [=](ZoomType type, const TranslatableString& title = {}, int value = 0) {
         MenuItem* menuItem = new MenuItem(this);
         menuItem->setId(QString::number(static_cast<int>(type)) + QString::number(value));
 
@@ -279,7 +298,7 @@ MenuItemList NotationStatusBarModel::makeAvailableZoomList()
         menuItem->setState(state);
 
         menuItem->setSelectable(true);
-        if (m_currentZoomType == type) {
+        if (currZoomType == type) {
             menuItem->setSelected(type == ZoomType::Percentage ? value == currZoomPercentage : true);
         }
 
@@ -298,7 +317,7 @@ MenuItemList NotationStatusBarModel::makeAvailableZoomList()
     result << buildZoomItem(ZoomType::WholePage);
     result << buildZoomItem(ZoomType::TwoPages);
 
-    bool isCustomZoom = m_currentZoomType == ZoomType::Percentage && !possibleZoomList.contains(currZoomPercentage);
+    bool isCustomZoom = currZoomType == ZoomType::Percentage && !possibleZoomList.contains(currZoomPercentage);
     if (isCustomZoom) {
         MenuItem* customZoom = buildZoomItem(ZoomType::Percentage, zoomPercentageTitle(currZoomPercentage), currZoomPercentage);
         customZoom->setSelected(true);
@@ -328,7 +347,6 @@ void NotationStatusBarModel::setCurrentZoom(const QString& zoomId)
     ZoomType type = zoom->args().arg<ZoomType>(0);
     int value = zoom->args().arg<int>(1);
 
-    m_currentZoomType = type;
     emit availableZoomListChanged();
 
     dispatch(zoomTypeToActionCode(type), ActionData::make_arg1<int>(value));

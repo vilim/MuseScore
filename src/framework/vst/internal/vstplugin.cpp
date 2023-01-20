@@ -32,14 +32,23 @@ using namespace mu::async;
 static const std::string_view COMPONENT_STATE_KEY = "componentState";
 static const std::string_view CONTROLLER_STATE_KEY = "controllerState";
 
-VstPlugin::VstPlugin(PluginModulePtr module)
-    : m_module(std::move(module)), m_componentHandlerPtr(new VstComponentHandler())
+VstPlugin::VstPlugin(const audio::AudioResourceId& resourceId)
+    : m_resourceId(resourceId), m_componentHandlerPtr(new VstComponentHandler())
 {
     ONLY_AUDIO_THREAD(threadSecurer);
 
     m_componentHandlerPtr->pluginParamsChanged().onNotify(this, [this]() {
         rescanParams();
     });
+}
+
+const audio::AudioResourceId& VstPlugin::resourceId() const
+{
+    ONLY_AUDIO_OR_MAIN_THREAD(threadSecurer);
+
+    std::lock_guard lock(m_mutex);
+
+    return m_resourceId;
 }
 
 const std::string& VstPlugin::name() const
@@ -62,6 +71,16 @@ void VstPlugin::load()
         ONLY_MAIN_THREAD(threadSecurer);
 
         std::lock_guard lock(m_mutex);
+
+        m_module = modulesRepo()->pluginModule(m_resourceId);
+        if (!m_module) {
+            modulesRepo()->addPluginModule(m_resourceId);
+            m_module = modulesRepo()->pluginModule(m_resourceId);
+        }
+
+        if (!m_module) {
+            return;
+        }
 
         const auto& factory = m_module->getFactory();
 
@@ -94,9 +113,31 @@ void VstPlugin::load()
     }, threadSecurer()->mainThreadId());
 }
 
+void VstPlugin::unload()
+{
+    Async::call(this, [this]() {
+        ONLY_MAIN_THREAD(threadSecurer);
+
+        modulesRepo()->removePluginModule(m_resourceId);
+
+        std::lock_guard lock(m_mutex);
+
+        m_module = nullptr;
+        m_pluginProvider = nullptr;
+        m_classInfo = ClassInfo();
+        m_isLoaded = false;
+        m_unloadingCompleted.notify();
+    }, threadSecurer()->mainThreadId());
+}
+
 void VstPlugin::rescanParams()
 {
-    ONLY_AUDIO_THREAD(threadSecurer);
+    ONLY_AUDIO_OR_MAIN_THREAD(threadSecurer);
+
+    if (!m_pluginProvider) {
+        LOGE() << "Plugin provider is not initialized";
+        return;
+    }
 
     auto component = m_pluginProvider->getComponent();
     auto controller = m_pluginProvider->getController();
@@ -108,6 +149,9 @@ void VstPlugin::rescanParams()
     m_componentStateBuffer.seek(0, Steinberg::IBStream::kIBSeekSet, nullptr);
     m_controllerStateBuffer.seek(0, Steinberg::IBStream::kIBSeekSet, nullptr);
 
+    m_componentStateBuffer.setSize(0);
+    m_controllerStateBuffer.setSize(0);
+
     audio::AudioUnitConfig updatedConfig;
 
     component->getState(&m_componentStateBuffer);
@@ -115,13 +159,6 @@ void VstPlugin::rescanParams()
 
     controller->getState(&m_controllerStateBuffer);
     updatedConfig.emplace(CONTROLLER_STATE_KEY, std::string(m_controllerStateBuffer.getData(), m_controllerStateBuffer.getSize()));
-
-    for (int32_t i = 0; i < controller->getParameterCount(); ++i) {
-        PluginParamInfo info;
-        controller->getParameterInfo(i, info);
-
-        updatedConfig.insert_or_assign(std::to_string(info.id), std::to_string(controller->getParamNormalized(info.id)));
-    }
 
     m_pluginSettingsChanges.send(std::move(updatedConfig));
 }
@@ -135,28 +172,21 @@ void VstPlugin::stateBufferFromString(VstMemoryStream& buffer, char* strData, co
     static Steinberg::int32 numBytesRead = 0;
 
     buffer.write(strData, strSize, &numBytesRead);
-    buffer.seek(0, Steinberg::IBStream::kIBSeekSet, nullptr);
+    buffer.seek(0, static_cast<size_t>(Steinberg::IBStream::kIBSeekSet), nullptr);
 }
 
-PluginViewPtr VstPlugin::view() const
+PluginViewPtr VstPlugin::createView() const
 {
     ONLY_MAIN_THREAD(threadSecurer);
 
     std::lock_guard lock(m_mutex);
 
-    if (m_pluginView) {
-        return m_pluginView;
-    }
-
     auto controller = m_pluginProvider->getController();
-
     if (!controller) {
         return nullptr;
     }
 
-    m_pluginView = owned(controller->createView(PluginEditorViewType::kEditor));
-
-    return m_pluginView;
+    return owned(controller->createView(PluginEditorViewType::kEditor));
 }
 
 PluginProviderPtr VstPlugin::provider() const
@@ -191,6 +221,11 @@ void VstPlugin::updatePluginConfig(const audio::AudioUnitConfig& config)
 
     std::lock_guard lock(m_mutex);
 
+    if (!m_pluginProvider) {
+        LOGE() << "Plugin provider is not initialized";
+        return;
+    }
+
     auto controller = m_pluginProvider->getController();
     auto component = m_pluginProvider->getComponent();
 
@@ -199,26 +234,39 @@ void VstPlugin::updatePluginConfig(const audio::AudioUnitConfig& config)
         return;
     }
 
-    for (auto& pair : config) {
-        if (pair.first == COMPONENT_STATE_KEY) {
-            stateBufferFromString(m_componentStateBuffer, const_cast<char*>(pair.second.data()), pair.second.size());
-            component->setState(&m_componentStateBuffer);
-            controller->setComponentState(&m_componentStateBuffer);
-            continue;
-        }
-
-        if (pair.first == CONTROLLER_STATE_KEY) {
-            stateBufferFromString(m_controllerStateBuffer, const_cast<char*>(pair.second.data()), pair.second.size());
-            controller->setState(&m_controllerStateBuffer);
-
-            continue;
-        }
-
-        PluginParamId id = std::stoi(pair.first);
-        PluginParamValue val = std::stod(pair.second);
-
-        controller->setParamNormalized(id, val);
+    auto componentState = config.find(COMPONENT_STATE_KEY.data());
+    if (componentState == config.end()) {
+        return;
     }
+
+    auto controllerState = config.find(CONTROLLER_STATE_KEY.data());
+    if (controllerState == config.end()) {
+        return;
+    }
+
+    try {
+        stateBufferFromString(m_componentStateBuffer, const_cast<char*>(componentState->second.c_str()), componentState->second.size());
+        component->setState(&m_componentStateBuffer);
+        controller->setComponentState(&m_componentStateBuffer);
+    } catch (...) {
+        LOGW() << "Unexpected VST plugin exception";
+    }
+
+    try {
+        stateBufferFromString(m_controllerStateBuffer, const_cast<char*>(controllerState->second.data()), controllerState->second.size());
+        controller->setState(&m_controllerStateBuffer);
+    } catch (...) {
+        LOGW() << "Unexpected VST plugin exception";
+    }
+}
+
+void VstPlugin::refreshConfig()
+{
+    ONLY_MAIN_THREAD(threadSecurer);
+
+    std::lock_guard lock(m_mutex);
+
+    rescanParams();
 }
 
 bool VstPlugin::isValid() const
@@ -245,6 +293,11 @@ bool VstPlugin::isLoaded() const
 Notification VstPlugin::loadingCompleted() const
 {
     return m_loadingCompleted;
+}
+
+Notification VstPlugin::unloadingCompleted() const
+{
+    return m_unloadingCompleted;
 }
 
 async::Channel<audio::AudioUnitConfig> VstPlugin::pluginSettingsChanged() const

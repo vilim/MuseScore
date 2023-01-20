@@ -32,10 +32,6 @@ Item {
 
     property alias navigationPanel: view.navigationPanel
 
-    function focusOnFirst() {
-        root.model.selectPart(0)
-    }
-
     QtObject {
         id: prv
 
@@ -56,7 +52,7 @@ Item {
         StyledTextLabel {
             width: parent.width
 
-            text: qsTrc("notation", "NAME")
+            text: qsTrc("notation", "Name")
 
             horizontalAlignment: Qt.AlignLeft
             font.capitalization: Font.AllUppercase
@@ -96,7 +92,7 @@ Item {
             }
         }
 
-        ScrollBar.vertical: StyledScrollBar {}
+        ScrollBar.vertical: StyledScrollBar { policy: ScrollBar.AlwaysOn }
 
         Connections {
             target: root.model
@@ -114,7 +110,7 @@ Item {
             title: model.title
             currentPartIndex: view.currentIndex
             isSelected: model.isSelected
-            isCreated: model.isCreated
+            isCustom: model.isCustom
 
             navigation.name: model.title + model.index
             navigation.panel: view.navigationPanel
@@ -131,24 +127,20 @@ Item {
                 view.currentIndex = model.index
             }
 
-            onTitleEdited: function(newTitle) {
-                root.model.setPartTitle(model.index, newTitle)
-            }
-
-            onTitleEditingFinished: {
-                root.model.validatePartTitle(model.index)
-            }
-
             onRemovePartRequested: {
                 root.model.removePart(model.index)
             }
 
-            onCopyPartRequested: {
-                root.model.copyPart(model.index)
+            onTitleEdited: function(newTitle) {
+                incorrectTitleWarning = root.model.validatePartTitle(model.index, newTitle)
             }
 
-            onRemoveSelectionRequested: {
-                root.model.removeSelectedParts()
+            onTitleEditingFinished: function(newTitle) {
+                root.model.setPartTitle(model.index, newTitle)
+            }
+
+            onCopyPartRequested: {
+                root.model.copyPart(model.index)
             }
         }
     }

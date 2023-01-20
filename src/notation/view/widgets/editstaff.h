@@ -53,9 +53,9 @@ public:
 private:
     void hideEvent(QHideEvent*) override;
     void apply();
-    void setStaff(Ms::Staff*, const Ms::Fraction& tick);
-    void updateInterval(const Ms::Interval&);
-    void updateStaffType(const Ms::StaffType& staffType);
+    void setStaff(mu::engraving::Staff*, const mu::engraving::Fraction& tick);
+    void updateInterval(const mu::engraving::Interval&);
+    void updateStaffType(const mu::engraving::StaffType& staffType);
     void updateInstrument();
     void updateNextPreviousButtons();
 
@@ -86,7 +86,9 @@ signals:
 
 private:
     INotationPtr notation() const;
+    IMasterNotationPtr masterNotation() const;
     INotationPartsPtr notationParts() const;
+    INotationPartsPtr masterNotationParts() const;
 
     void initStaff();
 
@@ -98,13 +100,13 @@ private:
 
     QString midiCodeToStr(int midiCode);
 
-    Ms::Staff* m_staff = nullptr;
-    Ms::Staff* m_orgStaff = nullptr;
+    mu::engraving::Staff* m_staff = nullptr;
+    mu::engraving::Staff* m_orgStaff = nullptr;
     Instrument m_instrument;
     Instrument m_orgInstrument;
     InstrumentKey m_instrumentKey;
     int m_minPitchA, m_maxPitchA, m_minPitchP, m_maxPitchP;
-    Ms::Fraction m_tickStart, m_tickEnd;
+    mu::engraving::Fraction m_tickStart, m_tickEnd;
 
     EditStaffType* editStaffTypeDialog = nullptr;
 };

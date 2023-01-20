@@ -21,6 +21,8 @@
  */
 #pragma once
 
+#include "io/file.h"
+
 #include <libmscore/score.h>
 #include <libmscore/mscore.h>
 #include <types/fraction.h>
@@ -36,16 +38,18 @@
 #include <libmscore/ottava.h>
 #include <libmscore/drumset.h>
 
-namespace Ms {
+#include "engraving/engravingerrors.h"
+
+namespace mu::engraving {
 class PalmMute;
 
 class PowerTab
 {
-    QFile* _file;
-    MasterScore* score;
+    mu::io::IODevice* _file = nullptr;
+    MasterScore* score = nullptr;
 
     bool              readBoolean();
-    unsigned char     readUChar();
+    unsigned char     readUInt8();
     char              readChar();
     unsigned short    readShort();
     int               readInt();
@@ -67,7 +71,7 @@ class PowerTab
         std::string album;
         std::string author;
         std::string lyricist;
-        std::string arrenger;
+        std::string arranger;
         std::string guitarTranscriber;
         std::string bassTranscriber;
         std::string lyrics;
@@ -107,7 +111,7 @@ class PowerTab
     };
 
     struct ptGuitarIn final : public ptComponent {
-        int rhytmSlash{ true };
+        int rhythmSlash{ true };
         int staff{ 0 };
         int trackinfo{ 0 };
         int section{ 0 };
@@ -187,8 +191,8 @@ class PowerTab
         bool doubleDotted{ false };
         bool vibrato{ false };
         bool grace{ false };
-        bool arpegioUp{ false };
-        bool arpegioDown{ false };
+        bool arpeggioUp{ false };
+        bool arpeggioDown{ false };
         bool palmMute{ false };
         bool accent{ false };
         bool staccato{ false };
@@ -196,6 +200,7 @@ class PowerTab
 
         ptBeat(int _staff, int _voice)
             : staff(_staff), voice(_voice) {}
+        ptBeat() = default;
         Type type() override
         {
             return Beat;
@@ -268,7 +273,7 @@ class PowerTab
         int notes_count{ 0 };
     };
 
-    typedef std::list<std::shared_ptr<ptBeat> > tBeatList;
+    typedef std::list<ptBeat> tBeatList;
 
     struct ptTrack;
     struct ptSection {
@@ -283,7 +288,7 @@ class PowerTab
 
         int tempo { 0 };
 
-        std::list<stRhytmSlash> rhytm;
+        std::list<stRhytmSlash> rhythm;
 
         std::map<int, ptChordText> chordTextMap;
         std::vector<tBeatList> beats;
@@ -388,8 +393,8 @@ class PowerTab
     void addPalmMute(Chord*);
 
 public:
-    PowerTab(QFile* f, MasterScore* s)
+    PowerTab(mu::io::IODevice* f, MasterScore* s)
         : _file(f), score(s) {}
-    Score::FileError read();
+    Err read();
 };
 }

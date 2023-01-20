@@ -21,18 +21,21 @@
  */
 
 #include "location.h"
+
 #include "rw/xml.h"
+
 #include "chord.h"
 #include "engravingitem.h"
 #include "measure.h"
 #include "mscore.h"
+#include "note.h"
 
 #include "log.h"
 
 using namespace mu;
 using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 static constexpr Location absDefaults = Location::absolute();
 static constexpr Location relDefaults = Location::relative();
 
@@ -65,15 +68,15 @@ void Location::setTrack(int track)
 
 void Location::write(XmlWriter& xml) const
 {
-    Q_ASSERT(isRelative());
-    xml.startObject("location");
+    assert(isRelative());
+    xml.startElement("location");
     xml.tag("staves", _staff, relDefaults._staff);
     xml.tag("voices", _voice, relDefaults._voice);
     xml.tag("measures", _measure, relDefaults._measure);
-    xml.tag("fractions", _frac.reduced(), relDefaults._frac);
+    xml.tagFraction("fractions", _frac.reduced(), relDefaults._frac);
     xml.tag("grace", _graceIndex, relDefaults._graceIndex);
     xml.tag("notes", _note, relDefaults._note);
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -83,7 +86,7 @@ void Location::write(XmlWriter& xml) const
 void Location::read(XmlReader& e)
 {
     while (e.readNextStartElement()) {
-        const QStringRef& tag(e.name());
+        const AsciiStringView tag(e.name());
 
         if (tag == "staves") {
             _staff = e.readInt();
@@ -147,7 +150,7 @@ void Location::toRelative(const Location& ref)
 
 void Location::fillPositionForElement(const EngravingItem* e, bool absfrac)
 {
-    Q_ASSERT(isAbsolute());
+    assert(isAbsolute());
     if (!e) {
         LOGW("Location::fillPositionForElement: element is nullptr");
         return;
@@ -172,7 +175,7 @@ void Location::fillPositionForElement(const EngravingItem* e, bool absfrac)
 
 void Location::fillForElement(const EngravingItem* e, bool absfrac)
 {
-    Q_ASSERT(isAbsolute());
+    assert(isAbsolute());
     if (!e) {
         LOGW("Location::fillForElement: element is nullptr");
         return;

@@ -27,12 +27,12 @@ import MuseScore.UiComponents 1.0
 BaseSection {
     id: root
 
-    title: qsTrc("appshell", "Programme start")
+    title: qsTrc("appshell/preferences", "Program start")
 
     navigation.direction: NavigationPanel.Both
 
     property alias startupModes: startupModesBox.model
-    property string scorePathFilter: ""
+    property var scorePathFilter: null
 
     property alias panels: panelsView.model
 
@@ -51,12 +51,14 @@ BaseSection {
         width: parent.width
 
         delegate: Row {
+            width: parent.width
             spacing: root.columnSpacing
 
             RoundedRadioButton {
                 anchors.verticalCenter: parent.verticalCenter
 
-                width: root.columnWidth
+                width: filePicker.visible ? Math.max(implicitWidth, root.columnWidth)
+                                          : parent.width
 
                 checked: modelData.checked
                 text: modelData.title
@@ -72,10 +74,12 @@ BaseSection {
             }
 
             FilePicker {
+                id: filePicker
+
                 pathFieldWidth: root.columnWidth
                 spacing: root.columnSpacing
 
-                dialogTitle: qsTrc("appshell", "Choose starting score")
+                dialogTitle: qsTrc("appshell/preferences", "Choose starting score")
                 filter: root.scorePathFilter
 
                 visible: modelData.canSelectScorePath
@@ -102,6 +106,8 @@ BaseSection {
         height: contentHeight
 
         delegate: CheckBox {
+            width: parent.width
+
             text: modelData.title
             checked: modelData.visible
 

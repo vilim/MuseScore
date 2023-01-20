@@ -7,6 +7,19 @@ set(SHARED_LIBS_INSTALL_DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 
 set(CMAKE_UNITY_BUILD_BATCH_SIZE 12)
 
+if (QT_SUPPORT)
+    add_definitions(-DQT_SUPPORT)
+    add_definitions(-DHAW_LOGGER_QT_SUPPORT)
+else()
+    add_definitions(-DNO_QT_SUPPORT)
+endif()
+
+add_definitions(-DHAW_PROFILER_ENABLED)
+
+if (NOT BUILD_ALLOCATOR)
+    add_definitions(-DCUSTOM_ALLOCATOR_DISABLED)
+endif()
+
 if (CC_IS_GCC)
     message(STATUS "Using Compiler GCC ${CMAKE_CXX_COMPILER_VERSION}")
 
@@ -15,6 +28,10 @@ if (CC_IS_GCC)
 
     if (TRY_BUILD_SHARED_LIBS_IN_DEBUG AND BUILD_IS_DEBUG)
         set(BUILD_SHARED_LIBS ON)
+    endif()
+
+    if (BUILD_ASAN)
+        string(APPEND CMAKE_CXX_FLAGS_DEBUG " -fsanitize=address -fno-omit-frame-pointer")
     endif()
 
 elseif(CC_IS_MSVC)
@@ -62,6 +79,14 @@ elseif(CC_IS_CLANG)
     set(CMAKE_CXX_FLAGS_DEBUG   "-g")
     set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 
+    if (BUILD_ASAN)
+        string(APPEND CMAKE_CXX_FLAGS_DEBUG " -fsanitize=address -fno-omit-frame-pointer")
+    endif()
+
+    if (BUILD_IS_DEBUG)
+        add_definitions(-DSTRING_DEBUG_HACK)
+    endif()
+
 elseif(CC_IS_EMSCRIPTEN)
     message(STATUS "Using Compiler Emscripten ${CMAKE_CXX_COMPILER_VERSION}")
 
@@ -107,8 +132,19 @@ endif()
 
 # APPLE specific
 if (OS_IS_MAC)
-      set(CMAKE_OSX_ARCHITECTURES x86_64)
-      set(MACOSX_DEPLOYMENT_TARGET 10.14)
-      set(CMAKE_OSX_DEPLOYMENT_TARGET 10.14)
+    if (BUILD_MACOS_APPLE_SILICON)
+        set(CMAKE_OSX_ARCHITECTURES ) # leave empty, use default
+    else()
+        set(CMAKE_OSX_ARCHITECTURES x86_64)
+    endif()
+
+    if (CMAKE_OSX_ARCHITECTURES)
+        message(STATUS "Building for architecture(s) ${CMAKE_OSX_ARCHITECTURES}")
+    else()
+        message(STATUS "Building for default architecture(s)")
+    endif()
+
+    set(MACOSX_DEPLOYMENT_TARGET 10.14)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET 10.14)
 endif(OS_IS_MAC)
 

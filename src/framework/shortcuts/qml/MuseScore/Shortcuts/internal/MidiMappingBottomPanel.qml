@@ -40,7 +40,7 @@ Row {
         name: "MidiMappingBottomPanel"
         enabled: root.enabled && root.visible
         direction: NavigationPanel.Horizontal
-        accessible.name: qsTrc("shortcuts", "Midi mapping bottom panel")
+        accessible.name: qsTrc("shortcuts", "MIDI mapping bottom panel")
 
         onActiveChanged: function(active) {
             if (active) {
@@ -87,7 +87,7 @@ Row {
         navigation.column: 2
 
         onClicked: {
-            root.clearAllActions()
+            root.clearAllActionsRequested()
         }
     }
 }

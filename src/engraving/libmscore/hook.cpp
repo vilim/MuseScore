@@ -21,14 +21,14 @@
  */
 
 #include "hook.h"
+
 #include "chord.h"
-#include "stem.h"
 #include "score.h"
 
 #include "log.h"
 
 using namespace mu;
-using namespace Ms;
+using namespace mu::engraving;
 
 Hook::Hook(Chord* parent)
     : Symbol(ElementType::HOOK, parent, ElementFlag::NOTHING)

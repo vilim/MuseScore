@@ -1,9 +1,12 @@
 #ifndef GPMASTERTRACKS_H
 #define GPMASTERTRACKS_H
 
+#include <stddef.h>
 #include <vector>
 
-namespace Ms {
+#include "types/string.h"
+
+namespace mu::engraving {
 class GPMasterTracks
 {
 public:
@@ -17,6 +20,7 @@ public:
         bool linear{ false };
         int value{ 0 };
         int tempoUnit{ 0 };
+        String text;
         friend bool operator<(const Automation& l, const Automation& r) { return l.bar < r.bar; }
     };
 

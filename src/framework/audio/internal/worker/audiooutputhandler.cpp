@@ -120,6 +120,19 @@ void AudioOutputHandler::setMasterOutputParams(const AudioOutputParams& params)
     }, AudioThread::ID);
 }
 
+void AudioOutputHandler::clearMasterOutputParams()
+{
+    Async::call(this, [this]() {
+        ONLY_AUDIO_WORKER_THREAD;
+
+        IF_ASSERT_FAILED(mixer()) {
+            return;
+        }
+
+        mixer()->clearMasterOutputParams();
+    }, AudioThread::ID);
+}
+
 Channel<AudioOutputParams> AudioOutputHandler::masterOutputParamsChanged() const
 {
     ONLY_AUDIO_MAIN_OR_WORKER_THREAD;
@@ -168,7 +181,7 @@ Promise<AudioSignalChanges> AudioOutputHandler::masterSignalChanges() const
     }, AudioThread::ID);
 }
 
-Promise<bool> AudioOutputHandler::saveSoundTrack(const TrackSequenceId sequenceId, const io::path& destination,
+Promise<bool> AudioOutputHandler::saveSoundTrack(const TrackSequenceId sequenceId, const io::path_t& destination,
                                                  const SoundTrackFormat& format)
 {
     return Promise<bool>([this, sequenceId, destination, format](auto resolve, auto reject) {
@@ -184,14 +197,38 @@ Promise<bool> AudioOutputHandler::saveSoundTrack(const TrackSequenceId sequenceI
         }
 
 #ifdef ENABLE_AUDIO_EXPORT
+        s->player()->stop();
+        s->player()->seek(0);
         msecs_t totalDuration = s->player()->duration();
         SoundTrackWriter writer(destination, format, totalDuration, mixer());
 
-        return resolve(writer.write());
+        framework::Progress progress = saveSoundTrackProgress(sequenceId);
+        writer.progress().progressChanged.onReceive(this, [&progress](int64_t current, int64_t total, std::string title) {
+            progress.progressChanged.send(current, total, title);
+        });
+
+        bool ok = writer.write();
+        s->player()->seek(0);
+
+        return resolve(ok);
 #else
         return reject(static_cast<int>(Err::DisabledAudioExport), "audio export is disabled");
 #endif
     }, AudioThread::ID);
+}
+
+mu::framework::Progress AudioOutputHandler::saveSoundTrackProgress(const TrackSequenceId sequenceId)
+{
+    if (!m_saveSoundTracksMap.contains(sequenceId)) {
+        m_saveSoundTracksMap.insert(sequenceId, framework::Progress());
+    }
+
+    return m_saveSoundTracksMap[sequenceId];
+}
+
+void AudioOutputHandler::clearAllFx()
+{
+    fxResolver()->clearAllFx();
 }
 
 std::shared_ptr<Mixer> AudioOutputHandler::mixer() const

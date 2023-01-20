@@ -21,14 +21,14 @@
  */
 #include "linkedobjects.h"
 
-#include "score.h"
 #include "masterscore.h"
 #include "measure.h"
+#include "score.h"
 #include "staff.h"
 
 #include "log.h"
 
-using namespace Ms;
+using namespace mu::engraving;
 
 LinkedObjects::LinkedObjects(Score* score)
 {

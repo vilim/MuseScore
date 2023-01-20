@@ -22,40 +22,43 @@
 
 #include <QRegularExpression>
 
-#include "engraving/libmscore/factory.h"
 #include "engraving/libmscore/box.h"
-#include "engraving/libmscore/chordrest.h"
-#include "engraving/libmscore/instrtemplate.h"
+#include "engraving/libmscore/factory.h"
+#include "engraving/libmscore/layoutbreak.h"
 #include "engraving/libmscore/measure.h"
 #include "engraving/libmscore/page.h"
 #include "engraving/libmscore/part.h"
-#include "engraving/libmscore/scorefont.h"
+#include "engraving/libmscore/score.h"
 #include "engraving/libmscore/staff.h"
-#include "engraving/libmscore/stringdata.h"
-#include "engraving/libmscore/symbol.h"
+#include "engraving/libmscore/text.h"
 #include "engraving/libmscore/timesig.h"
-#include "engraving/libmscore/spanner.h"
-#include "engraving/libmscore/bracketItem.h"
 #include "engraving/libmscore/utils.h"
 
-#include "engraving/types/symnames.h"
 #include "engraving/style/style.h"
+#include "engraving/style/textstyle.h"
+
+#include "engraving/types/symnames.h"
 
 #include "importmxmllogger.h"
 #include "importmxmlnoteduration.h"
 #include "importmxmlpass1.h"
-#include "importmxmlpass2.h"
 
 #include "modularity/ioc.h"
 #include "importexport/musicxml/imusicxmlconfiguration.h"
 
 #include "log.h"
 
+using namespace mu;
 using namespace mu::engraving;
 
 static std::shared_ptr<mu::iex::musicxml::IMusicXmlConfiguration> configuration()
 {
     return mu::modularity::ioc()->resolve<mu::iex::musicxml::IMusicXmlConfiguration>("iex_musicxml");
+}
+
+static std::shared_ptr<mu::engraving::IEngravingFontsProvider> engravingFonts()
+{
+    return mu::modularity::ioc()->resolve<mu::engraving::IEngravingFontsProvider>("iex_musicxml");
 }
 
 static bool musicxmlImportBreaks()
@@ -70,7 +73,7 @@ static bool musicxmlImportLayout()
     return conf ? conf->musicxmlImportLayout() : true;
 }
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   allocateStaves
 //---------------------------------------------------------
@@ -228,8 +231,7 @@ void MusicXMLParserPass1::addError(const QString& error)
 {
     if (error != "") {
         _logger->logError(error, &_e);
-        QString errorWithLocation = xmlReaderLocation(_e) + ' ' + error + '\n';
-        _errors += errorWithLocation;
+        _errors += errorStringWithLocation(_e.lineNumber(), _e.columnNumber(), error) + '\n';
     }
 }
 
@@ -459,7 +461,7 @@ track_idx_t MusicXMLParserPass1::trackForPart(const QString& id) const
 {
     Part* part = _partMap.value(id);
     IF_ASSERT_FAILED(part) {
-        return -1;
+        return mu::nidx;
     }
     staff_idx_t scoreRelStaff = _score->staffIdx(part);   // zero-based number of parts first staff in the score
     return scoreRelStaff * VOICES;
@@ -753,7 +755,7 @@ static VBox* addCreditWords(Score* const score, const CreditWordsList& crWords,
     std::vector<const CreditWords*> words;
     if (pageNr == 1) {
         // if there are more credit words in the footer than in header,
-        // swap heaer and footer, assuming this will result in a vertical
+        // swap header and footer, assuming this will result in a vertical
         // frame with the title on top of the page.
         // Sibelius (direct export) typically exports no header
         // and puts the title etc. in the footer
@@ -798,26 +800,26 @@ static void createDefaultHeader(Score* const score)
     QString strPoet;
     QString strTranslator;
 
-    if (!(score->metaTag("movementTitle").isEmpty() && score->metaTag("workTitle").isEmpty())) {
-        strTitle = score->metaTag("movementTitle");
+    if (!(score->metaTag(u"movementTitle").isEmpty() && score->metaTag(u"workTitle").isEmpty())) {
+        strTitle = score->metaTag(u"movementTitle");
         if (strTitle.isEmpty()) {
-            strTitle = score->metaTag("workTitle");
+            strTitle = score->metaTag(u"workTitle");
         }
     }
-    if (!(score->metaTag("movementNumber").isEmpty() && score->metaTag("workNumber").isEmpty())) {
-        strSubTitle = score->metaTag("movementNumber");
+    if (!(score->metaTag(u"movementNumber").isEmpty() && score->metaTag(u"workNumber").isEmpty())) {
+        strSubTitle = score->metaTag(u"movementNumber");
         if (strSubTitle.isEmpty()) {
-            strSubTitle = score->metaTag("workNumber");
+            strSubTitle = score->metaTag(u"workNumber");
         }
     }
-    QString metaComposer = score->metaTag("composer");
-    QString metaPoet = score->metaTag("poet");
-    QString metaTranslator = score->metaTag("translator");
+    QString metaComposer = score->metaTag(u"composer");
+    QString metaPoet = score->metaTag(u"poet");
+    QString metaTranslator = score->metaTag(u"translator");
     if (!metaComposer.isEmpty()) {
         strComposer = metaComposer;
     }
     if (metaPoet.isEmpty()) {
-        metaPoet = score->metaTag("lyricist");
+        metaPoet = score->metaTag(u"lyricist");
     }
     if (!metaPoet.isEmpty()) {
         strPoet = metaPoet;
@@ -944,13 +946,13 @@ static void fixupSigmap(MxmlLogger* logger, Score* score, const QVector<Fraction
  Parse MusicXML in \a device and extract pass 1 data.
  */
 
-Score::FileError MusicXMLParserPass1::parse(QIODevice* device)
+Err MusicXMLParserPass1::parse(QIODevice* device)
 {
     _logger->logDebugTrace("MusicXMLParserPass1::parse device");
     _parts.clear();
     _e.setDevice(device);
     auto res = parse();
-    if (res != Score::FileError::FILE_NO_ERROR) {
+    if (res != Err::NoError) {
         return res;
     }
 
@@ -973,7 +975,7 @@ Score::FileError MusicXMLParserPass1::parse(QIODevice* device)
  Start the parsing process, after verifying the top-level node is score-partwise
  */
 
-Score::FileError MusicXMLParserPass1::parse()
+Err MusicXMLParserPass1::parse()
 {
     _logger->logDebugTrace("MusicXMLParserPass1::parse");
 
@@ -986,16 +988,16 @@ Score::FileError MusicXMLParserPass1::parse()
             _logger->logError(QString("this is not a MusicXML score-partwise file (top-level node '%1')")
                               .arg(_e.name().toString()), &_e);
             _e.skipCurrentElement();
-            return Score::FileError::FILE_BAD_FORMAT;
+            return Err::FileBadFormat;
         }
     }
 
     if (!found) {
         _logger->logError("this is not a MusicXML score-partwise file, node <score-partwise> not found", &_e);
-        return Score::FileError::FILE_BAD_FORMAT;
+        return Err::FileBadFormat;
     }
 
-    return Score::FileError::FILE_NO_ERROR;
+    return Err::NoError;
 }
 
 //---------------------------------------------------------
@@ -1038,9 +1040,9 @@ void MusicXMLParserPass1::scorePartwise()
         } else if (_e.name() == "work") {
             while (_e.readNextStartElement()) {
                 if (_e.name() == "work-number") {
-                    _score->setMetaTag("workNumber", _e.readElementText());
+                    _score->setMetaTag(u"workNumber", _e.readElementText());
                 } else if (_e.name() == "work-title") {
-                    _score->setMetaTag("workTitle", _e.readElementText());
+                    _score->setMetaTag(u"workTitle", _e.readElementText());
                 } else {
                     skipLogCurrElem();
                 }
@@ -1050,9 +1052,9 @@ void MusicXMLParserPass1::scorePartwise()
         } else if (_e.name() == "defaults") {
             defaults();
         } else if (_e.name() == "movement-number") {
-            _score->setMetaTag("movementNumber", _e.readElementText());
+            _score->setMetaTag(u"movementNumber", _e.readElementText());
         } else if (_e.name() == "movement-title") {
-            _score->setMetaTag("movementTitle", _e.readElementText());
+            _score->setMetaTag(u"movementTitle", _e.readElementText());
         } else if (_e.name() == "credit") {
             credit(_credits);
         } else {
@@ -1085,7 +1087,7 @@ void MusicXMLParserPass1::scorePartwise()
             partSet << il.at(pg->start);
         }
         // determine span in staves
-        int stavesSpan = 0;
+        size_t stavesSpan = 0;
         for (int j = 0; j < pg->span; j++) {
             stavesSpan += il.at(pg->start + j)->nstaves();
         }
@@ -1110,7 +1112,7 @@ void MusicXMLParserPass1::scorePartwise()
             p->staff(0)->setBracketSpan(column, p->nstaves());
             if (allStaffGroupsIdentical(p)) {
                 // span only if the same types
-                p->staff(0)->setBarLineSpan(p->nstaves());
+                p->staff(0)->setBarLineSpan(static_cast<int>(p->nstaves()));
             }
         }
     }
@@ -1136,7 +1138,7 @@ void MusicXMLParserPass1::identification()
             QString strType = _e.attributes().value("type").toString();
             _score->setMetaTag(strType, _e.readElementText());
         } else if (_e.name() == "rights") {
-            _score->setMetaTag("copyright", _e.readElementText());
+            _score->setMetaTag(u"copyright", _e.readElementText());
         } else if (_e.name() == "encoding") {
             // TODO
             while (_e.readNextStartElement()) {
@@ -1148,10 +1150,10 @@ void MusicXMLParserPass1::identification()
             // _score->setMetaTag("encoding", _e.readElementText()); works with DOM but not with pull parser
             // temporarily fake the encoding tag (compliant with DOM parser) to help the autotester
             if (MScore::debugMode) {
-                _score->setMetaTag("encoding", "MuseScore 0.7.02007-09-10");
+                _score->setMetaTag(u"encoding", u"MuseScore 0.7.02007-09-10");
             }
         } else if (_e.name() == "source") {
-            _score->setMetaTag("source", _e.readElementText());
+            _score->setMetaTag(u"source", _e.readElementText());
         } else if (_e.name() == "miscellaneous") {
             // TODO
             _e.skipCurrentElement();        // skip but don't log
@@ -1178,7 +1180,7 @@ static QString text2syms(const QString& t)
     // note that this takes about 1 msec on a Core i5,
     // caching does not gain much
 
-    ScoreFont* sf = ScoreFont::fallbackFont();
+    IEngravingFontPtr sf = engravingFonts()->fallbackFont();
     QMap<QString, SymId> map;
     int maxStringSize = 0;          // maximum string size found
 
@@ -1203,7 +1205,7 @@ static QString text2syms(const QString& t)
     while (in != "") {
         // try to find the largest match possible
         int maxMatch = qMin(in.size(), maxStringSize);
-        QString sym;
+        AsciiStringView sym;
         while (maxMatch > 0) {
             QString toBeMatched = in.left(maxMatch);
             if (map.contains(toBeMatched)) {
@@ -1215,7 +1217,7 @@ static QString text2syms(const QString& t)
         if (maxMatch > 0) {
             // found a match, add sym to res and remove match from string in
             res += "<sym>";
-            res += sym;
+            res += sym.ascii();
             res += "</sym>";
             in.remove(0, maxMatch);
         } else {
@@ -1447,7 +1449,7 @@ static void updateStyles(Score* score,
             continue;
         }
         const TextStyle* ts = textStyle(tid);
-        for (const StyledProperty& a :*ts) {
+        for (const auto& a :*ts) {
             if (a.pid == Pid::FONT_FACE && wordFamily != "" && !needUseDefaultFont) {
                 score->style().set(a.sid, wordFamily);
             } else if (a.pid == Pid::FONT_SIZE && dblWordSize > epsilon) {
@@ -2044,7 +2046,7 @@ static void setNumberOfStavesForPart(Part* const part, const size_t staves)
     }
 
     if (staves > part->nstaves()) {
-        part->setStaves(staves);
+        part->setStaves(static_cast<int>(staves));
     }
 }
 
@@ -2566,7 +2568,7 @@ void MusicXMLParserPass1::direction(const QString& partId, const Fraction cTime)
         if (_e.name() == "direction-type") {
             directionType(cTime, starts, stops);
         } else if (_e.name() == "staff") {
-            int nstaves = getPart(partId)->nstaves();
+            int nstaves = static_cast<int>(getPart(partId)->nstaves());
             QString strStaff = _e.readElementText();
             staff = strStaff.toInt() - 1;
             if (0 <= staff && staff < nstaves) {
@@ -3199,7 +3201,7 @@ void MusicXMLParserPass1::note(const QString& partId,
     // check for timing error(s) and set dura
     // keep in this order as checkTiming() might change dura
     auto errorStr = mnd.checkTiming(type, bRest, grace);
-    dura = mnd.dura();
+    dura = mnd.duration();
     if (errorStr != "") {
         _logger->logError(errorStr, &_e);
     }
@@ -3216,7 +3218,7 @@ void MusicXMLParserPass1::note(const QString& partId,
         // do tuplet
         auto timeMod = mnd.timeMod();
         auto& tupletState = tupletStates[voice];
-        tupletState.determineTupletAction(mnd.dura(), timeMod, tupletStartStop, mnd.normalType(), missingPrev, missingCurr);
+        tupletState.determineTupletAction(mnd.duration(), timeMod, tupletStartStop, mnd.normalType(), missingPrev, missingCurr);
     }
 
     // store result

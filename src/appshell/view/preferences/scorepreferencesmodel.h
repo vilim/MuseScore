@@ -59,8 +59,6 @@ private:
 
     enum class DefaultFileType {
         Undefined,
-        FirstInstrumentList,
-        SecondInstrumentList,
         FirstScoreOrderList,
         SecondScoreOrderList,
         Style,
@@ -71,17 +69,11 @@ private:
         DefaultFileType type = DefaultFileType::Undefined;
         QString title;
         QString path;
-        QString pathFilter;
+        QStringList pathFilter;
         QString chooseTitle;
     };
 
     void savePath(DefaultFileType fileType, const QString& path);
-
-    QString firstInstrumentListPath() const;
-    void setFirstInstrumentListPath(const QString& path);
-
-    QString secondInstrumentListPath() const;
-    void setSecondInstrumentListPath(const QString& path);
 
     QString firstScoreOrderListPath() const;
     void setFirstScoreOrderListPath(const QString& path);
@@ -92,11 +84,9 @@ private:
     QString stylePath() const;
     QString partStylePath() const;
 
-    QString instrumentPathFilter() const;
-    QString scoreOrderPathFilter() const;
-    QString stylePathFilter() const;
+    QStringList scoreOrderPathFilter() const;
+    QStringList stylePathFilter() const;
 
-    QString instrumentChooseTitle() const;
     QString scoreOrderChooseTitle() const;
     QString styleChooseTitle() const;
     QString partStyleChooseTitle() const;

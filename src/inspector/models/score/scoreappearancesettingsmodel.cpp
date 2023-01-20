@@ -31,66 +31,71 @@ ScoreAppearanceSettingsModel::ScoreAppearanceSettingsModel(QObject* parent, IEle
 {
     setSectionType(InspectorSectionType::SECTION_SCORE_APPEARANCE);
     setTitle(qtrc("inspector", "Score appearance"));
-
-    auto onCurrentNotationChanged = [this]() {
-        emit styleChanged();
-
-        if (style()) {
-            style()->styleChanged().onNotify(this, [this]() {
-                emit styleChanged();
-            });
-        }
-    };
-
-    onCurrentNotationChanged();
-    context()->currentNotationChanged().onNotify(this, onCurrentNotationChanged);
 }
 
 bool ScoreAppearanceSettingsModel::hideEmptyStaves() const
 {
-    return style() ? style()->styleValue(StyleId::hideEmptyStaves).toBool() : false;
+    return styleValue(StyleId::hideEmptyStaves).toBool();
 }
 
 void ScoreAppearanceSettingsModel::setHideEmptyStaves(bool hide)
 {
-    if (hide == hideEmptyStaves() || !style()) {
-        return;
+    if (updateStyleValue(StyleId::hideEmptyStaves, hide)) {
+        emit hideEmptyStavesChanged();
     }
-
-    style()->setStyleValue(StyleId::hideEmptyStaves, hide);
 }
 
 bool ScoreAppearanceSettingsModel::dontHideEmptyStavesInFirstSystem() const
 {
-    return style() ? style()->styleValue(StyleId::dontHideStavesInFirstSystem).toBool() : false;
+    return styleValue(StyleId::dontHideStavesInFirstSystem).toBool();
 }
 
 void ScoreAppearanceSettingsModel::setDontHideEmptyStavesInFirstSystem(bool dont)
 {
-    if (dont == dontHideEmptyStavesInFirstSystem() || !style()) {
-        return;
+    if (updateStyleValue(StyleId::dontHideStavesInFirstSystem, dont)) {
+        emit dontHideEmptyStavesInFirstSystemChanged();
     }
-
-    style()->setStyleValue(StyleId::dontHideStavesInFirstSystem, dont);
 }
 
 bool ScoreAppearanceSettingsModel::showBracketsWhenSpanningSingleStaff() const
 {
-    return style() ? style()->styleValue(StyleId::alwaysShowBracketsWhenEmptyStavesAreHidden).toBool() : false;
+    return styleValue(StyleId::alwaysShowBracketsWhenEmptyStavesAreHidden).toBool();
 }
 
 void ScoreAppearanceSettingsModel::setShowBracketsWhenSpanningSingleStaff(bool show)
 {
-    if (show == showBracketsWhenSpanningSingleStaff() || !style()) {
-        return;
+    if (updateStyleValue(StyleId::alwaysShowBracketsWhenEmptyStavesAreHidden, show)) {
+        emit showBracketsWhenSpanningSingleStaffChanged();
     }
-
-    style()->setStyleValue(StyleId::alwaysShowBracketsWhenEmptyStavesAreHidden, show);
 }
 
 bool ScoreAppearanceSettingsModel::isEmpty() const
 {
     return !isNotationExisting();
+}
+
+void ScoreAppearanceSettingsModel::onCurrentNotationChanged()
+{
+    AbstractInspectorModel::onCurrentNotationChanged();
+
+    emit hideEmptyStavesChanged();
+    emit dontHideEmptyStavesInFirstSystemChanged();
+    emit showBracketsWhenSpanningSingleStaffChanged();
+}
+
+void ScoreAppearanceSettingsModel::onNotationChanged(const engraving::PropertyIdSet&, const engraving::StyleIdSet& changedStyleIdSet)
+{
+    if (mu::contains(changedStyleIdSet, StyleId::hideEmptyStaves)) {
+        emit hideEmptyStavesChanged();
+    }
+
+    if (mu::contains(changedStyleIdSet, StyleId::dontHideStavesInFirstSystem)) {
+        emit dontHideEmptyStavesInFirstSystemChanged();
+    }
+
+    if (mu::contains(changedStyleIdSet, StyleId::alwaysShowBracketsWhenEmptyStavesAreHidden)) {
+        emit showBracketsWhenSpanningSingleStaffChanged();
+    }
 }
 
 void ScoreAppearanceSettingsModel::showPageSettings()

@@ -29,19 +29,23 @@
 #include "libmscore/segment.h"
 #include "libmscore/chord.h"
 #include "libmscore/note.h"
+#include "libmscore/bracketItem.h"
 
+#ifndef ENGRAVING_NO_ACCESSIBILITY
 #include "accessibility/accessibleitem.h"
+#endif
 
 using namespace mu::engraving;
 using namespace mu::engraving::compat;
 
 DummyElement::DummyElement(EngravingObject* parent)
-    : Ms::EngravingItem(Ms::ElementType::DUMMY, parent)
+    : EngravingItem(ElementType::DUMMY, parent)
 {
 }
 
 DummyElement::~DummyElement()
 {
+    delete m_bracketItem;
     delete m_note;
     delete m_chord;
     delete m_segment;
@@ -53,10 +57,16 @@ DummyElement::~DummyElement()
 
 void DummyElement::init()
 {
+#ifndef ENGRAVING_NO_ACCESSIBILITY
     setupAccessible();
+#endif
+
     m_root = new RootItem(score());
     m_root->setParent(explicitParent());
+
+#ifndef ENGRAVING_NO_ACCESSIBILITY
     m_root->setupAccessible();
+#endif
 
     m_page = Factory::createPage(m_root);
     m_page->setParent(explicitParent());
@@ -75,6 +85,9 @@ void DummyElement::init()
 
     m_note = Factory::createNote(m_chord);
     m_note->setParent(m_chord);
+
+    m_bracketItem = Factory::createBracketItem(m_system);
+    m_bracketItem->setParent(m_system);
 }
 
 RootItem* DummyElement::rootItem()
@@ -82,37 +95,50 @@ RootItem* DummyElement::rootItem()
     return m_root;
 }
 
-Ms::Page* DummyElement::page()
+Page* DummyElement::page()
 {
     return m_page;
 }
 
-Ms::System* DummyElement::system()
+System* DummyElement::system()
 {
     return m_system;
 }
 
-Ms::Measure* DummyElement::measure()
+Measure* DummyElement::measure()
 {
     return m_measure;
 }
 
-Ms::Segment* DummyElement::segment()
+Segment* DummyElement::segment()
 {
     return m_segment;
 }
 
-Ms::Chord* DummyElement::chord()
+Chord* DummyElement::chord()
 {
     return m_chord;
 }
 
-Ms::Note* DummyElement::note()
+Note* DummyElement::note()
 {
     return m_note;
 }
 
-Ms::EngravingItem* DummyElement::clone() const
+BracketItem* DummyElement::bracketItem()
+{
+    return m_bracketItem;
+}
+
+EngravingItem* DummyElement::clone() const
 {
     return nullptr;
 }
+
+#ifndef ENGRAVING_NO_ACCESSIBILITY
+AccessibleItemPtr DummyElement::createAccessible()
+{
+    return std::make_shared<AccessibleItem>(this, accessibility::IAccessible::Panel);
+}
+
+#endif

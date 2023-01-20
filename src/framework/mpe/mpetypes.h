@@ -32,9 +32,9 @@
 #include <set>
 #include <vector>
 
-#include "log.h"
-#include "sharedhashmap.h"
-#include "sharedmap.h"
+#include "types/sharedhashmap.h"
+#include "types/sharedmap.h"
+#include "realfn.h"
 
 #include "soundid.h"
 
@@ -104,6 +104,76 @@ struct ValuesCurve : public SharedMap<duration_percentage_t, T>
     {
         return this->empty() ? 0 : this->rbegin()->first - amplitudeValuePoint().first;
     }
+
+    float velocityFraction() const
+    {
+        auto amplitudePoint = amplitudeValuePoint();
+        duration_percentage_t duration = amplitudePoint.first;
+        T amplitude = amplitudePoint.second;
+
+        if (duration == 0) {
+            return 1.f;
+        }
+
+        float factor = log10f(amplitude / static_cast<float>(duration));
+
+        return (factor + 1.f) / 2.f;
+    }
+
+    void amplifyVelocity(const float requiredVelocityFraction)
+    {
+        if (RealIsEqual(requiredVelocityFraction, 0.f)) {
+            return;
+        }
+
+        ValuesCurve result;
+
+        if (RealIsEqualOrMore(requiredVelocityFraction, 0.5f)) {
+            accelerate(requiredVelocityFraction, result);
+        } else {
+            decelerate(requiredVelocityFraction, result);
+        }
+
+        *this = result;
+    }
+
+private:
+    void accelerate(const float requiredVelocityFraction, ValuesCurve& result)
+    {
+        float positionAmplifyFactor = std::pow(10.f, (requiredVelocityFraction * 2.f) - 1.f);
+
+        for (const auto& pair : *this) {
+            if (pair.first == 0 || pair.first == HUNDRED_PERCENT) {
+                result.insert({ pair.first, pair.second });
+                continue;
+            }
+
+            float newPointPositionCoef = (pair.second / static_cast<float>(pair.first)) * positionAmplifyFactor;
+            duration_percentage_t newPointPosition = static_cast<duration_percentage_t>(RealRound(pair.second / newPointPositionCoef, 0));
+
+            result.insert({ newPointPosition, pair.second });
+        }
+    }
+
+    void decelerate(const float requiredVelocityFraction, ValuesCurve& result)
+    {
+        float amplifyFactor = std::pow(10.f, (requiredVelocityFraction * 2.f) - 1.f);
+
+        auto amplitudePoint = amplitudeValuePoint();
+        T oldAmplitudeLevel = amplitudePoint.second;
+        T newAmplitudeLevel = amplitudePoint.first * amplifyFactor;
+
+        float ratio = newAmplitudeLevel / static_cast<float>(oldAmplitudeLevel);
+
+        for (const auto& pair : *this) {
+            if (pair.first == amplitudePoint.first) {
+                result.insert({ pair.first, newAmplitudeLevel });
+                continue;
+            }
+
+            result.insert({ pair.first, pair.second * ratio });
+        }
+    }
 };
 
 // Pitch
@@ -146,9 +216,10 @@ constexpr inline pitch_level_t pitchLevelDiff(const PitchClass fClass, const oct
     return pitchLevel(fClass, fOctave) - pitchLevel(sClass, sOctave);
 }
 
-constexpr inline int pitchStepsCount(const pitch_level_t pitchRange)
+constexpr inline size_t pitchStepsCount(const pitch_level_t pitchRange)
 {
-    return static_cast<int>(pitchRange / PITCH_LEVEL_STEP) + 1;
+    size_t range = pitchRange > 0 ? pitchRange : -pitchRange;
+    return range / PITCH_LEVEL_STEP;
 }
 
 // Expression
@@ -174,6 +245,7 @@ enum class ArticulationType {
     FadeOut,
 
     Harmonic,
+    JazzTone,
     Mute,
     Open,
     Pizzicato,
@@ -233,6 +305,8 @@ enum class ArticulationType {
     TrillBaroque,
     UpperMordent,
     LowerMordent,
+    UpperMordentBaroque,
+    LowerMordentBaroque,
     PrallMordent,
     MordentWithUpperPrefix,
     UpMordent,
@@ -287,6 +361,16 @@ inline bool isMultiNoteArticulation(const ArticulationType type)
     return !isSingleNoteArticulation(type);
 }
 
+inline bool isRangedArticulation(const ArticulationType type)
+{
+    if (isSingleNoteArticulation(type)) {
+        return false;
+    }
+
+    return type == ArticulationType::Legato
+           || type == ArticulationType::Pedal;
+}
+
 using dynamic_level_t = percentage_t;
 constexpr dynamic_level_t MAX_DYNAMIC_LEVEL = HUNDRED_PERCENT;
 constexpr dynamic_level_t MIN_DYNAMIC_LEVEL = 0;
@@ -295,25 +379,25 @@ constexpr dynamic_level_t DYNAMIC_LEVEL_STEP = 5 * ONE_PERCENT;
 enum class DynamicType {
     Undefined = -1,
     ppppppppp = MIN_DYNAMIC_LEVEL,
-    pppppppp = 5 * ONE_PERCENT,
-    ppppppp = 10 * ONE_PERCENT,
-    pppppp = 15 * ONE_PERCENT,
-    ppppp = 20 * ONE_PERCENT,
-    pppp = 25 * ONE_PERCENT,
-    ppp = 30 * ONE_PERCENT,
-    pp = 35 * ONE_PERCENT,
-    p = 40 * ONE_PERCENT,
-    mp = 45 * ONE_PERCENT,
+    pppppppp = static_cast<int>(7.5f * ONE_PERCENT),
+    ppppppp = static_cast<int>(12.5f * ONE_PERCENT),
+    pppppp = static_cast<int>(17.5f * ONE_PERCENT),
+    ppppp = static_cast<int>(22.5f * ONE_PERCENT),
+    pppp = static_cast<int>(27.5f * ONE_PERCENT),
+    ppp = static_cast<int>(32.5f * ONE_PERCENT),
+    pp = static_cast<int>(37.5f * ONE_PERCENT),
+    p = static_cast<int>(42.5f * ONE_PERCENT),
+    mp = static_cast<int>(47.5f * ONE_PERCENT),
     Natural = 50 * ONE_PERCENT,
-    mf = 55 * ONE_PERCENT,
-    f = 60 * ONE_PERCENT,
-    ff = 65 * ONE_PERCENT,
-    fff = 70 * ONE_PERCENT,
-    ffff = 75 * ONE_PERCENT,
-    fffff = 80 * ONE_PERCENT,
-    ffffff = 85 * ONE_PERCENT,
-    fffffff = 90 * ONE_PERCENT,
-    ffffffff = 95 * ONE_PERCENT,
+    mf = static_cast<int>(52.5f * ONE_PERCENT),
+    f = static_cast<int>(57.5f * ONE_PERCENT),
+    ff = static_cast<int>(62.5f * ONE_PERCENT),
+    fff = static_cast<int>(67.5f * ONE_PERCENT),
+    ffff = static_cast<int>(72.5f * ONE_PERCENT),
+    fffff = static_cast<int>(77.5f * ONE_PERCENT),
+    ffffff = static_cast<int>(82.5f * ONE_PERCENT),
+    fffffff = static_cast<int>(87.5f * ONE_PERCENT),
+    ffffffff = static_cast<int>(92.5f * ONE_PERCENT),
     fffffffff = MAX_DYNAMIC_LEVEL,
     Last
 };
@@ -666,6 +750,19 @@ struct ArticulationMap : public SharedHashMap<ArticulationType, ArticulationAppl
             return;
         }
 
+        if (size() == 1) {
+            const ArticulationPatternSegment& segment = cbegin()->second.appliedPatternSegment;
+
+            m_averageDurationFactor = segment.arrangementPattern.durationFactor;
+            m_averageTimestampOffset = segment.arrangementPattern.timestampOffset;
+            m_averageMaxAmplitudeLevel = segment.expressionPattern.maxAmplitudeLevel();
+            m_averagePitchRange = cbegin()->second.occupiedPitchChangesRange;
+            m_averageDynamicRange = cbegin()->second.occupiedDynamicChangesRange;
+            m_averageDynamicOffsetMap = segment.expressionPattern.dynamicOffsetMap;
+            m_averagePitchOffsetMap = segment.pitchPattern.pitchOffsetMap;
+            return;
+        }
+
         resetData();
 
         for (auto it = cbegin(); it != cend(); ++it) {
@@ -683,10 +780,22 @@ private:
         auto segmentDynamicOffsetIt = segment.expressionPattern.dynamicOffsetMap.cbegin();
         auto segmentPitchOffsetIt = segment.pitchPattern.pitchOffsetMap.cbegin();
 
+        bool hasMeaningDynamicOffset = segment.expressionPattern.maxAmplitudeLevel() != dynamicLevelFromType(DynamicType::Natural);
+        bool hasMeaningPitchOffset = segment.pitchPattern.maxAmplitudeLevel() != 0;
+
+        if (!hasMeaningDynamicOffset && !hasMeaningPitchOffset) {
+            return;
+        }
+
         while (segmentDynamicOffsetIt != segment.expressionPattern.dynamicOffsetMap.cend()
                && segmentPitchOffsetIt != segment.pitchPattern.pitchOffsetMap.cend()) {
-            averageDynamicOffsetIt->second += segmentDynamicOffsetIt->second;
-            averagePitchOffsetIt->second += segmentPitchOffsetIt->second;
+            if (hasMeaningDynamicOffset) {
+                averageDynamicOffsetIt->second += segmentDynamicOffsetIt->second;
+            }
+
+            if (hasMeaningPitchOffset) {
+                averagePitchOffsetIt->second += segmentPitchOffsetIt->second;
+            }
 
             ++averageDynamicOffsetIt;
             ++averagePitchOffsetIt;
@@ -764,6 +873,10 @@ private:
             for (auto& pair : m_averageDynamicOffsetMap) {
                 pair.second /= dynamicChangesCount;
             }
+        } else if (dynamicChangesCount == 0) {
+            m_averageMaxAmplitudeLevel = cbegin()->second.appliedPatternSegment.expressionPattern.maxAmplitudeLevel();
+            m_averageDynamicRange = cbegin()->second.meta.overallDynamicChangesRange;
+            m_averageDynamicOffsetMap = cbegin()->second.appliedPatternSegment.expressionPattern.dynamicOffsetMap;
         }
 
         if (pitchChangesCount > 0) {
@@ -772,6 +885,9 @@ private:
             for (auto& pair : m_averagePitchOffsetMap) {
                 pair.second /= pitchChangesCount;
             }
+        } else if (pitchChangesCount == 0) {
+            m_averagePitchRange = cbegin()->second.meta.overallPitchChangesRange;
+            m_averagePitchOffsetMap = cbegin()->second.appliedPatternSegment.pitchPattern.pitchOffsetMap;
         }
     }
 

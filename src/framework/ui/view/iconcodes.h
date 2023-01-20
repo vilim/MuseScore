@@ -99,8 +99,8 @@ public:
         ARROW_UP = 0xEF37,
         POSITION_ARROWS = 0xEF38,
         TEXT_ALIGN_BASELINE = 0xEF39,
-        TEXT_ALIGN_ABOVE = 0xEF3A,
-        TEXT_ALIGN_UNDER = 0xEF3B,
+        TEXT_ALIGN_BOTTOM = 0xEF3A,
+        TEXT_ALIGN_TOP = 0xEF3B,
         TEXT_ALIGN_MIDDLE = 0xEF3C,
         TEXT_ALIGN_LEFT = 0xEF3D,
         TEXT_ALIGN_CENTER = 0xEF3E,
@@ -124,10 +124,10 @@ public:
         VISIBILITY_ON = 0xEF53,
         VISIBILITY_OFF = 0xEF54,
         SETTINGS_COG = 0xEF55,
-        FEATHERED_RIGHT_HEIGHT = 0xEF56,
-        FEATHERED_LEFT_HEIGHT = 0xEF57,
-        BEAM_RIGHT_Y_POSITION = 0xEF5A,
-        BEAM_LEFT_Y_POSITION = 0xEF5B,
+        BEAM_FEATHERING_RIGHT_HEIGHT = 0xEF56,
+        BEAM_FEATHERING_LEFT_HEIGHT = 0xEF57,
+        BEAM_HEIGHT_LEFT = 0xEF5A,
+        BEAM_HEIGHT_RIGHT = 0xEF5B,
         LOCK_CLOSED = 0xEF5C,
         LOCK_OPEN = 0xEF5D,
         DOT_ABOVE_LINE = 0xEF5E,
@@ -173,8 +173,8 @@ public:
         LINE_WITH_END_HOOK = 0xEF85,
         LINE_WITH_ANGLED_END_HOOK = 0xEF86,
         LINE_PEDAL_STAR_ENDING = 0xEF87,
-        BEAM_FEATHERING_LEFT = 0xEF88,
-        BEAM_FEATHERING_RIGHT = 0xEF89,
+        BEAM_FEATHERED_ACCELERATE = 0xEF88,
+        BEAM_FEATHERED_DECELERATE = 0xEF89,
 
         RIGHT_GAP = 0xEF90,
         LEFT_GAP = 0xEF91,
@@ -203,10 +203,10 @@ public:
 
         AUTO_TEXT = 0xF329,
         NOTE_HEAD_EIGHTH = 0xF33A,
-        BEAM_START = 0xF33B,
-        BEAM_MIDDLE = 0xF33D,
-        BEAM_32 = 0xF33E,
-        BEAM_64 = 0xF33F,
+        BEAM_BREAK_LEFT = 0xF33B,
+        BEAM_JOIN = 0xF33D,
+        BEAM_BREAK_INNER_8TH = 0xF33E,
+        BEAM_BREAK_INNER_16TH = 0xF33F,
 
         QUESTION_MARK = 0xF340,
 
@@ -298,6 +298,9 @@ public:
         PASTE = 0xF399,
         CUT = 0xF39A,
 
+        CHEVRON_RIGHT = 0xF39B,
+        CHEVRON_LEFT = 0xF39C,
+
         NOTE_PLUS = 0xF39D,
         NOTE_TO_RIGHT = 0xF39E,
         RHYTHM_ONLY = 0xF39F,
@@ -367,7 +370,14 @@ public:
 
         INSERT_ONE_MEASURE = 0xF432,
 
+        CLOUD = 0xF435,
+
         CROSS_STAFF_BEAMING = 0xF43D,
+
+        TEMPO_CHANGE = 0xF43F,
+
+        PLUGIN = 0xF440,
+        LYRICS = 0xF441,
 
         NONE = 0xFFFF
     };

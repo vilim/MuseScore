@@ -26,8 +26,10 @@
 #include "engraving/libmscore/page.h"
 #include "engraving/libmscore/system.h"
 #include "engraving/libmscore/repeatlist.h"
+#include "engraving/libmscore/masterscore.h"
 
-#include "engraving/paint/paint.h"
+#include "engraving/infrastructure/paint.h"
+#include "notation/view/playbackcursor.h"
 
 #include "log.h"
 
@@ -46,13 +48,13 @@ bool VideoWriter::supportsUnitType(UnitType unitType) const
     return std::find(unitTypes.cbegin(), unitTypes.cend(), unitType) != unitTypes.cend();
 }
 
-mu::Ret VideoWriter::write(INotationProjectPtr, io::Device&, const Options&)
+mu::Ret VideoWriter::write(INotationProjectPtr, QIODevice&, const Options&)
 {
     NOT_SUPPORTED;
     return make_ret(Ret::Code::NotSupported);
 }
 
-mu::Ret VideoWriter::write(INotationProjectPtr project, const io::path& filePath, const Options&)
+mu::Ret VideoWriter::write(INotationProjectPtr project, const io::path_t& filePath, const Options&)
 {
     Config cfg;
 
@@ -100,11 +102,14 @@ mu::Ret VideoWriter::write(INotationProjectPtr project, const io::path& filePath
     }
     cfg.bitrate = int(br * 1000000);
 
+    cfg.leadingSec = configuration()->leadingSec();
+    cfg.trailingSec = configuration()->trailingSec();
+
     Ret ret = generatePagedOriginalVideo(project, filePath, cfg);
     return ret;
 }
 
-mu::Ret VideoWriter::generatePagedOriginalVideo(INotationProjectPtr project, const io::path& filePath, const Config& config)
+mu::Ret VideoWriter::generatePagedOriginalVideo(INotationProjectPtr project, const io::path_t& filePath, const Config& config)
 {
     // --score-video -o ./simple5.mp4 ./simple5.mscz
 
@@ -116,7 +121,7 @@ mu::Ret VideoWriter::generatePagedOriginalVideo(INotationProjectPtr project, con
 
     IMasterNotationPtr masterNotation = project->masterNotation();
 
-    Ms::MasterScore* score = masterNotation->notation()->elements()->msScore()->masterScore();
+    engraving::MasterScore* score = masterNotation->notation()->elements()->msScore()->masterScore();
 
     const double CANVAS_DPI = 300;
     const draw::Color CURSOR_COLOR = draw::Color(0, 0, 255, 50);
@@ -130,32 +135,32 @@ mu::Ret VideoWriter::generatePagedOriginalVideo(INotationProjectPtr project, con
     score->setShowUnprintable(false);
     score->setShowVBox(false);
 
-    score->setStyleValue(Ms::Sid::pageHeight, config.height / CANVAS_DPI);
-    score->setStyleValue(Ms::Sid::pageWidth, config.width / CANVAS_DPI);
-    score->setStyleValue(Ms::Sid::pagePrintableWidth, score->styleD(Ms::Sid::pageWidth)
-                         - score->styleD(Ms::Sid::pageOddLeftMargin)
-                         - score->styleD(Ms::Sid::pageEvenLeftMargin));
+    score->setStyleValue(engraving::Sid::pageHeight, config.height / CANVAS_DPI);
+    score->setStyleValue(engraving::Sid::pageWidth, config.width / CANVAS_DPI);
+    score->setStyleValue(engraving::Sid::pagePrintableWidth, score->styleD(engraving::Sid::pageWidth)
+                         - score->styleD(engraving::Sid::pageOddLeftMargin)
+                         - score->styleD(engraving::Sid::pageEvenLeftMargin));
 
-    score->setStyleValue(Ms::Sid::pageEvenTopMargin, 0.0);
-    score->setStyleValue(Ms::Sid::pageEvenBottomMargin, 0.0);
-    score->setStyleValue(Ms::Sid::pageOddTopMargin, 0.0);
-    score->setStyleValue(Ms::Sid::pageOddBottomMargin, 0.0);
-    score->setStyleValue(Ms::Sid::pageTwosided, false);
-    score->setStyleValue(Ms::Sid::showHeader, false);
-    score->setStyleValue(Ms::Sid::showFooter, false);
+    score->setStyleValue(engraving::Sid::pageEvenTopMargin, 0.0);
+    score->setStyleValue(engraving::Sid::pageEvenBottomMargin, 0.0);
+    score->setStyleValue(engraving::Sid::pageOddTopMargin, 0.0);
+    score->setStyleValue(engraving::Sid::pageOddBottomMargin, 0.0);
+    score->setStyleValue(engraving::Sid::pageTwosided, false);
+    score->setStyleValue(engraving::Sid::showHeader, false);
+    score->setStyleValue(engraving::Sid::showFooter, false);
 
-    score->setStyleValue(Ms::Sid::minSystemDistance, Ms::Spatium(10));
-    score->setStyleValue(Ms::Sid::maxSystemDistance, Ms::Spatium(10));
-    score->setStyleValue(Ms::Sid::staffLowerBorder, Ms::Spatium(5));
-    score->setStyleValue(Ms::Sid::staffUpperBorder, Ms::Spatium(7));
+    score->setStyleValue(engraving::Sid::minSystemDistance, engraving::Spatium(10));
+    score->setStyleValue(engraving::Sid::maxSystemDistance, engraving::Spatium(10));
+    score->setStyleValue(engraving::Sid::staffLowerBorder, engraving::Spatium(5));
+    score->setStyleValue(engraving::Sid::staffUpperBorder, engraving::Spatium(7));
 
     score->setLayoutAll();
     score->update();
 
     // Setup painting
     QImage frame(config.width, config.height, QImage::Format_RGB32);
-    frame.setDotsPerMeterX(std::lrint((CANVAS_DPI * 1000) / Ms::INCH));
-    frame.setDotsPerMeterY(std::lrint((CANVAS_DPI * 1000) / Ms::INCH));
+    frame.setDotsPerMeterX(std::lrint((CANVAS_DPI * 1000) / engraving::INCH));
+    frame.setDotsPerMeterY(std::lrint((CANVAS_DPI * 1000) / engraving::INCH));
 
     QPainter qp(&frame);
     qp.setRenderHint(QPainter::Antialiasing, true);
@@ -185,6 +190,9 @@ mu::Ret VideoWriter::generatePagedOriginalVideo(INotationProjectPtr project, con
         return nullptr;
     };
 
+    PlaybackCursor cursor;
+    cursor.setNotation(masterNotation->notation());
+
     for (int f = 0; f < frameCount; f++) {
         float currentTimeSec = (qreal)f / config.fps;
         currentTimeSec -= config.leadingSec;
@@ -195,7 +203,7 @@ mu::Ret VideoWriter::generatePagedOriginalVideo(INotationProjectPtr project, con
             currentTimeSec = totalPlayTimeSec;
         }
 
-        midi::tick_t tick = playback->secToPlayedtick(currentTimeSec);
+        midi::tick_t tick = playback->secToPlayedTick(currentTimeSec);
 
         const Page* page = pageByTick(pages, tick);
         if (!page) {
@@ -211,7 +219,9 @@ mu::Ret VideoWriter::generatePagedOriginalVideo(INotationProjectPtr project, con
 
         painting->paintPrint(&painter, opt);
 
-        RectF cursorRect = playback->playbackCursorRectByTick(tick);
+        cursor.move(tick);
+
+        RectF cursorRect = cursor.rect();
         PointF pagePos = page->pos();
         RectF cursorAbsRect = cursorRect.translated(-pagePos);
 

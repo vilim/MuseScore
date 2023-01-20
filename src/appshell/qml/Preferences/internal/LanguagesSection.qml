@@ -28,19 +28,21 @@ import MuseScore.UiComponents 1.0
 BaseSection {
     id: root
 
-    title: qsTrc("appshell", "Languages")
+    title: qsTrc("appshell/preferences", "Languages")
 
     navigation.direction: NavigationPanel.Horizontal
 
     property alias languages: dropdown.model
     property string currentLanguageCode: ""
+    property bool isNeedRestart: false
 
     signal languageSelected(string languageCode)
     signal checkForUpdateRequested()
 
-    function setUpdateProgress(progressValue, progressStatus) {
-        progressBtn.value = progressValue
-        progressBtn.progressStatus = progressStatus
+    function setUpdateProgress(current, total, status) {
+        progressBtn.to = total
+        progressBtn.value = current
+        progressBtn.progressStatus = status
     }
 
     Row {
@@ -74,7 +76,7 @@ BaseSection {
 
             anchors.verticalCenter: parent.verticalCenter
 
-            text: qsTrc("appshell", "Check for update")
+            text: qsTrc("appshell/preferences", "Check for language updates")
 
             navigationName: "CheckForUpdate"
             navigationPanel: root.navigation
@@ -84,5 +86,10 @@ BaseSection {
                 root.checkForUpdateRequested()
             }
         }
+    }
+
+    StyledTextLabel {
+        text: qsTrc("appshell/preferences", "Restart required")
+        visible: root.isNeedRestart
     }
 }

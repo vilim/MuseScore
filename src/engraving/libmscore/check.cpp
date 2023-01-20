@@ -20,29 +20,25 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QFile>
-
-#include "factory.h"
-#include "score.h"
-#include "slur.h"
-#include "measure.h"
-#include "tuplet.h"
 #include "chordrest.h"
+#include "factory.h"
+#include "keysig.h"
+#include "measure.h"
 #include "rest.h"
+#include "score.h"
 #include "segment.h"
 #include "staff.h"
-#include "keysig.h"
-#include "clef.h"
+#include "tuplet.h"
 #include "utils.h"
+
+#include "engravingerrors.h"
 
 #include "log.h"
 
 using namespace mu;
 using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   checkScore
 //---------------------------------------------------------
@@ -58,7 +54,7 @@ void Score::checkScore()
 
         if (s->segmentType() & (SegmentType::ChordRest)) {
             bool empty = true;
-            foreach (EngravingItem* e, s->elist()) {
+            for (EngravingItem* e : s->elist()) {
                 if (e) {
                     empty = false;
                     break;
@@ -110,11 +106,11 @@ void Score::checkScore()
 ///    Check that voices > 1 contains less than measure duration
 //---------------------------------------------------------
 
-bool Score::sanityCheck(const QString& name)
+Ret Score::sanityCheck()
 {
-    bool result = true;
+    StringList errors;
     int mNumber = 1;
-    QString error;
+
     for (Measure* m = firstMeasure(); m; m = m->nextMeasure()) {
         Fraction mLen = m->ticks();
         size_t endStaff  = staves().size();
@@ -139,59 +135,37 @@ bool Score::sanityCheck(const QString& name)
                     }
                 }
             }
+
             if (voices[0] != mLen) {
-                QString msg = QObject::tr("Measure %1, staff %2 incomplete. Expected: %3; Found: %4").arg(mNumber).arg(staffIdx + 1).arg(
-                    mLen.toString(), voices[0].toString());
-                LOGE() << msg;
-                error += QString("%1\n").arg(msg);
+                errors << mtrc("engraving", u"<b>Incomplete measure</b>: Measure %1, Staff %2. Found: %3. Expected: %4.")
+                    .arg(mNumber).arg(staffIdx + 1).arg(voices[0].toString(), mLen.toString());
 #ifndef NDEBUG
                 m->setCorrupted(staffIdx, true);
 #endif
-                result = false;
                 // try to fix a bad full measure rest
                 if (fmrest0) {
                     // fmrest0->setDuration(mLen * fmrest0->staff()->timeStretch(fmrest0->tick()));
                     fmrest0->setTicks(mLen);
-                    if (fmrest0->actualTicks() != mLen) {
-                        fprintf(stderr, "whoo???\n");
-                    }
                 }
             }
             for (voice_idx_t v = 1; v < VOICES; ++v) {
                 if (voices[v] > mLen) {
-                    QString msg = QObject::tr("Measure %1, staff %2, voice %3 too long. Expected: %4; Found: %5").arg(mNumber).arg(
-                        staffIdx + 1).arg(v + 1).arg(mLen.toString(), voices[v].toString());
-                    LOGE() << msg;
-                    error += QString("%1\n").arg(msg);
+                    errors << mtrc("engraving", u"<b>Voice too long</b>: Measure %1, Staff %2, Voice %3. Found: %4. Expected: %5.")
+                        .arg(mNumber).arg(staffIdx + 1).arg(v + 1).arg(voices[v].toString(), mLen.toString());
 #ifndef NDEBUG
                     m->setCorrupted(staffIdx, true);
 #endif
-                    result = false;
                 }
             }
         }
         mNumber++;
     }
-    if (!name.isEmpty()) {
-        QJsonObject json;
-        if (result) {
-            json["result"] = 0;
-        } else {
-            json["result"] = 1;
-            json["error"] = error.trimmed().replace("\n", "\\n");
-        }
-        QJsonDocument jsonDoc(json);
-        QFile fp(name);
-        if (!fp.open(QIODevice::WriteOnly)) {
-            LOGD("Open <%s> failed", qPrintable(name));
-            return false;
-        }
-        fp.write(jsonDoc.toJson(QJsonDocument::Compact));
-        fp.close();
-    } else {
-        MScore::lastError = error;
+
+    if (errors.empty()) {
+        return make_ok();
     }
-    return result;
+
+    return Ret(static_cast<int>(Err::FileCorrupted), errors.join(u"\n").toStdString());
 }
 
 //---------------------------------------------------------
@@ -228,7 +202,7 @@ bool Score::checkKeys()
 
 void Measure::fillGap(const Fraction& pos, const Fraction& len, track_idx_t track, const Fraction& stretch, bool useGapRests)
 {
-    LOGD("measure %6d pos %d, len %d/%d, stretch %d/%d track %zu",
+    LOGN("measure %6d pos %d, len %d/%d, stretch %d/%d track %zu",
          tick().ticks(),
          pos.ticks(),
          len.numerator(), len.denominator(),
@@ -278,11 +252,11 @@ void Measure::checkMeasure(staff_idx_t staffIdx, bool useGapRests)
             currentPos    = seg->rtick() * stretch;
 
             if (currentPos < expectedPos) {
-                LOGD("in measure overrun %6d at %d-%d track %zu", tick().ticks(),
+                LOGN("in measure overrun %6d at %d-%d track %zu", tick().ticks(),
                      (currentPos / stretch).ticks(), (expectedPos / stretch).ticks(), track);
                 break;
             } else if (currentPos > expectedPos) {
-                LOGD("in measure underrun %6d at %d-%d track %zu", tick().ticks(),
+                LOGN("in measure underrun %6d at %d-%d track %zu", tick().ticks(),
                      (currentPos / stretch).ticks(), (expectedPos / stretch).ticks(), track);
                 fillGap(expectedPos, currentPos - expectedPos, track, stretch, useGapRests);
             }

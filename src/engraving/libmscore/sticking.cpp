@@ -28,7 +28,7 @@
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   stickingStyle
 //---------------------------------------------------------
@@ -54,12 +54,12 @@ Sticking::Sticking(Segment* parent)
 
 void Sticking::write(XmlWriter& xml) const
 {
-    if (!xml.canWrite(this)) {
+    if (!xml.context()->canWrite(this)) {
         return;
     }
-    xml.startObject(this);
+    xml.startElement(this);
     TextBase::writeProperties(xml);
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -78,15 +78,6 @@ bool Sticking::isEditAllowed(EditData& ed) const
     }
 
     return TextBase::isEditAllowed(ed);
-}
-
-bool Sticking::edit(EditData& ed)
-{
-    if (!isEditAllowed(ed)) {
-        return false;
-    }
-
-    return TextBase::edit(ed);
 }
 
 //---------------------------------------------------------

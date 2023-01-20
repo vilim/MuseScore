@@ -41,11 +41,11 @@ PopupView {
 
     property alias animationEnabled: content.animationEnabled
 
-    property alias isCloseByEscape: content.isCloseByEscape
+    property alias closeOnEscape: content.closeOnEscape
     property alias navigationSection: content.navigationSection
 
-    contentWidth: 240
-    contentHeight: content.contentBodyHeight
+    property int contentWidth: 240
+    property int contentHeight: content.contentBodyHeight
 
     closePolicy: PopupView.CloseOnPressOutsideParent
 
@@ -65,8 +65,6 @@ PopupView {
 
         objectName: "Popup"
 
-        property alias cascadeAlign: root.cascadeAlign
-
         contentWidth: root.contentWidth
         contentHeight: root.contentHeight
 
@@ -76,6 +74,8 @@ PopupView {
         arrowX: root.arrowX
         opensUpward: root.opensUpward
         isOpened: root.isOpened
+
+        enabled: root.isOpened
 
         onCloseRequested: {
             root.close()

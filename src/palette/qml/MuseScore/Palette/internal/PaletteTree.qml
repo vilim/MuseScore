@@ -47,12 +47,16 @@ StyledListView {
     property string filter: ""
     property bool searchOpened: false
 
+    property bool isResultFound: count !== 0
+
     property bool enableAnimations: true
     property int expandDuration: enableAnimations ? 150 : 0 // duration of expand / collapse animations
 
     preferredHighlightBegin: Math.min(48, Math.floor(0.1 * height))
     preferredHighlightEnd: Math.ceil(height - preferredHighlightBegin)
     highlightRangeMode: itemDragged ? ListView.ApplyRange : ListView.NoHighlightRange
+
+    cacheBuffer: 3000
 
     NavigationPanel {
         id: keynavTree
@@ -403,7 +407,7 @@ StyledListView {
                 paletteTree.paletteController.remove(modelIndex);
             }
 
-            text: filter.length ? qsTrc("palette", "%1, contains %n matching element(s)", "palette", mainPalette.count).arg(model.accessibleText)
+            text: filter.length ? qsTrc("palette", "%1, contains %n matching element(s)", "", mainPalette.count).arg(model.accessibleText)
                                 : model.expanded ? qsTrc("palette", "%1 expanded", "tree item not collapsed").arg(model.accessibleText)
                                                  : model.accessibleText
 
@@ -539,7 +543,7 @@ StyledListView {
 
                     onHideSelectedElementsRequested: paletteTree.removeSelectedItems(control.modelIndex);
 
-                    onInsertNewPaletteRequested: paletteTree.insertCustomPalette(control.rowIndex);
+                    onInsertNewPaletteRequested: paletteTree.insertCustomPalette(control.rowIndex, qsTrc("palette", "Untitled palette"));
                     onHidePaletteRequested: control.hidePalette();
 
                     paletteProvider: paletteTree.paletteProvider

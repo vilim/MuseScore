@@ -64,10 +64,12 @@ PreferencesPage {
             Layout.fillHeight: true
 
             keyRoleName: "keyRole"
-            keyTitle: qsTrc("appshell", "Preference")
+            keyTitle: qsTrc("appshell/preferences", "Preference")
             valueRoleName: "valueRole"
-            valueTitle: qsTrc("appshell", "Value")
+            valueTitle: qsTrc("appshell/preferences", "Value")
             valueTypeRole: "typeRole"
+            minValueRoleName: "minValueRole"
+            maxValueRoleName: "maxValueRole"
 
             navigationSection: root.navigationSection
             navigationOrderStart: root.navigationOrderStart + 2

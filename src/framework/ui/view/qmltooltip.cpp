@@ -21,59 +21,77 @@
  */
 #include "qmltooltip.h"
 
-#include <QWidget>
-#include <QToolTip>
 #include <QGuiApplication>
-#include <QStyleHints>
-#include <QCursor>
-#include <QQuickWindow>
 
-#include "log.h"
+static constexpr int INTERVAL = 500;
 
 using namespace mu::ui;
 
 QmlToolTip::QmlToolTip(QObject* parent)
     : QObject(parent)
 {
-    m_timer.setSingleShot(true);
-    connect(&m_timer, &QTimer::timeout, this, &QmlToolTip::doShow);
+    connect(&m_openTimer, &QTimer::timeout, this, &QmlToolTip::doShow);
+
+    m_closeTimer.setSingleShot(true);
+    connect(&m_closeTimer, &QTimer::timeout, this, &QmlToolTip::doHide);
+
+    qApp->installEventFilter(this);
 }
 
 void QmlToolTip::show(QQuickItem* item, const QString& title, const QString& description, const QString& shortcut)
 {
     if (item == m_item) {
+        m_closeTimer.stop();
         return;
     }
 
-    doHide();
-
-    m_item = item;
     m_title = title;
     m_description = description;
     m_shortcut = shortcut;
 
-    if (m_item) {
+    bool toolTipNotOpened = m_item == nullptr;
+    bool openTimerStarted = m_openTimer.isActive();
+
+    m_item = item;
+    m_shouldBeClosed = false;
+
+    if (toolTipNotOpened || openTimerStarted) {
         connect(m_item, &QObject::destroyed, this, &QmlToolTip::doHide);
 
-        const int interval = item ? qApp->styleHints()->mousePressAndHoldInterval() : 100;
-        m_timer.start(interval);
+        m_openTimer.start(INTERVAL);
     } else {
-        doHide();
+        doShow();
     }
 }
 
-void QmlToolTip::hide(QQuickItem* item)
+void QmlToolTip::hide(QQuickItem* item, bool force)
 {
     if (m_item != item) {
         return;
     }
 
-    doHide();
+    m_shouldBeClosed = true;
+
+    if (force) {
+        doHide();
+        return;
+    }
+
+    m_closeTimer.start(INTERVAL);
 }
 
 void QmlToolTip::doShow()
 {
+    m_openTimer.stop();
+    m_closeTimer.stop();
+
     if (!m_item) {
+        return;
+    }
+
+    if (m_shouldBeClosed) {
+        m_item = nullptr;
+        m_shouldBeClosed = false;
         return;
     }
 
@@ -82,15 +100,31 @@ void QmlToolTip::doShow()
 
 void QmlToolTip::doHide()
 {
+    if (!m_shouldBeClosed) {
+        return;
+    }
+
     if (m_item) {
         disconnect(m_item, &QObject::destroyed, this, &QmlToolTip::doHide);
     }
 
-    m_timer.stop();
+    m_openTimer.stop();
+    m_closeTimer.stop();
+
     m_item = nullptr;
     m_title = QString();
     m_description = QString();
     m_shortcut = QString();
 
     emit hideToolTip();
+}
+
+bool QmlToolTip::eventFilter(QObject*, QEvent* event)
+{
+    if (event->type() == QEvent::Wheel) {
+        m_shouldBeClosed = true;
+        doHide();
+    }
+
+    return false;
 }

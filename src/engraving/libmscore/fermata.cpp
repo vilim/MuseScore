@@ -22,24 +22,26 @@
 
 #include "fermata.h"
 
-#include "log.h"
 #include "rw/xml.h"
 #include "types/symnames.h"
+#include "types/translatablestring.h"
 
-#include "score.h"
+#include "chord.h"
 #include "chordrest.h"
-#include "system.h"
 #include "measure.h"
+#include "note.h"
+#include "page.h"
+#include "score.h"
 #include "staff.h"
 #include "stafftype.h"
-#include "undo.h"
-#include "page.h"
-#include "barline.h"
+#include "system.h"
+
+#include "log.h"
 
 using namespace mu;
 using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   fermataStyle
 //---------------------------------------------------------
@@ -58,7 +60,6 @@ Fermata::Fermata(EngravingItem* parent)
 {
     setPlacement(PlacementV::ABOVE);
     _symId         = SymId::noSym;
-    _timeStretch   = 1.0;
     setPlay(true);
     initElementStyle(&fermataStyle);
 }
@@ -82,10 +83,10 @@ void Fermata::read(XmlReader& e)
 
 bool Fermata::readProperties(XmlReader& e)
 {
-    const QStringRef& tag(e.name());
+    const AsciiStringView tag(e.name());
 
     if (tag == "subtype") {
-        QString s = e.readElementText();
+        AsciiStringView s = e.readAsciiText();
         SymId id = SymNames::symIdByName(s);
         setSymId(id);
     } else if (tag == "play") {
@@ -111,11 +112,11 @@ bool Fermata::readProperties(XmlReader& e)
 
 void Fermata::write(XmlWriter& xml) const
 {
-    if (!xml.canWrite(this)) {
+    if (!xml.context()->canWrite(this)) {
         LOGD("%s not written", typeName());
         return;
     }
-    xml.startObject(this);
+    xml.startElement(this);
     xml.tag("subtype", SymNames::nameForSymId(_symId));
     writeProperty(xml, Pid::TIME_STRETCH);
     writeProperty(xml, Pid::PLAY);
@@ -124,7 +125,7 @@ void Fermata::write(XmlWriter& xml) const
         writeProperty(xml, Pid::OFFSET);
     }
     EngravingItem::writeProperties(xml);
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -133,9 +134,9 @@ void Fermata::write(XmlWriter& xml) const
 
 int Fermata::subtype() const
 {
-    QString s = SymNames::nameForSymId(_symId);
-    if (s.endsWith("Below")) {
-        return int(SymNames::symIdByName(s.left(s.size() - 5) + "Above"));
+    String s = String::fromAscii(SymNames::nameForSymId(_symId).ascii());
+    if (s.endsWith(u"Below")) {
+        return int(SymNames::symIdByName(s.left(s.size() - 5) + u"Above"));
     } else {
         return int(_symId);
     }
@@ -145,9 +146,9 @@ int Fermata::subtype() const
 //   typeUserName
 //---------------------------------------------------------
 
-QString Fermata::typeUserName() const
+TranslatableString Fermata::typeUserName() const
 {
-    return SymNames::translatedUserNameForSymId(symId());
+    return TranslatableString("engraving/sym", SymNames::userNameForSymId(symId()));
 }
 
 //---------------------------------------------------------
@@ -211,6 +212,14 @@ Page* Fermata::page() const
 
 void Fermata::layout()
 {
+    const StaffType* stType = staffType();
+
+    _skipDraw = false;
+    if (stType && stType->isHiddenElementOnTab(score(), Sid::fermataShowTabCommon, Sid::fermataShowTabSimple)) {
+        _skipDraw = true;
+        return;
+    }
+
     Segment* s = segment();
     setPos(PointF());
     if (!s) {            // for use in palette
@@ -226,21 +235,24 @@ void Fermata::layout()
     EngravingItem* e = s->element(track());
     if (e) {
         if (e->isChord()) {
-            rxpos() += score()->noteHeadWidth() * staff()->staffMag(Fraction(0, 1)) * .5;
+            Chord* chord = toChord(e);
+            Note* note = chord->up() ? chord->downNote() : chord->upNote();
+            double offset = chord->xpos() + note->xpos() + note->headWidth() / 2;
+            movePosX(offset);
         } else {
-            rxpos() += e->x() + e->width() * staff()->staffMag(Fraction(0, 1)) * .5;
+            movePosX(e->x() - e->shape().left() + e->width() * staff()->staffMag(Fraction(0, 1)) * .5);
         }
     }
 
-    QString name = SymNames::nameForSymId(_symId);
+    String name = String::fromAscii(SymNames::nameForSymId(_symId).ascii());
     if (placeAbove()) {
-        if (name.endsWith("Below")) {
-            _symId = SymNames::symIdByName(name.left(name.size() - 5) + "Above");
+        if (name.endsWith(u"Below")) {
+            _symId = SymNames::symIdByName(name.left(name.size() - 5) + u"Above");
         }
     } else {
-        rypos() += staff()->height();
-        if (name.endsWith("Above")) {
-            _symId = SymNames::symIdByName(name.left(name.size() - 5) + "Below");
+        movePosY(staff()->height());
+        if (name.endsWith(u"Above")) {
+            _symId = SymNames::symIdByName(name.left(name.size() - 5) + u"Below");
         }
     }
     RectF b(symBbox(_symId));
@@ -290,10 +302,10 @@ bool Fermata::setProperty(Pid propertyId, const PropertyValue& v)
     case Pid::PLACEMENT: {
         PlacementV p = v.value<PlacementV>();
         if (p != placement()) {
-            QString s = SymNames::nameForSymId(_symId);
+            String s = String::fromAscii(SymNames::nameForSymId(_symId).ascii());
             bool up = placeAbove();
-            if (s.endsWith(up ? "Above" : "Below")) {
-                QString s2 = s.left(s.size() - 5) + (up ? "Below" : "Above");
+            if (s.endsWith(up ? u"Above" : u"Below")) {
+                String s2 = s.left(s.size() - 5) + (up ? u"Below" : u"Above");
                 _symId = SymNames::symIdByName(s2);
             }
             setPlacement(p);
@@ -305,7 +317,7 @@ bool Fermata::setProperty(Pid propertyId, const PropertyValue& v)
         break;
     case Pid::TIME_STRETCH:
         setTimeStretch(v.toDouble());
-        score()->setUpTempoMap();
+        score()->setUpTempoMapLater();
         break;
     default:
         return EngravingItem::setProperty(propertyId, v);
@@ -324,7 +336,22 @@ PropertyValue Fermata::propertyDefault(Pid propertyId) const
     case Pid::PLACEMENT:
         return track() & 1 ? PlacementV::BELOW : PlacementV::ABOVE;
     case Pid::TIME_STRETCH:
-        return 1.0;           // articulationList[int(articulationType())].timeStretch;
+        switch (fermataType()) {
+        case FermataType::VeryShort:
+            return 1.25;
+        case FermataType::Short:
+        case FermataType::ShortHenze:
+            return 1.5;
+        case FermataType::Normal:
+        case FermataType::Undefined:
+            return 2.0;
+        case FermataType::Long:
+        case FermataType::LongHenze:
+            return 3.0;
+        case FermataType::VeryLong:
+            return 4.0;
+        }
+        break;
     case Pid::PLAY:
         return true;
     default:
@@ -351,18 +378,6 @@ void Fermata::resetProperty(Pid id)
 }
 
 //---------------------------------------------------------
-//   propertyId
-//---------------------------------------------------------
-
-Pid Fermata::propertyId(const QStringRef& xmlName) const
-{
-    if (xmlName == "subtype") {
-        return Pid::SYMBOL;
-    }
-    return EngravingItem::propertyId(xmlName);
-}
-
-//---------------------------------------------------------
 //   getPropertyStyle
 //---------------------------------------------------------
 
@@ -378,28 +393,34 @@ Sid Fermata::getPropertyStyle(Pid pid) const
 //   mag
 //---------------------------------------------------------
 
-qreal Fermata::mag() const
+double Fermata::mag() const
 {
     return staff() ? staff()->staffMag(tick()) * score()->styleD(Sid::articulationMag) : 1.0;
+}
+
+void Fermata::setSymId(SymId id)
+{
+    _symId  = id;
+    _timeStretch = _timeStretch == -1 ? propertyDefault(Pid::TIME_STRETCH).value<double>() : -1;
 }
 
 FermataType Fermata::fermataType() const
 {
     static const std::unordered_map<SymId, FermataType> FERMATA_TYPES = {
-        { Ms::SymId::fermataAbove, FermataType::Normal },
-        { Ms::SymId::fermataBelow, FermataType::Normal },
-        { Ms::SymId::fermataLongAbove, FermataType::Long },
-        { Ms::SymId::fermataLongBelow, FermataType::Long },
-        { Ms::SymId::fermataLongHenzeAbove, FermataType::LongHenze },
-        { Ms::SymId::fermataLongHenzeBelow, FermataType::LongHenze },
-        { Ms::SymId::fermataVeryLongAbove, FermataType::VeryLong },
-        { Ms::SymId::fermataVeryLongBelow, FermataType::VeryLong },
-        { Ms::SymId::fermataShortHenzeAbove, FermataType::ShortHenze },
-        { Ms::SymId::fermataShortHenzeBelow, FermataType::ShortHenze },
-        { Ms::SymId::fermataVeryShortAbove, FermataType::VeryShort },
-        { Ms::SymId::fermataVeryShortBelow, FermataType::VeryShort },
-        { Ms::SymId::fermataShortAbove, FermataType::Short },
-        { Ms::SymId::fermataShortBelow, FermataType::Short },
+        { SymId::fermataAbove, FermataType::Normal },
+        { SymId::fermataBelow, FermataType::Normal },
+        { SymId::fermataLongAbove, FermataType::Long },
+        { SymId::fermataLongBelow, FermataType::Long },
+        { SymId::fermataLongHenzeAbove, FermataType::LongHenze },
+        { SymId::fermataLongHenzeBelow, FermataType::LongHenze },
+        { SymId::fermataVeryLongAbove, FermataType::VeryLong },
+        { SymId::fermataVeryLongBelow, FermataType::VeryLong },
+        { SymId::fermataShortHenzeAbove, FermataType::ShortHenze },
+        { SymId::fermataShortHenzeBelow, FermataType::ShortHenze },
+        { SymId::fermataVeryShortAbove, FermataType::VeryShort },
+        { SymId::fermataVeryShortBelow, FermataType::VeryShort },
+        { SymId::fermataShortAbove, FermataType::Short },
+        { SymId::fermataShortBelow, FermataType::Short },
     };
 
     auto search = FERMATA_TYPES.find(symId());
@@ -415,9 +436,9 @@ FermataType Fermata::fermataType() const
 //   accessibleInfo
 //---------------------------------------------------------
 
-QString Fermata::accessibleInfo() const
+String Fermata::accessibleInfo() const
 {
-    return QString("%1: %2").arg(EngravingItem::accessibleInfo(), typeUserName());
+    return String(u"%1: %2").arg(EngravingItem::accessibleInfo(), translatedTypeUserName());
 }
 
 void Fermata::added()
@@ -426,7 +447,7 @@ void Fermata::added()
         return;
     }
 
-    score()->setUpTempoMap();
+    score()->setUpTempoMapLater();
 }
 
 void Fermata::removed()
@@ -435,6 +456,6 @@ void Fermata::removed()
         return;
     }
 
-    score()->setUpTempoMap();
+    score()->setUpTempoMapLater();
 }
 }

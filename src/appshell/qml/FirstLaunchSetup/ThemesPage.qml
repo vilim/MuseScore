@@ -29,8 +29,10 @@ import MuseScore.AppShell 1.0
 import "../shared"
 
 Page {
-    title: qsTrc("appshell", "Welcome to MuseScore 4")
-    explanation: qsTrc("appshell", "Let's get started by choosing a theme.")
+    id: root
+
+    title: qsTrc("appshell/gettingstarted", "Welcome to MuseScore 4")
+    explanation: qsTrc("appshell/gettingstarted", "Let's get started by choosing a theme.")
 
     titleContentSpacing: model.isFollowSystemThemeAvailable ? 24 : 28
 
@@ -51,7 +53,7 @@ Page {
             visible: model.isFollowSystemThemeAvailable
             Layout.alignment: Qt.AlignCenter
 
-            text: qsTrc("appshell", "Follow system theme")
+            text: qsTrc("appshell/gettingstarted", "Follow system theme")
 
             checked: model.isFollowSystemTheme
 
@@ -61,7 +63,7 @@ Page {
                 name: "FollowSystemThemeBox"
                 enabled: parent.enabled && parent.visible
                 section: root.navigationSection
-                order: 1
+                order: root.navigationStartRow + 1
                 direction: NavigationPanel.Horizontal
             }
 
@@ -80,7 +82,7 @@ Page {
             spacing: 48
 
             navigationPanel.section: root.navigationSection
-            navigationPanel.order: 2
+            navigationPanel.order: root.navigationStartRow + 2
 
             onThemeChangeRequested: function(newThemeCode) {
                 model.currentThemeCode = newThemeCode
@@ -100,7 +102,7 @@ Page {
             spacing: 4
 
             navigationPanel.section: root.navigationSection
-            navigationPanel.order: 3
+            navigationPanel.order: root.navigationStartRow + 3
 
             onAccentColorChangeRequested: function(newColorIndex) {
                 model.currentAccentColorIndex = newColorIndex
@@ -112,13 +114,13 @@ Page {
             visible: model.highContrastEnabled
             Layout.fillWidth: true
             Layout.preferredHeight: Math.max(implicitHeight, accentColorsList.implicitHeight)
-            text: qsTrc("appshell", "Further high contrast settings are available in Preferences.")
+            text: qsTrc("appshell/gettingstarted", "Further high contrast settings are available in Preferences.")
         }
 
         CheckBox {
             Layout.alignment: Qt.AlignCenter
 
-            text: qsTrc("appshell", "Enable high contrast")
+            text: qsTrc("appshell/gettingstarted", "Enable high contrast")
             checked: model.highContrastEnabled
 
             navigation.name: "EnableHighContrastCheckbox"
@@ -127,7 +129,7 @@ Page {
                 name: "EnableHighContrast"
                 enabled: parent.enabled && parent.visible
                 section: root.navigationSection
-                order: 4
+                order: root.navigationStartRow + 4
                 direction: NavigationPanel.Horizontal
             }
             navigation.accessible.description: highContrastPreferencesHintLabel.text

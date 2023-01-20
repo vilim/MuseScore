@@ -21,6 +21,8 @@
  */
 #include "importgtp.h"
 
+#include "serialization/zipreader.h"
+
 #include "gtp/gp7dombuilder.h"
 #include "libmscore/factory.h"
 #include "libmscore/bracketItem.h"
@@ -29,24 +31,59 @@
 #include "libmscore/part.h"
 #include "libmscore/staff.h"
 
-#include "thirdparty/qzip/qzipreader_p.h"
+#include "log.h"
 
+using namespace mu::io;
 using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   read
 //---------------------------------------------------------
 
-bool GuitarPro7::read(QFile* fp)
+bool GuitarPro7::read(IODevice* io)
 {
-    f = fp;
+    f = io;
     previousTempo = -1;
-    MQZipReader zip(fp);
-    QByteArray fileData = zip.fileData("Content/score.gpif");
+
+    ZipReader zip(io);
+    ByteArray fileData = zip.fileData("Content/score.gpif");
+    ByteArray partsData = zip.fileData("Content/PartConfiguration");
     zip.close();
+
+    m_properties = readProperties(&partsData);
+
     readGpif(&fileData);
     return true;
+}
+
+//---------------------------------------------------------
+//   readProperties
+//---------------------------------------------------------
+
+GuitarPro::GPProperties GuitarPro7::readProperties(ByteArray* data)
+{
+    GPProperties properties;
+    size_t partsInfoSize = data->size();
+    const size_t numInstrOffset = 8;
+    if (partsInfoSize <= numInstrOffset) {
+        LOGE() << "failed to read gp properties";
+        return properties;
+    }
+
+    size_t numberOfInstruments = static_cast<size_t>(data->at(numInstrOffset));
+    if (partsInfoSize <= numInstrOffset + numberOfInstruments) {
+        LOGE() << "failed to read gp properties";
+        return properties;
+    }
+
+    std::vector<TabImportOption> partsImportOpts = properties.partsImportOptions;
+
+    for (size_t i = numInstrOffset + 1; i <= numInstrOffset + numberOfInstruments; i++) {
+        partsImportOpts.push_back(static_cast<TabImportOption>(data->at(static_cast<int>(i))));
+    }
+
+    return properties;
 }
 
 std::unique_ptr<IGPDomBuilder> GuitarPro7::createGPDomBuilder() const

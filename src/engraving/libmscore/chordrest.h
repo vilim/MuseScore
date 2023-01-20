@@ -24,13 +24,11 @@
 #define __CHORDREST_H__
 
 #include <functional>
-#include "symbol.h"
-#include "duration.h"
-#include "beam.h"
-#include "shape.h"
-#include "measure.h"
 
-namespace Ms {
+#include "durationelement.h"
+#include "types/types.h"
+
+namespace mu::engraving {
 enum class CrossMeasure : signed char {
     UNKNOWN = -1,
     NONE = 0,
@@ -38,28 +36,28 @@ enum class CrossMeasure : signed char {
     SECOND
 };
 
-class Score;
-class Measure;
-class Tuplet;
-class Segment;
-class Slur;
 class Articulation;
 class Lyrics;
+class Measure;
+class Score;
+class Segment;
+class Slur;
 class TabDurationSymbol;
-class Spanner;
 enum class SegmentType;
 
 //-------------------------------------------------------------------
 //   ChordRest
 //    Virtual base class. Chords and rests can be part of a beam
-//
 //-------------------------------------------------------------------
 
 class ChordRest : public DurationElement
 {
+    OBJECT_ALLOCATOR(engraving, ChordRest)
+
     ElementList _el;
     TDuration _durationType;
-    int _staffMove;           // -1, 0, +1, used for crossbeaming
+    int _staffMove; // -1, 0, +1, used for crossbeaming
+    int _storedStaffMove = 0; // used to remember and re-apply staff move if needed
 
     void processSiblings(std::function<void(EngravingItem*)> func);
 
@@ -103,19 +101,19 @@ public:
     BeamMode beamMode() const { return _beamMode; }
 
     void setBeam(Beam* b);
-    virtual Beam* beam() const final { return !(measure() && measure()->stemless(staffIdx())) ? _beam : nullptr; }
+    virtual Beam* beam() const final;
     int beams() const { return _durationType.hooks(); }
-    virtual qreal upPos()   const = 0;
-    virtual qreal downPos() const = 0;
+    virtual double upPos()   const = 0;
+    virtual double downPos() const = 0;
 
     int line(bool up) const { return up ? upLine() : downLine(); }
     int line() const { return _up ? upLine() : downLine(); }
     virtual int upLine() const = 0;
     virtual int downLine() const = 0;
     virtual mu::PointF stemPos() const = 0;
-    virtual qreal stemPosX() const = 0;
+    virtual double stemPosX() const = 0;
     virtual mu::PointF stemPosBeam() const = 0;
-    virtual qreal rightEdge() const = 0;
+    virtual double rightEdge() const = 0;
 
     void setUp(bool val) { _up = val; }
     bool up() const { return _up; }
@@ -126,8 +124,10 @@ public:
     void undoSetSmall(bool val);
 
     int staffMove() const { return _staffMove; }
+    int storedStaffMove() const { return _storedStaffMove; }
     void setStaffMove(int val) { _staffMove = val; }
     staff_idx_t vStaffIdx() const override { return staffIdx() + _staffMove; }
+    void checkStaffMoveValidity();
 
     const TDuration durationType() const
     {
@@ -152,7 +152,7 @@ public:
         return _crossMeasure == CrossMeasure::FIRST ? _crossMeasureTDur.ticks() : _durationType.ticks();
     }
 
-    QString durationUserName() const;
+    String durationUserName() const;
 
     void setTrack(track_idx_t val) override;
 
@@ -181,10 +181,10 @@ public:
     TDuration crossMeasureDurationType() const { return _crossMeasureTDur; }
     void setCrossMeasureDurationType(TDuration v) { _crossMeasureTDur = v; }
 
-    void localSpatiumChanged(qreal oldValue, qreal newValue) override;
-    mu::engraving::PropertyValue getProperty(Pid propertyId) const override;
-    bool setProperty(Pid propertyId, const mu::engraving::PropertyValue&) override;
-    mu::engraving::PropertyValue propertyDefault(Pid) const override;
+    void localSpatiumChanged(double oldValue, double newValue) override;
+    PropertyValue getProperty(Pid propertyId) const override;
+    bool setProperty(Pid propertyId, const PropertyValue&) override;
+    PropertyValue propertyDefault(Pid) const override;
     bool isGrace() const;
     bool isGraceBefore() const;
     bool isGraceAfter() const;
@@ -200,7 +200,7 @@ public:
     EngravingItem* lastElementBeforeSegment();
     virtual EngravingItem* nextSegmentElement() override;
     virtual EngravingItem* prevSegmentElement() override;
-    virtual QString accessibleExtraInfo() const override;
+    virtual String accessibleExtraInfo() const override;
     virtual Shape shape() const override;
     virtual void computeUp() { _usesAutoUp = false; _up = true; }
 
@@ -211,5 +211,5 @@ public:
 
     void undoAddAnnotation(EngravingItem*);
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

@@ -23,20 +23,21 @@
 #ifndef __INSTRCHANGE_H__
 #define __INSTRCHANGE_H__
 
-#include <QCoreApplication>
+#include "textbase.h"
 
-#include "text.h"
 #include "instrument.h"
-#include "clef.h"
 
-namespace Ms {
+namespace mu::engraving {
+class Clef;
+
 //---------------------------------------------------------
 //   @@ InstrumentChange
 //---------------------------------------------------------
 
 class InstrumentChange final : public TextBase
 {
-    Q_DECLARE_TR_FUNCTIONS(InstrumentChange)
+    OBJECT_ALLOCATOR(engraving, InstrumentChange)
+
     Instrument* _instrument;    // Staff holds ownership if part of score
     bool _init = false;   // Set if the instrument has been set by the user, as there is no other way to tell.
 
@@ -67,9 +68,9 @@ public:
 
     Segment* segment() const { return toSegment(explicitParent()); }
 
-    mu::engraving::PropertyValue propertyDefault(Pid) const override;
+    PropertyValue propertyDefault(Pid) const override;
 
     bool placeMultiple() const override { return false; }
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

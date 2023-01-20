@@ -22,34 +22,29 @@
 
 #include "testbase.h"
 
-#include <QFile>
 #include <QProcess>
 #include <QTextStream>
 
-#include "config.h"
+#include "io/file.h"
+
 #include "libmscore/masterscore.h"
-#include "libmscore/musescoreCore.h"
 
 #include "engraving/compat/mscxcompat.h"
 #include "engraving/compat/scoreaccess.h"
 #include "engraving/compat/writescorehook.h"
-#include "engraving/infrastructure/io/localfileinfoprovider.h"
+#include "engraving/infrastructure/localfileinfoprovider.h"
 
 #include "log.h"
 
 using namespace mu;
+using namespace mu::io;
 using namespace mu::engraving;
 
-namespace Ms {
-extern Score::FileError importBB(MasterScore* score, const QString& name);
+namespace mu::iex::bb {
+extern Err importBB(MasterScore* score, const QString& name);
 }
 
-namespace Ms {
-MTest::MTest()
-{
-    MScore::testMode = true;
-}
-
+namespace mu::engraving {
 MasterScore* MTest::readScore(const QString& name)
 {
     QString path = root + "/" + name;
@@ -58,16 +53,16 @@ MasterScore* MTest::readScore(const QString& name)
     std::string suffix = io::suffix(path);
 
     ScoreLoad sl;
-    Score::FileError rv;
+    Err rv;
     if (suffix == "mscz" || suffix == "mscx") {
-        rv = compat::loadMsczOrMscx(score, path, false);
+        rv = static_cast<Err>(compat::loadMsczOrMscx(score, path, false).code());
     } else if (suffix == "sgu") {
-        rv = importBB(score, path);
+        rv = iex::bb::importBB(score, path);
     } else {
-        rv = Score::FileError::FILE_UNKNOWN_TYPE;
+        rv = Err::FileUnknownType;
     }
 
-    if (rv != Score::FileError::FILE_NO_ERROR) {
+    if (rv != Err::NoError) {
         LOGE() << "cannot load file at " << path;
         delete score;
         score = nullptr;
@@ -82,12 +77,12 @@ MasterScore* MTest::readScore(const QString& name)
 
 bool MTest::saveScore(Score* score, const QString& name) const
 {
-    QFile file(name);
+    File file(name);
     if (file.exists()) {
         file.remove();
     }
 
-    if (!file.open(QIODevice::ReadWrite)) {
+    if (!file.open(IODevice::ReadWrite)) {
         return false;
     }
     compat::WriteScoreHook hook;
@@ -131,15 +126,8 @@ bool MTest::saveCompareScore(Score* score, const QString& saveName, const QStrin
     return compareFiles(saveName, compareWith);
 }
 
-void MTest::initMTest(const QString& rootDir)
+void MTest::setRootDir(const QString& rootDir)
 {
-    MScore::noGui = true;
-
-    mscore = new MScore;
-    new MuseScoreCore;
-    mscore->init();
-
     root = rootDir;
-    loadInstrumentTemplates(":/data/instruments.xml");
 }
 }

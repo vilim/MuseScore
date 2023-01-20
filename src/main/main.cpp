@@ -29,6 +29,7 @@
 #include "appshell/appshell.h"
 
 #include "framework/global/globalmodule.h"
+#include "framework/draw/drawmodule.h"
 #include "framework/ui/uimodule.h"
 #include "framework/uicomponents/uicomponentsmodule.h"
 #include "framework/fonts/fontsmodule.h"
@@ -143,6 +144,12 @@
 #include "stubs/multiinstances/multiinstancesstubmodule.h"
 #endif
 
+#ifdef BUILD_UPDATE_MODULE
+#include "update/updatemodule.h"
+#else
+#include "stubs/update/updatestubmodule.h"
+#endif
+
 #include "diagnostics/diagnosticsmodule.h"
 
 #ifdef BUILD_AUTOBOT_MODULE
@@ -173,6 +180,7 @@ int main(int argc, char** argv)
     //! NOTE `diagnostics` must be first, because it installs the crash handler.
     //! For other modules, the order is (an should be) unimportant.
     app.addModule(new mu::diagnostics::DiagnosticsModule());
+    app.addModule(new mu::draw::DrawModule());
     app.addModule(new mu::fonts::FontsModule());
     app.addModule(new mu::ui::UiModule());
     app.addModule(new mu::uicomponents::UiComponentsModule());
@@ -278,6 +286,12 @@ int main(int argc, char** argv)
 #endif
 
     app.addModule(new mu::mi::MultiInstancesModule());
+
+#ifdef BUILD_UPDATE_MODULE
+    app.addModule(new mu::update::UpdateModule());
+#else
+    app.addModule(new mu::update::UpdateStubModule());
+#endif
 
 #ifdef BUILD_AUTOBOT_MODULE
     app.addModule(new mu::autobot::AutobotModule());

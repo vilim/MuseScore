@@ -75,6 +75,14 @@ static void clearRegistry()
     for (KDDockWidgets::DockWidgetBase* dock : registry->dockwidgets()) {
         registry->unregisterDockWidget(dock);
     }
+
+    for (KDDockWidgets::Frame* frame : registry->frames()) {
+        for (KDDockWidgets::DockWidgetBase* dock : frame->dockWidgets()) {
+            frame->removeWidget(dock);
+        }
+
+        registry->unregisterFrame(frame);
+    }
 }
 }
 
@@ -101,6 +109,7 @@ void DockWindow::componentComplete()
                                                       this);
 
     connect(qApp, &QCoreApplication::aboutToQuit, this, &DockWindow::onQuit);
+    connect(this, &QQuickItem::windowChanged, this, &DockWindow::windowPropertyChanged);
 }
 
 void DockWindow::geometryChanged(const QRectF& newGeometry, const QRectF& oldGeometry)
@@ -120,7 +129,7 @@ void DockWindow::geometryChanged(const QRectF& newGeometry, const QRectF& oldGeo
 
     QQuickItem::geometryChanged(newGeometry, oldGeometry);
 
-    alignToolBars(m_currentPage);
+    alignTopLevelToolBars(m_currentPage);
 }
 
 void DockWindow::onQuit()
@@ -151,6 +160,11 @@ QQmlListProperty<mu::dock::DockToolBarView> DockWindow::toolBarsProperty()
 QQmlListProperty<mu::dock::DockPageView> DockWindow::pagesProperty()
 {
     return m_pages.property();
+}
+
+QQuickWindow* DockWindow::windowProperty() const
+{
+    return window();
 }
 
 void DockWindow::init()
@@ -207,22 +221,28 @@ void DockWindow::loadPage(const QString& uri, const QVariantMap& params)
         return;
     }
 
-    emit currentPageUriChanged(uri);
+    auto notifyAboutPageLoaded = [this, &uri]() {
+        emit currentPageUriChanged(uri);
+        emit pageLoaded();
+        notifyAboutDocksOpenStatus();
+    };
 
     if (isFirstOpening) {
-        if (!m_hasGeometryBeenRestored
-            || (m_mainWindow->windowHandle()->windowStates() & QWindow::FullScreen)) {
-            //! NOTE: show window as maximized if no geometry has been restored
-            //! or if the user had closed app in FullScreen mode
-            m_mainWindow->windowHandle()->showMaximized();
-        } else {
-            m_mainWindow->windowHandle()->setVisible(true);
-        }
+        async::Async::call(this, [this, notifyAboutPageLoaded]() {
+            if (!m_hasGeometryBeenRestored
+                || (m_mainWindow->windowHandle()->windowStates() & QWindow::FullScreen)) {
+                //! NOTE: show window as maximized if no geometry has been restored
+                //! or if the user had closed app in FullScreen mode
+                m_mainWindow->windowHandle()->showMaximized();
+            } else {
+                m_mainWindow->windowHandle()->setVisible(true);
+            }
+
+            notifyAboutPageLoaded();
+        });
+    } else {
+        notifyAboutPageLoaded();
     }
-
-    emit pageLoaded();
-
-    notifyAboutDocksOpenStatus();
 }
 
 bool DockWindow::isDockOpen(const QString& dockName) const
@@ -276,8 +296,6 @@ QQuickItem& DockWindow::asItem() const
 void DockWindow::restoreDefaultLayout()
 {
     TRACEFUNC;
-
-    clearRegistry();
 
     if (m_currentPage) {
         for (DockBase* dock : m_currentPage->allDocks()) {
@@ -373,7 +391,7 @@ void DockWindow::loadPanels(const DockPageView* page)
     }
 }
 
-void DockWindow::alignToolBars(const DockPageView* page)
+void DockWindow::alignTopLevelToolBars(const DockPageView* page)
 {
     QList<DockToolBarView*> topToolBars = topLevelToolBars(page);
 
@@ -384,7 +402,7 @@ void DockWindow::alignToolBars(const DockPageView* page)
     int centralToolBarsWidth = 0;
     int rightToolBarsWidth = 0;
 
-    int separatorThicnkess = KDDockWidgets::Config::self().separatorThickness();
+    int separatorThickness = KDDockWidgets::Config::self().separatorThickness();
 
     for (DockToolBarView* toolBar : topToolBars) {
         if (toolBar->floating() || !toolBar->isVisible()) {
@@ -398,10 +416,10 @@ void DockWindow::alignToolBars(const DockPageView* page)
             break;
         case DockToolBarAlignment::Center:
             lastCentralToolBar = toolBar;
-            centralToolBarsWidth += (toolBar->contentWidth() + separatorThicnkess);
+            centralToolBarsWidth += (toolBar->contentWidth() + separatorThickness);
             break;
         case DockToolBarAlignment::Right:
-            rightToolBarsWidth += (toolBar->contentWidth() + separatorThicnkess);
+            rightToolBarsWidth += (toolBar->contentWidth() + separatorThickness);
             break;
         }
     }
@@ -580,6 +598,8 @@ void DockWindow::reloadCurrentPage()
 
     TRACEFUNC;
 
+    clearRegistry();
+
     for (DockBase* dock : m_currentPage->allDocks()) {
         dock->deinit();
     }
@@ -606,11 +626,19 @@ void DockWindow::initDocks(DockPageView* page)
         page->init();
     }
 
-    alignToolBars(page);
+    alignTopLevelToolBars(page);
 
-    for (DockToolBarView* toolbar : page->mainToolBars()) {
+    for (DockToolBarView* toolbar : topLevelToolBars(page)) {
         connect(toolbar, &DockToolBarView::floatingChanged, this, [this, page]() {
-            alignToolBars(page);
+            alignTopLevelToolBars(page);
+        }, Qt::UniqueConnection);
+
+        connect(toolbar, &DockToolBarView::contentSizeChanged, this, [this, page]() {
+            alignTopLevelToolBars(page);
+        }, Qt::UniqueConnection);
+
+        connect(toolbar, &DockToolBarView::visibleChanged, this, [this, page]() {
+            alignTopLevelToolBars(page);
         }, Qt::UniqueConnection);
     }
 }

@@ -23,6 +23,7 @@
 #include "arpeggiorenderer.h"
 
 #include "libmscore/chord.h"
+#include "libmscore/arpeggio.h"
 
 using namespace mu::engraving;
 using namespace mu::mpe;
@@ -38,12 +39,18 @@ const ArticulationTypeSet& ArpeggioRenderer::supportedTypes()
     return types;
 }
 
-void ArpeggioRenderer::doRender(const Ms::EngravingItem* item, const mpe::ArticulationType preferredType, const RenderingContext& context,
+void ArpeggioRenderer::doRender(const EngravingItem* item, const mpe::ArticulationType preferredType,
+                                const RenderingContext& context,
                                 mpe::PlaybackEventList& result)
 {
-    const Ms::Chord* chord = Ms::toChord(item);
+    const Chord* chord = toChord(item);
 
     IF_ASSERT_FAILED(chord) {
+        return;
+    }
+
+    const Arpeggio* arpeggio = chord->arpeggio();
+    IF_ASSERT_FAILED(arpeggio) {
         return;
     }
 
@@ -53,7 +60,7 @@ void ArpeggioRenderer::doRender(const Ms::EngravingItem* item, const mpe::Articu
     auto buildEvent = [&](NominalNoteCtx& noteCtx, const int stepNumber) {
         noteCtx.chordCtx.commonArticulations.updateOccupiedRange(preferredType, stepNumber * percentageStep,
                                                                  (stepNumber + 1) * percentageStep);
-        noteCtx.timestamp += timestampOffsetStep(context) * stepNumber;
+        noteCtx.timestamp += timestampOffsetStep(context) * stepNumber * arpeggio->Stretch();
         result.emplace_back(buildNoteEvent(std::move(noteCtx)));
     };
 
@@ -87,7 +94,7 @@ bool ArpeggioRenderer::isDirectionUp(const mpe::ArticulationType type)
 
 msecs_t ArpeggioRenderer::timestampOffsetStep(const RenderingContext& ctx)
 {
-    constexpr int MINIMAL_TIMESTAMP_OFFSET_STEP = 60;
+    constexpr int MINIMAL_TIMESTAMP_OFFSET_STEP = 60000;
 
     if (RealIsEqualOrMore(ctx.beatsPerSecond.val, PRESTISSIMO_BPS_BOUND)) {
         return MINIMAL_TIMESTAMP_OFFSET_STEP * 1.5;
@@ -104,12 +111,12 @@ msecs_t ArpeggioRenderer::timestampOffsetStep(const RenderingContext& ctx)
     return MINIMAL_TIMESTAMP_OFFSET_STEP;
 }
 
-std::map<pitch_level_t, NominalNoteCtx> ArpeggioRenderer::arpeggioNotes(const Ms::Chord* chord, const RenderingContext& ctx)
+std::map<pitch_level_t, NominalNoteCtx> ArpeggioRenderer::arpeggioNotes(const Chord* chord, const RenderingContext& ctx)
 {
     std::map<pitch_level_t, NominalNoteCtx> result;
 
-    for (const Ms::Note* note : chord->notes()) {
-        if (!isNotePlayable(note)) {
+    for (const Note* note : chord->notes()) {
+        if (!isNotePlayable(note, ctx.commonArticulations)) {
             continue;
         }
 

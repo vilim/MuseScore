@@ -45,7 +45,7 @@ Column {
 
             Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
 
-            text: qsTrc("mpe", "Point index")
+            text: /*qsTrc*/ "Point index"
         }
 
         StyledSlider {
@@ -80,7 +80,7 @@ Column {
 
             Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
 
-            text: qsTrc("mpe", "Pitch offset")
+            text: /*qsTrc*/ "Pitch offset"
         }
 
         StyledSlider {
@@ -118,7 +118,7 @@ Column {
                 decimal: 1
             }
 
-            onCurrentTextEdited: function(newTextValue) {
+            onTextChanged: function(newTextValue) {
                 if (root.patternModel) {
                     root.patternModel.updatePitchOffsetValue(offsetPointIndexSlider.value,
                                                              newTextValue * 100)

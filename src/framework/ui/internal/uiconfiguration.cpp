@@ -163,7 +163,7 @@ static const QMap<ThemeStyleKey, QVariant> HIGH_CONTRAST_WHITE_THEME_VALUES {
     { ITEM_OPACITY_DISABLED, 0.3 }
 };
 
-void UiConfiguration::init()
+void UiConfiguration::initSettings()
 {
     settings()->setDefaultValue(UI_CURRENT_THEME_CODE_KEY, Val(LIGHT_THEME_CODE));
     settings()->setDefaultValue(UI_FOLLOW_SYSTEM_THEME_KEY, Val(false));
@@ -212,8 +212,6 @@ void UiConfiguration::init()
     m_uiArrangement.stateChanged(WINDOW_GEOMETRY_KEY).onNotify(this, [this]() {
         m_windowGeometryChanged.notify();
     });
-
-    initThemes();
 }
 
 void UiConfiguration::load()
@@ -329,16 +327,12 @@ ThemeInfo UiConfiguration::makeStandardTheme(const ThemeCode& codeKey) const
     theme.codeKey = codeKey;
 
     if (codeKey == LIGHT_THEME_CODE) {
-        theme.title = trc("ui", "Light");
         theme.values = LIGHT_THEME_VALUES;
     } else if (codeKey == DARK_THEME_CODE) {
-        theme.title = trc("ui", "Dark");
         theme.values = DARK_THEME_VALUES;
     } else if (codeKey == HIGH_CONTRAST_WHITE_THEME_CODE) {
-        theme.title = trc("ui", "White");
         theme.values = HIGH_CONTRAST_WHITE_THEME_VALUES;
     } else if (codeKey == HIGH_CONTRAST_BLACK_THEME_CODE) {
-        theme.title = trc("ui", "Black");
         theme.values = HIGH_CONTRAST_BLACK_THEME_VALUES;
     }
 
@@ -351,7 +345,7 @@ ThemeList UiConfiguration::readThemes() const
 
     ThemeList result;
 
-    QByteArray json = settings()->value(UI_THEMES_KEY).toQString().toUtf8();
+    QByteArray json = QByteArray::fromStdString(settings()->value(UI_THEMES_KEY).toString());
     if (json.isEmpty()) {
         return result;
     }
@@ -432,22 +426,16 @@ QStringList UiConfiguration::possibleAccentColors() const
     return lightAccentColors;
 }
 
-void UiConfiguration::resetCurrentThemeToDefault(const ThemeCode& codeKey)
+void UiConfiguration::resetThemes()
 {
-    for (ThemeInfo& theme : m_themes) {
-        if (theme.codeKey != codeKey) {
-            continue;
-        }
-
-        theme = makeStandardTheme(codeKey);
-        writeThemes(m_themes);
-
-        if (theme.codeKey == currentThemeCodeKey()) {
-            notifyAboutCurrentThemeChanged();
-        }
-
-        return;
+    m_themes.clear();
+    for (const ThemeCode& codeKey : allStandardThemeCodes()) {
+        m_themes.push_back(makeStandardTheme(codeKey));
     }
+
+    writeThemes(m_themes);
+
+    notifyAboutCurrentThemeChanged();
 }
 
 const ThemeInfo& UiConfiguration::currentTheme() const
@@ -616,20 +604,6 @@ std::string UiConfiguration::defaultFontFamily() const
 {
     std::string family = QFontDatabase::systemFont(QFontDatabase::GeneralFont).family().toStdString();
 
-#ifdef Q_OS_MACOS
-    // The macOS default font *is* SF Pro, but under the name ".AppleSystemUIFont".
-    // In Qt, the version under this name has an issue with the width of the comma
-    // character (see https://github.com/musescore/MuseScore/issues/10736). This does
-    // not occur in user-installed versions of the font. So if the user has one, we
-    // use it, otherwise, it will be just the system version.
-    // TODO(qt-6): This can be removed when switching to Qt 6.
-    static const QString defaultMacFamily = "SF Pro";
-    QFontDatabase fontDatabase;
-    if (fontDatabase.hasFamily(defaultMacFamily)) {
-        family = defaultMacFamily.toStdString();
-    }
-#endif
-
 #ifdef Q_OS_WIN
     static const QString defaultWinFamily = "Segoe UI";
     QFontDatabase fontDatabase;
@@ -646,9 +620,18 @@ int UiConfiguration::defaultFontSize() const
     return 12;
 }
 
+void UiConfiguration::resetFonts()
+{
+    settings()->setSharedValue(UI_FONT_FAMILY_KEY, settings()->defaultValue(UI_FONT_FAMILY_KEY));
+    settings()->setSharedValue(UI_FONT_SIZE_KEY, settings()->defaultValue(UI_FONT_SIZE_KEY));
+    settings()->setSharedValue(UI_ICONS_FONT_FAMILY_KEY, settings()->defaultValue(UI_ICONS_FONT_FAMILY_KEY));
+    settings()->setSharedValue(UI_MUSICAL_FONT_FAMILY_KEY, settings()->defaultValue(UI_MUSICAL_FONT_FAMILY_KEY));
+    settings()->setSharedValue(UI_MUSICAL_FONT_SIZE_KEY, settings()->defaultValue(UI_MUSICAL_FONT_SIZE_KEY));
+}
+
 double UiConfiguration::guiScaling() const
 {
-    const QScreen* screen = mainWindow()->screen();
+    const QScreen* screen = mainWindow() ? mainWindow()->screen() : nullptr;
     return screen ? screen->devicePixelRatio() : 1;
 }
 
@@ -663,7 +646,7 @@ double UiConfiguration::physicalDpi() const
         return m_customDPI.value();
     }
 
-    const QScreen* screen = mainWindow()->screen();
+    const QScreen* screen = mainWindow() ? mainWindow()->screen() : nullptr;
     if (!screen) {
         constexpr double DEFAULT_DPI = 96;
         return DEFAULT_DPI;
@@ -680,7 +663,7 @@ double UiConfiguration::physicalDpi() const
 
 double UiConfiguration::logicalDpi() const
 {
-    const QScreen* screen = mainWindow()->screen();
+    const QScreen* screen = mainWindow() ? mainWindow()->screen() : nullptr;
     if (!screen) {
         constexpr double DEFAULT_DPI = 96;
         return DEFAULT_DPI;

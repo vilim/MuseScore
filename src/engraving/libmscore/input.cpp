@@ -21,23 +21,24 @@
  */
 
 #include "input.h"
-#include "segment.h"
+
+#include "articulation.h"
+#include "chord.h"
+#include "durationtype.h"
+#include "hook.h"
+#include "measure.h"
+#include "note.h"
 #include "part.h"
+#include "rest.h"
+#include "score.h"
+#include "segment.h"
+#include "select.h"
 #include "staff.h"
 #include "stem.h"
-#include "hook.h"
-#include "score.h"
-#include "chord.h"
-#include "rest.h"
-#include "measure.h"
-#include "accidental.h"
-#include "durationtype.h"
-#include "select.h"
-#include "articulation.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 class DrumSet;
 
 //---------------------------------------------------------
@@ -168,8 +169,8 @@ void InputState::update(Selection& selection)
                     articulationsIds.insert(artic->symId());
                 }
 
-                articulationsIds = Ms::splitArticulations(articulationsIds);
-                articulationsIds = Ms::flipArticulations(articulationsIds, Ms::PlacementV::ABOVE);
+                articulationsIds = mu::engraving::splitArticulations(articulationsIds);
+                articulationsIds = mu::engraving::flipArticulations(articulationsIds, PlacementV::ABOVE);
                 for (const SymId& articulationSymbolId: articulationsIds) {
                     if (std::find(articulationSymbolIds.begin(), articulationSymbolIds.end(),
                                   articulationSymbolId) == articulationSymbolIds.end()) {
@@ -183,7 +184,7 @@ void InputState::update(Selection& selection)
                 for (Articulation* artic: n->chord()->articulations()) {
                     articulationsIds.insert(artic->symId());
                 }
-                articulationSymbolIds = Ms::flipArticulations(articulationsIds, Ms::PlacementV::ABOVE);
+                articulationSymbolIds = mu::engraving::flipArticulations(articulationsIds, PlacementV::ABOVE);
 
                 n1 = n;
             }

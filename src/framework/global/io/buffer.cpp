@@ -23,6 +23,7 @@
 
 #include <cstring>
 
+using namespace mu;
 using namespace mu::io;
 
 Buffer::Buffer()
@@ -48,6 +49,11 @@ Buffer::Buffer(ByteArray* ba)
     if (!m_ref) {
         m_ref = &m_ba;
     }
+}
+
+const ByteArray& Buffer::data() const
+{
+    return *m_ref;
 }
 
 bool Buffer::doOpen(OpenMode)

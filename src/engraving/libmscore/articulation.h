@@ -26,23 +26,32 @@
 #include <set>
 
 #include "engravingitem.h"
-#include "mscore.h"
 
 namespace mu::engraving {
 class Factory;
-}
 
-namespace Ms {
 class ChordRest;
-class Segment;
 class Measure;
-class System;
 class Page;
+class Segment;
+class System;
 
 //---------------------------------------------------------
 //   ArticulationInfo
 //    gives infos about note attributes
 //---------------------------------------------------------
+
+enum class ArticulationCategory : char {
+    NONE = 0x0,
+    DOUBLE = 0x1,
+    TENUTO = 0x2,
+    STACCATO = 0x4,
+    ACCENT = 0x8,
+    MARCATO = 0x10,
+    LUTE_FINGERING = 0x20,
+};
+DECLARE_FLAGS(ArticulationCategories, ArticulationCategory)
+DECLARE_OPERATORS_FOR_FLAGS(ArticulationCategories)
 
 enum class ArticulationAnchor : char {
     TOP_STAFF,        // anchor is always placed at top of staff
@@ -85,9 +94,24 @@ std::set<SymId> flipArticulations(const std::set<SymId>& articulationSymbolIds, 
 
 class Articulation final : public EngravingItem
 {
+    OBJECT_ALLOCATOR(engraving, Articulation)
+public:
+
+    enum TextType {
+        NO_TEXT,
+        TAP,
+        SLAP,
+        POP
+    };
+
+private:
+
     SymId _symId;
     DirectionV _direction;
-    QString _channelName;
+    String _channelName;
+
+    TextType m_textType;
+    mu::draw::Font m_font; // used for drawing text type articulations
 
     ArticulationAnchor _anchor;
 
@@ -95,10 +119,14 @@ class Articulation final : public EngravingItem
     OrnamentStyle _ornamentStyle;       // for use in ornaments such as trill
     bool _playArticulation;
 
+    std::pair<Sid, Sid> m_showOnTabStyles = { Sid::NOSTYLE, Sid::NOSTYLE };
+
     friend class mu::engraving::Factory;
     Articulation(ChordRest* parent);
 
     void draw(mu::draw::Painter*) const override;
+    bool isHiddenOnTabStaff() const;
+    void setupShowOnTabStyles();
 
     enum class AnchorGroup {
         ARTICULATION,
@@ -107,6 +135,9 @@ class Articulation final : public EngravingItem
     };
     static AnchorGroup anchorGroup(SymId);
 
+    ArticulationCategories m_categories = ArticulationCategory::NONE;
+    void computeCategories();
+
 public:
 
     Articulation(const Articulation&) = default;
@@ -114,14 +145,16 @@ public:
 
     Articulation* clone() const override { return new Articulation(*this); }
 
-    qreal mag() const override;
+    double mag() const override;
 
     SymId symId() const { return _symId; }
     void setSymId(SymId id);
     int subtype() const override;
-    QString typeUserName() const override;
-    const char* articulationName() const;    // type-name of articulation; used for midi rendering
-    static const char* symId2ArticulationName(SymId symId);
+    void setTextType(TextType textType);
+    TranslatableString typeUserName() const override;
+    String translatedTypeUserName() const override;
+    String articulationName() const;    // type-name of articulation; used for midi rendering
+    static String symId2ArticulationName(SymId symId);
 
     void layout() override;
     bool layoutCloseToNote() const;
@@ -132,13 +165,11 @@ public:
 
     std::vector<mu::LineF> dragAnchorLines() const override;
 
-    mu::engraving::PropertyValue getProperty(Pid propertyId) const override;
-    bool setProperty(Pid propertyId, const mu::engraving::PropertyValue&) override;
-    mu::engraving::PropertyValue propertyDefault(Pid) const override;
+    PropertyValue getProperty(Pid propertyId) const override;
+    bool setProperty(Pid propertyId, const PropertyValue&) override;
+    PropertyValue propertyDefault(Pid) const override;
     void resetProperty(Pid id) override;
     Sid getPropertyStyle(Pid id) const override;
-
-    Pid propertyId(const QStringRef& xmlName) const override;
 
     bool up() const { return _up; }
     void setUp(bool val);
@@ -160,22 +191,25 @@ public:
     bool playArticulation() const { return _playArticulation; }
     void setPlayArticulation(bool val) { _playArticulation = val; }
 
-    QString channelName() const { return _channelName; }
-    void setChannelName(const QString& s) { _channelName = s; }
+    String channelName() const { return _channelName; }
+    void setChannelName(const String& s) { _channelName = s; }
 
-    QString accessibleInfo() const override;
+    String accessibleInfo() const override;
 
-    bool isDouble() const;
-    bool isTenuto() const;
-    bool isStaccato() const;
-    bool isAccent() const;
-    bool isMarcato() const;
-    bool isLuteFingering() const;
+    bool isDouble() const { return m_categories & ArticulationCategory::DOUBLE; }
+    bool isTenuto() const { return m_categories & ArticulationCategory::TENUTO; }
+    bool isStaccato() const { return m_categories & ArticulationCategory::STACCATO; }
+    bool isAccent() const { return m_categories & ArticulationCategory::ACCENT; }
+    bool isMarcato() const { return m_categories & ArticulationCategory::MARCATO; }
+    bool isLuteFingering() { return m_categories & ArticulationCategory::LUTE_FINGERING; }
 
     bool isOrnament() const;
     static bool isOrnament(int subtype);
 
     void doAutoplace();
+
+    void styleChanged() override;
 };
-}     // namespace Ms
+} // namespace mu::engraving
+
 #endif

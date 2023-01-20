@@ -26,9 +26,12 @@
 #include <QJsonArray>
 #include <QJsonObject>
 
+#include "types/bytearray.h"
+
 using namespace mu::project;
 using namespace mu::audio;
 using namespace mu::engraving;
+using namespace mu::playback;
 
 static const std::map<AudioSourceType, QString> SOURCE_TYPE_MAP = {
     { AudioSourceType::Undefined, "undefined" },
@@ -169,17 +172,28 @@ mu::ValNt<bool> ProjectAudioSettings::needSave() const
     return needSave;
 }
 
+const SoundProfileName& ProjectAudioSettings::activeSoundProfile() const
+{
+    return m_activeSoundProfileName;
+}
+
+void ProjectAudioSettings::setActiveSoundProfile(const playback::SoundProfileName& profileName)
+{
+    m_activeSoundProfileName = profileName;
+    setNeedSave(true);
+}
+
 mu::Ret ProjectAudioSettings::read(const engraving::MscReader& reader)
 {
-    QByteArray json = reader.readAudioSettingsJsonFile();
-    QJsonObject rootObj = QJsonDocument::fromJson(json).object();
+    ByteArray json = reader.readAudioSettingsJsonFile();
+    QJsonObject rootObj = QJsonDocument::fromJson(json.toQByteArrayNoCopy()).object();
 
     QJsonObject masterObj = rootObj.value("master").toObject();
     m_masterOutputParams = outputParamsFromJson(masterObj);
 
     QJsonArray tracksArray = rootObj.value("tracks").toArray();
 
-    for (const QJsonValue& value : tracksArray) {
+    for (const QJsonValue value : tracksArray) {
         QJsonObject trackObject = value.toObject();
 
         ID partId = trackObject.value("partId").toString();
@@ -196,6 +210,11 @@ mu::Ret ProjectAudioSettings::read(const engraving::MscReader& reader)
         m_soloMuteStatesMap.emplace(id, std::move(soloMuteState));
     }
 
+    m_activeSoundProfileName = rootObj.value("activeSoundProfile").toString();
+    if (m_activeSoundProfileName.empty()) {
+        m_activeSoundProfileName = playbackConfig()->defaultProfileForNewProjects();
+    }
+
     return make_ret(Ret::Code::Ok);
 }
 
@@ -210,9 +229,10 @@ mu::Ret ProjectAudioSettings::write(engraving::MscWriter& writer)
     }
 
     rootObj["tracks"] = tracksArray;
+    rootObj["activeSoundProfile"] = m_activeSoundProfileName.toQString();
 
     QByteArray json = QJsonDocument(rootObj).toJson();
-    writer.writeAudioSettingsJsonFile(json);
+    writer.writeAudioSettingsJsonFile(ByteArray::fromQByteArrayNoCopy(json));
 
     setNeedSave(false);
 
@@ -221,7 +241,7 @@ mu::Ret ProjectAudioSettings::write(engraving::MscWriter& writer)
 
 void ProjectAudioSettings::makeDefault()
 {
-    //TODO initialize default audio input params
+    m_activeSoundProfileName = playbackConfig()->defaultProfileForNewProjects();
 }
 
 AudioInputParams ProjectAudioSettings::inputParamsFromJson(const QJsonObject& object) const
@@ -282,6 +302,7 @@ AudioResourceMeta ProjectAudioSettings::resourceMetaFromJson(const QJsonObject& 
     result.hasNativeEditorSupport = object.value("hasNativeEditorSupport").toBool();
     result.vendor = object.value("vendor").toString().toStdString();
     result.type = resourceTypeFromString(object.value("type").toString());
+    result.attributes = attributesFromJson(object.value("attributes").toObject());
 
     return result;
 }
@@ -291,7 +312,19 @@ AudioUnitConfig ProjectAudioSettings::unitConfigFromJson(const QJsonObject& obje
     AudioUnitConfig result;
 
     for (const QString& key : object.keys()) {
-        result.emplace(key.toStdString(), object.value(key).toString().toStdString());
+        QByteArray base = QByteArray::fromBase64(object.value(key).toString().toUtf8());
+        result.emplace(key.toStdString(), base.toStdString());
+    }
+
+    return result;
+}
+
+AudioResourceAttributes ProjectAudioSettings::attributesFromJson(const QJsonObject& object) const
+{
+    AudioResourceAttributes result;
+
+    for (const QString& key : object.keys()) {
+        result.emplace(String::fromQString(key), String::fromQString(object.value(key).toString()));
     }
 
     return result;
@@ -354,6 +387,7 @@ QJsonObject ProjectAudioSettings::resourceMetaToJson(const audio::AudioResourceM
     result.insert("hasNativeEditorSupport", meta.hasNativeEditorSupport);
     result.insert("vendor", QString::fromStdString(meta.vendor));
     result.insert("type", resourceTypeToString(meta.type));
+    result.insert("attributes", attributesToJson(meta.attributes));
 
     return result;
 }
@@ -363,7 +397,19 @@ QJsonObject ProjectAudioSettings::unitConfigToJson(const audio::AudioUnitConfig&
     QJsonObject result;
 
     for (const auto& pair : config) {
-        result.insert(QString::fromStdString(pair.first), QString::fromStdString(pair.second));
+        QByteArray byteArray = QByteArray::fromRawData(pair.second.c_str(), static_cast<int>(pair.second.size()));
+        result.insert(QString::fromStdString(pair.first), QString(byteArray.toBase64()));
+    }
+
+    return result;
+}
+
+QJsonObject ProjectAudioSettings::attributesToJson(const audio::AudioResourceAttributes& attributes) const
+{
+    QJsonObject result;
+
+    for (const auto& pair : attributes) {
+        result.insert(pair.first.toQString(), pair.second.toQString());
     }
 
     return result;

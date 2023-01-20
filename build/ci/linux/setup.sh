@@ -21,9 +21,17 @@
 
 # For maximum AppImage compatibility, build on the oldest Linux distribution
 # that still receives security updates from its manufacturer.
-
 echo "Setup Linux build environment"
 trap 'echo Setup failed; exit 1' ERR
+
+GCC_VERSION="10"
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -g|--gcc_version) GCC_VERSION="$2"; shift ;;
+    esac
+    shift
+done
+
 
 df -h .
 
@@ -90,6 +98,7 @@ apt_packages_runtime=(
   libxcb-icccm4
   libxcb-image0
   libxcb-keysyms1
+  libxcb-randr0
   libxcb-render-util0
   libxcb-xinerama0
   )
@@ -101,7 +110,8 @@ apt_packages_ffmpeg=(
   libswscale-dev
   )
 
-sudo apt-get update # no package lists in Docker image
+sudo sed -i 's/azure\.//' /etc/apt/sources.list
+sudo apt-get update 
 sudo apt-get install -y --no-install-recommends \
   "${apt_packages_basic[@]}" \
   "${apt_packages_standard[@]}" \
@@ -134,18 +144,16 @@ echo export QML2_IMPORT_PATH="${qt_dir}/qml" >> ${ENV_FILE}
 ##########################################################################
 
 # COMPILER
-
-gcc_version="7"
-sudo apt-get install -y --no-install-recommends "g++-${gcc_version}"
+sudo apt-get install -y --no-install-recommends "g++-${GCC_VERSION}"
 sudo update-alternatives \
-  --install /usr/bin/gcc gcc "/usr/bin/gcc-${gcc_version}" 40 \
-  --slave /usr/bin/g++ g++ "/usr/bin/g++-${gcc_version}"
+  --install /usr/bin/gcc gcc "/usr/bin/gcc-${GCC_VERSION}" 40 \
+  --slave /usr/bin/g++ g++ "/usr/bin/g++-${GCC_VERSION}"
 
-echo export CC="/usr/bin/gcc-${gcc_version}" >> ${ENV_FILE}
-echo export CXX="/usr/bin/g++-${gcc_version}" >> ${ENV_FILE}
+echo export CC="/usr/bin/gcc-${GCC_VERSION}" >> ${ENV_FILE}
+echo export CXX="/usr/bin/g++-${GCC_VERSION}" >> ${ENV_FILE}
 
-gcc-${gcc_version} --version
-g++-${gcc_version} --version 
+gcc-${GCC_VERSION} --version
+g++-${GCC_VERSION} --version
 
 # CMAKE
 # Get newer CMake (only used cached version if it is the same)
@@ -183,13 +191,14 @@ echo export DUMPSYMS_BIN="$breakpad_dir/dump_syms" >> $ENV_FILE
 ##########################################################################
 # OTHER
 ##########################################################################
-echo "Get VST"
-vst_dir=$BUILD_TOOLS/vst
-if [[ ! -d "$vst_dir" ]]; then
-  wget -q --show-progress -O $BUILD_TOOLS/vst_sdk.7z "https://s3.amazonaws.com/utils.musescore.org/VST3_SDK_37.7z"
-  7z x -y $BUILD_TOOLS/vst_sdk.7z -o"$vst_dir"
-fi
-echo export VST3_SDK_PATH="$vst_dir/VST3_SDK" >> $ENV_FILE
+# TODO: https://github.com/musescore/MuseScore/issues/11689
+#echo "Get VST"
+#vst_dir=$BUILD_TOOLS/vst
+#if [[ ! -d "$vst_dir" ]]; then
+#  wget -q --show-progress -O $BUILD_TOOLS/vst_sdk.7z "https://s3.amazonaws.com/utils.musescore.org/VST3_SDK_37.7z"
+#  7z x -y $BUILD_TOOLS/vst_sdk.7z -o"$vst_dir"
+#fi
+#echo export VST3_SDK_PATH="$vst_dir/VST3_SDK" >> $ENV_FILE
 
 ##########################################################################
 # POST INSTALL
@@ -204,4 +213,3 @@ chmod +x "$ENV_FILE"
 
 df -h .
 echo "Setup script done"
-

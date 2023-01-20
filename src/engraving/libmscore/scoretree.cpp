@@ -29,9 +29,8 @@
 #include "bracket.h"
 #include "bsymbol.h"
 #include "chord.h"
-#include "duration.h"
+#include "durationelement.h"
 #include "fret.h"
-#include "glissando.h"
 #include "hook.h"
 #include "instrumentname.h"
 #include "ledgerline.h"
@@ -40,18 +39,20 @@
 #include "measurenumber.h"
 #include "mmrestrange.h"
 #include "note.h"
+#include "notedot.h"
 #include "page.h"
 #include "rest.h"
 #include "score.h"
 #include "segment.h"
 #include "spacer.h"
 #include "spanner.h"
-#include "staff.h"
 #include "stafflines.h"
+#include "stafftype.h"
 #include "stem.h"
 #include "stemslash.h"
 #include "system.h"
 #include "systemdivider.h"
+#include "text.h"
 #include "textframe.h"
 #include "tie.h"
 #include "tremolo.h"
@@ -62,7 +63,7 @@
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   Score
 //---------------------------------------------------------
@@ -226,7 +227,7 @@ EngravingObjectList Measure::scanChildren() const
         }
     }
 
-    const std::multimap<int, Ms::Spanner*>& spannerMap = score()->spanner();
+    const std::multimap<int, Spanner*>& spannerMap = score()->spanner();
     int start_tick = tick().ticks();
     for (auto i = spannerMap.lower_bound(start_tick); i != spannerMap.upper_bound(start_tick); ++i) {
         Spanner* s = i->second;
@@ -268,12 +269,12 @@ EngravingObjectList Segment::scanChildren() const
         }
     }
 
-    for (EngravingItem* anotation : _annotations) {
-        children.push_back(anotation);
+    for (EngravingItem* annotation : _annotations) {
+        children.push_back(annotation);
     }
 
     if (segmentType() == SegmentType::ChordRest) {
-        const std::multimap<int, Ms::Spanner*>& spannerMap = score()->spanner();
+        const std::multimap<int, Spanner*>& spannerMap = score()->spanner();
         int start_tick = tick().ticks();
         for (auto i = spannerMap.lower_bound(start_tick); i != spannerMap.upper_bound(start_tick); ++i) {
             Spanner* s = i->second;
@@ -333,7 +334,7 @@ EngravingObjectList ChordRest::scanChildren() const
         children.push_back(element);
     }
 
-    const std::multimap<int, Ms::Spanner*>& spannerMap = score()->spanner();
+    const std::multimap<int, Spanner*>& spannerMap = score()->spanner();
     int start_tick = tick().ticks();
     for (auto i = spannerMap.lower_bound(start_tick); i != spannerMap.upper_bound(start_tick); ++i) {
         Spanner* s = i->second;
@@ -673,11 +674,17 @@ EngravingObjectList TBox::scanChildren() const
 {
     EngravingObjectList children;
 
-    if (_text) {
-        children.push_back(_text);
+    if (m_text) {
+        children.push_back(m_text);
     }
 
     return children;
+}
+
+void TBox::scanElements(void* data, void (* func)(void*, EngravingItem*), bool all)
+{
+    m_text->scanElements(data, func, all);
+    Box::scanElements(data, func, all);
 }
 
 //---------------------------------------------------------
@@ -687,7 +694,6 @@ EngravingObjectList TBox::scanChildren() const
 
 void _dumpScoreTree(EngravingObject* s, int depth)
 {
-    LOGD() << qPrintable(QString(" ").repeated(4 * depth)) << s->typeName() << "at" << s;
     for (EngravingObject* child : s->scanChildren()) {
         _dumpScoreTree(child, depth + 1);
     }
@@ -697,4 +703,4 @@ void Score::dumpScoreTree()
 {
     _dumpScoreTree(this, 0);
 }
-}  // namespace Ms
+} // namespace mu::engraving

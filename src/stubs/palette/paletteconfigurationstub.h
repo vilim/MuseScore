@@ -28,11 +28,16 @@ namespace mu::palette {
 class PaletteConfigurationStub : public IPaletteConfiguration
 {
 public:
+    double paletteSpatium() const override;
+
     double paletteScaling() const override;
     void setPaletteScaling(double scale) override;
 
-    bool isSinglePalette() const override;
+    ValCh<bool> isSinglePalette() const override;
     void setIsSinglePalette(bool isSingle) override;
+
+    ValCh<bool> isSingleClickToOpenPalette() const override;
+    void setIsSingleClickToOpenPalette(bool isSingleClick) override;
 
     QColor elementsBackgroundColor() const override;
     QColor elementsColor() const override;
@@ -40,8 +45,8 @@ public:
     QColor accentColor() const override;
     async::Notification colorsChanged() const override;
 
-    io::path keySignaturesDirPath() const override;
-    io::path timeSignaturesDirPath() const override;
+    io::path_t keySignaturesDirPath() const override;
+    io::path_t timeSignaturesDirPath() const override;
 
     bool useFactorySettings() const override;
     bool enableExperimental() const override;

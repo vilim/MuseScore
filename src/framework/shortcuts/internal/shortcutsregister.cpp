@@ -23,8 +23,8 @@
 
 #include <QKeySequence>
 
-#include "global/xmlreader.h"
-#include "global/xmlwriter.h"
+#include "global/deprecated/xmlreader.h"
+#include "global/deprecated/xmlwriter.h"
 #include "multiinstances/resourcelockguard.h"
 
 #include "log.h"
@@ -33,12 +33,11 @@ using namespace mu::shortcuts;
 using namespace mu::framework;
 using namespace mu::async;
 
-constexpr std::string_view SHORTCUTS_TAG("Shortcuts");
-constexpr std::string_view SHORTCUT_TAG("SC");
-constexpr std::string_view ACTION_CODE_TAG("key");
-constexpr std::string_view STANDARD_KEY_TAG("std");
-constexpr std::string_view SEQUENCE_TAG("seq");
-constexpr std::string_view CONTEXT_TAG("ctx");
+static constexpr std::string_view SHORTCUTS_TAG("Shortcuts");
+static constexpr std::string_view SHORTCUT_TAG("SC");
+static constexpr std::string_view ACTION_CODE_TAG("key");
+static constexpr std::string_view STANDARD_KEY_TAG("std");
+static constexpr std::string_view SEQUENCE_TAG("seq");
 
 static const std::string SHORTCUTS_RESOURCE_NAME("SHORTCUTS");
 
@@ -72,8 +71,8 @@ void ShortcutsRegister::reload(bool onlyDef)
     m_shortcuts.clear();
     m_defaultShortcuts.clear();
 
-    io::path defPath = configuration()->shortcutsAppDataPath();
-    io::path userPath = configuration()->shortcutsUserAppDataPath();
+    io::path_t defPath = configuration()->shortcutsAppDataPath();
+    io::path_t userPath = configuration()->shortcutsUserAppDataPath();
 
     bool ok = readFromFile(m_defaultShortcuts, defPath);
 
@@ -181,7 +180,6 @@ void ShortcutsRegister::expandStandardKeys(ShortcutList& shortcuts) const
 
         QList<QKeySequence> kslist = QKeySequence::keyBindings(shortcut.standardKey);
         if (kslist.isEmpty()) {
-            LOGW() << "not bind key sequence for standard key: " << shortcut.standardKey;
             notbonded.push_back(shortcut);
             continue;
         }
@@ -195,7 +193,7 @@ void ShortcutsRegister::expandStandardKeys(ShortcutList& shortcuts) const
         for (int i = 1; i < kslist.count(); ++i) {
             const QKeySequence& seq = kslist.at(i);
             Shortcut esc = shortcut;
-            esc.sequences.push_back(seq.toString().toStdString());
+            esc.sequences = { seq.toString().toStdString() };
             //LOGD() << "for standard key: " << esc.standardKey << ", alternative sequence: " << esc.sequence;
             expanded.push_back(esc);
         }
@@ -234,7 +232,7 @@ ShortcutList ShortcutsRegister::filterAndUpdateAdditionalShortcuts(const Shortcu
     return noAdditionalShortcuts;
 }
 
-bool ShortcutsRegister::readFromFile(ShortcutList& shortcuts, const io::path& path) const
+bool ShortcutsRegister::readFromFile(ShortcutList& shortcuts, const io::path_t& path) const
 {
     TRACEFUNC;
 
@@ -277,16 +275,12 @@ Shortcut ShortcutsRegister::readShortcut(framework::XmlReader& reader) const
             shortcut.standardKey = QKeySequence::StandardKey(reader.readInt());
         } else if (tag == SEQUENCE_TAG) {
             shortcut.sequences.push_back(reader.readString());
-        } else if (tag == CONTEXT_TAG) {
-            shortcut.context = reader.readString();
         } else {
             reader.skipCurrentElement();
         }
     }
 
-    if (shortcut.context.empty()) {
-        shortcut.context = "any";
-    }
+    shortcut.context = uiactionsRegister()->action(shortcut.action).scCtx;
 
     return shortcut;
 }
@@ -326,7 +320,7 @@ void ShortcutsRegister::resetShortcuts()
     reload();
 }
 
-bool ShortcutsRegister::writeToFile(const ShortcutList& shortcuts, const io::path& path) const
+bool ShortcutsRegister::writeToFile(const ShortcutList& shortcuts, const io::path_t& path) const
 {
     TRACEFUNC;
 
@@ -411,7 +405,7 @@ ShortcutList ShortcutsRegister::shortcutsForSequence(const std::string& sequence
     return list;
 }
 
-mu::Ret ShortcutsRegister::importFromFile(const io::path& filePath)
+mu::Ret ShortcutsRegister::importFromFile(const io::path_t& filePath)
 {
     mi::ReadResourceLockGuard(multiInstancesProvider(), SHORTCUTS_RESOURCE_NAME);
 
@@ -426,7 +420,7 @@ mu::Ret ShortcutsRegister::importFromFile(const io::path& filePath)
     return make_ret(Ret::Code::Ok);
 }
 
-mu::Ret ShortcutsRegister::exportToFile(const io::path& filePath) const
+mu::Ret ShortcutsRegister::exportToFile(const io::path_t& filePath) const
 {
     return writeToFile(m_shortcuts, filePath);
 }

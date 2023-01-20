@@ -68,9 +68,14 @@ inline audio::msecs_t secondsToMilliseconds(float seconds)
     return seconds * 1000;
 }
 
-inline QTime timeFromMilliseconds(audio::msecs_t millisecons)
+inline float secondsFromMilliseconds(audio::msecs_t milliseconds)
 {
-    return ZERO_TIME.addMSecs(millisecons);
+    return milliseconds / 1000.f;
+}
+
+inline QTime timeFromMilliseconds(audio::msecs_t milliseconds)
+{
+    return ZERO_TIME.addMSecs(milliseconds);
 }
 
 inline QTime timeFromSeconds(float seconds)
@@ -83,6 +88,48 @@ inline audio::msecs_t timeToMilliseconds(const QTime& time)
 {
     return ZERO_TIME.msecsTo(time);
 }
+
+enum class SoundProfileType {
+    Undefined = -1,
+    Basic,
+    Muse,
+    Custom
+};
+
+using SoundProfileName = String;
+using SoundProfileData = std::map<mpe::PlaybackSetupData, audio::AudioResourceMeta>;
+
+struct SoundProfile {
+    SoundProfileType type = SoundProfileType::Undefined;
+    SoundProfileName name;
+
+    SoundProfileData data;
+
+    const audio::AudioResourceMeta& findResource(const mpe::PlaybackSetupData& key) const
+    {
+        auto search = data.find(key);
+        if (search != data.cend()) {
+            return search->second;
+        }
+
+        static audio::AudioResourceMeta empty;
+        return empty;
+    }
+
+    bool isEnabled() const
+    {
+        return !data.empty();
+    }
+
+    bool isValid() const
+    {
+        return type != SoundProfileType::Undefined
+               && !name.isEmpty()
+               && isEnabled();
+    }
+};
+
+using SoundProfilesMap = std::map<SoundProfileName, SoundProfile>;
 }
 
 #endif // MU_PLAYBACK_PLAYBACKTYPES_H

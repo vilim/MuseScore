@@ -22,20 +22,18 @@
 #ifndef MU_ENGRAVING_READ400_H
 #define MU_ENGRAVING_READ400_H
 
-#include "libmscore/masterscore.h"
-#include "../engravingerrors.h"
-
-namespace Ms {
-class XmlReader;
-}
-
 namespace mu::engraving {
+class Score;
+
+class ReadContext;
+class XmlReader;
+
 class Read400
 {
 public:
 
-    static bool read400(Ms::Score* score, Ms::XmlReader& e, ReadContext& ctx);
-    static bool readScore400(Ms::Score* score, Ms::XmlReader& e, ReadContext& ctx);
+    static bool read400(Score* score, XmlReader& e, ReadContext& ctx);
+    static bool readScore400(Score* score, XmlReader& e, ReadContext& ctx);
 };
 }
 

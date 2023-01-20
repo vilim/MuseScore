@@ -21,14 +21,17 @@
  */
 #include "diagnosticsactionscontroller.h"
 
-#include "uri.h"
+#include "types/uri.h"
 
 #include "view/diagnosticaccessiblemodel.h"
 
+#include "log.h"
+
 using namespace mu::diagnostics;
 using namespace mu::accessibility;
+using namespace mu::framework;
 
-static const mu::UriQuery SYSTEN_PATHS_URI("musescore://diagnostics/system/paths?sync=false&modal=false&floating=true");
+static const mu::UriQuery SYSTEM_PATHS_URI("musescore://diagnostics/system/paths?sync=false&modal=false&floating=true");
 static const mu::UriQuery PROFILER_URI("musescore://diagnostics/system/profiler?sync=false&modal=false&floating=true");
 static const mu::UriQuery NAVIGATION_TREE_URI("musescore://diagnostics/navigation/tree?sync=false&modal=false&floating=true");
 static const mu::UriQuery ACCESSIBLE_TREE_URI("musescore://diagnostics/accessible/tree?sync=false&modal=false&floating=true");
@@ -36,12 +39,13 @@ static const mu::UriQuery ENGRAVING_ELEMENTS_URI("musescore://diagnostics/engrav
 
 void DiagnosticsActionsController::init()
 {
-    dispatcher()->reg(this, "diagnostic-show-paths", [this]() { openUri(SYSTEN_PATHS_URI); });
+    dispatcher()->reg(this, "diagnostic-show-paths", [this]() { openUri(SYSTEM_PATHS_URI); });
     dispatcher()->reg(this, "diagnostic-show-profiler", [this]() { openUri(PROFILER_URI); });
     dispatcher()->reg(this, "diagnostic-show-navigation-tree", [this]() { openUri(NAVIGATION_TREE_URI); });
     dispatcher()->reg(this, "diagnostic-show-accessible-tree", [this]() { openUri(ACCESSIBLE_TREE_URI); });
     dispatcher()->reg(this, "diagnostic-accessible-tree-dump", []() { DiagnosticAccessibleModel::dumpTree(); });
     dispatcher()->reg(this, "diagnostic-show-engraving-elements", [this]() { openUri(ENGRAVING_ELEMENTS_URI, false); });
+    dispatcher()->reg(this, "diagnostic-save-diagnostic-files", this, &DiagnosticsActionsController::saveDiagnosticFiles);
 }
 
 void DiagnosticsActionsController::openUri(const mu::UriQuery& uri, bool isSingle)
@@ -51,4 +55,12 @@ void DiagnosticsActionsController::openUri(const mu::UriQuery& uri, bool isSingl
     }
 
     interactive()->open(uri);
+}
+
+void DiagnosticsActionsController::saveDiagnosticFiles()
+{
+    Ret ret = saveDiagnosticsScenario()->saveDiagnosticFiles();
+    if (!ret) {
+        LOGE() << ret.toString();
+    }
 }

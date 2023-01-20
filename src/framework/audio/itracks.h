@@ -41,7 +41,7 @@ public:
     virtual async::Promise<TrackIdList> trackIdList(const TrackSequenceId sequenceId) const = 0;
     virtual async::Promise<TrackName> trackName(const TrackSequenceId sequenceId, const TrackId trackId) const = 0;
     virtual async::Promise<TrackId, AudioParams> addTrack(const TrackSequenceId sequenceId, const std::string& trackName,
-                                                          io::Device* playbackData, AudioParams&& params) = 0;
+                                                          io::IODevice* playbackData, AudioParams&& params) = 0;
     virtual async::Promise<TrackId, AudioParams> addTrack(const TrackSequenceId sequenceId, const std::string& trackName,
                                                           const mpe::PlaybackData& playbackData, AudioParams&& params) = 0;
     virtual void removeTrack(const TrackSequenceId sequenceId, const TrackId trackId) = 0;
@@ -55,6 +55,8 @@ public:
     virtual async::Promise<AudioInputParams> inputParams(const TrackSequenceId sequenceId, const TrackId trackId) const = 0;
     virtual void setInputParams(const TrackSequenceId sequenceId, const TrackId trackId, const AudioInputParams& params) = 0;
     virtual async::Channel<TrackSequenceId, TrackId, AudioInputParams> inputParamsChanged() const = 0;
+
+    virtual void clearSources() = 0;
 };
 
 using ITracksPtr = std::shared_ptr<ITracks>;

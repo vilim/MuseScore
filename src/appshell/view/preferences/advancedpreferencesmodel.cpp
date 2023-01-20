@@ -41,7 +41,9 @@ QVariant AdvancedPreferencesModel::data(const QModelIndex& index, int role) cons
     switch (role) {
     case KeyRole: return QString::fromStdString(item.key.key);
     case TypeRole: return typeToString(item.value.type());
-    case ValRole: return item.value.toQVariant();
+    case ValueRole: return item.value.toQVariant();
+    case MinValueRole: return !item.minValue.isNull() ? item.minValue.toQVariant() : -1000;
+    case MaxValueRole: return !item.maxValue.isNull() ? item.maxValue.toQVariant() : 1000;
     }
     return QVariant();
 }
@@ -53,9 +55,9 @@ bool AdvancedPreferencesModel::setData(const QModelIndex& index, const QVariant&
     }
 
     switch (role) {
-    case ValRole:
+    case ValueRole:
         changeVal(index.row(), value);
-        emit dataChanged(index, index, { ValRole });
+        emit dataChanged(index, index, { ValueRole });
         return true;
     default:
         return false;
@@ -72,7 +74,9 @@ QHash<int, QByteArray> AdvancedPreferencesModel::roleNames() const
     static const QHash<int, QByteArray> roles = {
         { KeyRole, "keyRole" },
         { TypeRole, "typeRole" },
-        { ValRole, "valueRole" }
+        { ValueRole, "valueRole" },
+        { MinValueRole, "minValueRole" },
+        { MaxValueRole, "maxValueRole" }
     };
 
     return roles;
@@ -87,7 +91,7 @@ void AdvancedPreferencesModel::load()
     Settings::Items items = settings()->items();
 
     for (auto it = items.cbegin(); it != items.cend(); ++it) {
-        if (it->second.canBeMannualyEdited) {
+        if (it->second.canBeManuallyEdited) {
             m_items << it->second;
         }
     }
@@ -122,10 +126,12 @@ QString AdvancedPreferencesModel::typeToString(Val::Type type) const
     case Val::Type::Undefined: return "Undefined";
     case Val::Type::Bool: return "Bool";
     case Val::Type::Int: return "Int";
+    case Val::Type::Int64: return "Int";
     case Val::Type::Double: return "Double";
     case Val::Type::String: return "String";
     case Val::Type::Color: return "Color";
-    case Val::Type::Variant: return "Variant";
+    case Val::Type::List: return "List";
+    case Val::Type::Map: return "Map";
     }
     return "Undefined";
 }

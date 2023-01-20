@@ -23,26 +23,31 @@
 #ifndef __IMPORTMXMLPASS1_H__
 #define __IMPORTMXMLPASS1_H__
 
-#include "libmscore/masterscore.h"
+#include <QXmlStreamReader>
+
 #include "importxmlfirstpass.h"
 #include "musicxml.h" // for the creditwords and MusicXmlPartGroupList definitions
 #include "musicxmlsupport.h"
 
-namespace Ms {
+#include "engraving/engravingerrors.h"
+
+namespace mu::engraving {
+class Score;
+
 //---------------------------------------------------------
 //   PageFormat
 //---------------------------------------------------------
 
 struct PageFormat {
-    QSizeF size;
-    qreal printableWidth;          // _width - left margin - right margin
-    qreal evenLeftMargin;          // values in inch
-    qreal oddLeftMargin;
-    qreal evenTopMargin;
-    qreal evenBottomMargin;
-    qreal oddTopMargin;
-    qreal oddBottomMargin;
-    bool twosided;
+    QSizeF size;                         // automatically initialized (to invalid)
+    qreal printableWidth { 5 };          // _width - left margin - right margin
+    qreal evenLeftMargin { 0.2 };        // values in inch
+    qreal oddLeftMargin { 0.2 };
+    qreal evenTopMargin { 0.2 };
+    qreal evenBottomMargin { 0.2 };
+    qreal oddTopMargin { 0.2 };
+    qreal oddBottomMargin { 0.2 };
+    bool twosided { false };
 };
 
 typedef QMap<QString, Part*> PartMap;
@@ -117,8 +122,8 @@ class MusicXMLParserPass1
 public:
     MusicXMLParserPass1(Score* score, MxmlLogger* logger);
     void initPartState(const QString& partId);
-    Score::FileError parse(QIODevice* device);
-    Score::FileError parse();
+    Err parse(QIODevice* device);
+    Err parse();
     QString errors() const { return _errors; }
     void scorePartwise();
     void identification();

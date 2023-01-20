@@ -23,9 +23,8 @@
 #define MU_NOTATION_IMASTERNOTATION_H
 
 #include "modularity/imoduleexport.h"
-#include "retval.h"
+#include "types/retval.h"
 #include "io/path.h"
-#include "io/device.h"
 
 #include "inotation.h"
 #include "iexcerptnotation.h"
@@ -39,19 +38,24 @@ class IMasterNotation
 public:
     virtual INotationPtr notation() = 0;
 
-    virtual bool isNewlyCreated() const = 0;
     virtual ValNt<bool> needSave() const = 0;
 
-    virtual IExcerptNotationPtr newExcerptBlankNotation() const = 0;
-    virtual ValCh<ExcerptNotationList> excerpts() const = 0;
-    virtual ExcerptNotationList potentialExcerpts() const = 0;
+    virtual IExcerptNotationPtr createEmptyExcerpt(const QString& name = QString()) const = 0;
 
+    virtual ValCh<ExcerptNotationList> excerpts() const = 0;
+    virtual const ExcerptNotationList& potentialExcerpts() const = 0;
+
+    virtual void initExcerpts(const ExcerptNotationList& excerpts) = 0;
     virtual void addExcerpts(const ExcerptNotationList& excerpts) = 0;
     virtual void removeExcerpts(const ExcerptNotationList& excerpts) = 0;
+    virtual void sortExcerpts(ExcerptNotationList& excerpts) = 0;
 
     virtual void setExcerptIsOpen(const INotationPtr excerptNotation, bool opened) = 0;
 
     virtual INotationPartsPtr parts() const = 0;
+    virtual bool hasParts() const = 0;
+    virtual async::Notification hasPartsChanged() const = 0;
+
     virtual INotationPlaybackPtr playback() const = 0;
 };
 

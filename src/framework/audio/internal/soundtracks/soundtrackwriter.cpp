@@ -24,95 +24,90 @@
 
 #include "internal/worker/audioengine.h"
 #include "internal/encoders/mp3encoder.h"
+#include "internal/encoders/oggencoder.h"
+#include "internal/encoders/flacencoder.h"
+#include "internal/encoders/wavencoder.h"
+
+#include "defer.h"
 
 using namespace mu;
 using namespace mu::audio;
 using namespace mu::audio::soundtrack;
 
-static constexpr audioch_t SUPPORTED_AUDIO_CHANNELS_COUNT = 2;
-static constexpr samples_t SAMPLES_PER_CHANNEL = 2048;
-static constexpr size_t INTERNAL_BUFFER_SIZE = SUPPORTED_AUDIO_CHANNELS_COUNT * SAMPLES_PER_CHANNEL;
+static constexpr int WRITE_STEPS = 2;
+static constexpr int PREPARE_STEP = 0;
+static constexpr int ENCODE_STEP = 1;
 
-SoundTrackWriter::SoundTrackWriter(const io::path& destination, const SoundTrackFormat& format, const msecs_t totalDuration,
+SoundTrackWriter::SoundTrackWriter(const io::path_t& destination, const SoundTrackFormat& format, const msecs_t totalDuration,
                                    IAudioSourcePtr source)
-    : m_format(format),
-    m_source(std::move(source))
+    : m_source(std::move(source))
 {
-    m_fileStream = std::fopen(destination.c_str(), "a+");
-
-    if (!m_fileStream || !m_source) {
+    if (!m_source) {
         return;
     }
 
-    samples_t totalSamplesNumber = (totalDuration / 1000.f) * source->audioChannelsCount() * format.sampleRate;
+    samples_t totalSamplesNumber = (totalDuration / 1000000.f) * sizeof(float) * format.sampleRate;
     m_inputBuffer.resize(totalSamplesNumber);
-    m_intermBuffer.resize(INTERNAL_BUFFER_SIZE);
-    m_outputBuffer.resize(requiredOutputBufferSize(format.type, totalSamplesNumber));
-}
+    m_intermBuffer.resize(config()->renderStep() * config()->audioChannelsCount());
 
-SoundTrackWriter::~SoundTrackWriter()
-{
-    std::fclose(m_fileStream);
+    m_encoderPtr = createEncoder(format.type);
+
+    if (!m_encoderPtr) {
+        return;
+    }
+
+    m_encoderPtr->init(destination, format, totalSamplesNumber);
+    m_encoderPtr->progress().progressChanged.onReceive(this, [this](int64_t current, int64_t total, std::string) {
+        sendStepProgress(ENCODE_STEP, current, total);
+    });
 }
 
 bool SoundTrackWriter::write()
 {
     TRACEFUNC;
 
-    if (m_format.type == SoundTrackType::Undefined || !m_source) {
+    if (!m_source || !m_encoderPtr) {
         return false;
     }
 
-    if (!m_fileStream) {
-        return false;
-    }
+    AudioEngine::instance()->setMode(RenderMode::OfflineMode);
 
-    m_source->setSampleRate(m_format.sampleRate);
+    m_source->setSampleRate(m_encoderPtr->format().sampleRate);
     m_source->setIsActive(true);
+
+    DEFER {
+        m_encoderPtr->flush();
+
+        AudioEngine::instance()->setMode(RenderMode::RealTimeMode);
+
+        m_source->setSampleRate(AudioEngine::instance()->sampleRate());
+        m_source->setIsActive(false);
+    };
 
     if (!prepareInputBuffer()) {
         return false;
     }
 
-    if (!writeEncodedOutput()) {
+    if (m_encoderPtr->encode(m_inputBuffer.size() / sizeof(float), m_inputBuffer.data()) == 0) {
         return false;
     }
-
-    completeOutput();
-
-    m_source->setSampleRate(AudioEngine::instance()->sampleRate());
-    m_source->setIsActive(false);
 
     return true;
 }
 
-size_t SoundTrackWriter::encode(const SoundTrackFormat& format, samples_t samplesPerChannel, float* input, char* output)
+framework::Progress SoundTrackWriter::progress()
 {
-    switch (m_format.type) {
-    case SoundTrackType::MP3: return encode::Mp3Encoder::encode(format, samplesPerChannel, input, output);
-    case SoundTrackType::OGG: return 0;
-    case SoundTrackType::FLAC: return 0;
-    default: return 0;
-    }
+    return m_progress;
 }
 
-size_t SoundTrackWriter::flush(char* output, size_t outputSize)
-{
-    switch (m_format.type) {
-    case SoundTrackType::MP3: return encode::Mp3Encoder::flush(output, outputSize);
-    case SoundTrackType::OGG: return 0;
-    case SoundTrackType::FLAC: return 0;
-    default: return 0;
-    }
-}
-
-size_t SoundTrackWriter::requiredOutputBufferSize(const SoundTrackType type, const samples_t samplesPerChannel) const
+encode::AbstractAudioEncoderPtr SoundTrackWriter::createEncoder(const SoundTrackType& type) const
 {
     switch (type) {
-    case SoundTrackType::MP3: return encode::Mp3Encoder::requiredOutputBufferSize(samplesPerChannel);
-    case SoundTrackType::OGG: return 0;
-    case SoundTrackType::FLAC: return 0;
-    default: return 0;
+    case SoundTrackType::MP3: return std::make_unique<encode::Mp3Encoder>();
+    case SoundTrackType::OGG: return std::make_unique<encode::OggEncoder>();
+    case SoundTrackType::FLAC: return std::make_unique<encode::FlacEncoder>();
+    case SoundTrackType::WAV: return std::make_unique<encode::WavEncoder>();
+    default: return nullptr;
     }
 }
 
@@ -121,18 +116,21 @@ bool SoundTrackWriter::prepareInputBuffer()
     size_t inputBufferOffset = 0;
     size_t inputBufferMaxOffset = m_inputBuffer.size();
 
-    while (m_source->process(m_intermBuffer.data(), SAMPLES_PER_CHANNEL) != 0) {
-        if (inputBufferOffset >= inputBufferMaxOffset) {
-            break;
-        }
+    sendStepProgress(PREPARE_STEP, inputBufferOffset, inputBufferMaxOffset);
 
-        size_t samplesToCopy = std::min(INTERNAL_BUFFER_SIZE, inputBufferMaxOffset - inputBufferOffset);
+    samples_t renderStep = config()->renderStep();
+
+    while (inputBufferOffset < inputBufferMaxOffset) {
+        m_source->process(m_intermBuffer.data(), renderStep);
+
+        size_t samplesToCopy = std::min(m_intermBuffer.size(), inputBufferMaxOffset - inputBufferOffset);
 
         std::copy(m_intermBuffer.begin(),
                   m_intermBuffer.begin() + samplesToCopy,
                   m_inputBuffer.begin() + inputBufferOffset);
 
         inputBufferOffset += samplesToCopy;
+        sendStepProgress(PREPARE_STEP, inputBufferOffset, inputBufferMaxOffset);
     }
 
     if (inputBufferOffset == 0) {
@@ -143,17 +141,10 @@ bool SoundTrackWriter::prepareInputBuffer()
     return true;
 }
 
-bool SoundTrackWriter::writeEncodedOutput()
+void SoundTrackWriter::sendStepProgress(int step, int64_t current, int64_t total)
 {
-    samples_t encodedBytes = encode(m_format, m_inputBuffer.size() / SUPPORTED_AUDIO_CHANNELS_COUNT,
-                                    m_inputBuffer.data(), m_outputBuffer.data());
-    std::fwrite(m_outputBuffer.data(), sizeof(char), encodedBytes, m_fileStream);
-
-    return true;
-}
-
-void SoundTrackWriter::completeOutput()
-{
-    samples_t encodedBytes = flush(m_outputBuffer.data(), m_outputBuffer.size());
-    std::fwrite(m_outputBuffer.data(), sizeof(char), encodedBytes, m_fileStream);
+    int stepRange = step == PREPARE_STEP ? 80 : 20;
+    int stepProgressStart = step == PREPARE_STEP ? 0 : 80;
+    int stepCurrentProgress = stepProgressStart + ((current * 100 / total) * stepRange) / 100;
+    m_progress.progressChanged.send(stepCurrentProgress, 100, "");
 }

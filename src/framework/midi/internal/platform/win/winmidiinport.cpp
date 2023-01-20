@@ -29,8 +29,10 @@
 #undef ERROR
 #endif
 
-#include "log.h"
 #include "midierrors.h"
+#include "translation.h"
+#include "defer.h"
+#include "log.h"
 
 struct mu::midi::WinMidiInPort::Win {
     HMIDIIN midiIn;
@@ -55,30 +57,43 @@ static std::string errorString(MMRESULT ret)
 }
 }
 
-WinMidiInPort::~WinMidiInPort()
+void WinMidiInPort::init()
+{
+    m_win = std::make_shared<Win>();
+
+    m_devicesListener.startWithCallback([this]() {
+        return availableDevices();
+    });
+
+    m_devicesListener.devicesChanged().onNotify(this, [this]() {
+        bool connectedDeviceRemoved = true;
+        for (const MidiDevice& device: availableDevices()) {
+            if (m_deviceID == device.id) {
+                connectedDeviceRemoved = false;
+            }
+        }
+
+        if (connectedDeviceRemoved) {
+            disconnect();
+        }
+
+        m_availableDevicesChanged.notify();
+    });
+}
+
+void WinMidiInPort::deinit()
 {
     if (isConnected()) {
         disconnect();
     }
 }
 
-void WinMidiInPort::init()
-{
-    m_win = std::make_shared<Win>();
-
-    m_devicesListener.startWithCallback([this]() {
-        return devices();
-    });
-
-    m_devicesListener.devicesChanged().onNotify(this, [this]() {
-        m_devicesChanged.notify();
-    });
-}
-
-MidiDeviceList WinMidiInPort::devices() const
+MidiDeviceList WinMidiInPort::availableDevices() const
 {
     std::lock_guard lock(m_devicesMutex);
     MidiDeviceList ret;
+
+    ret.push_back({ NONE_DEVICE_ID, trc("midi", "No device") });
 
     unsigned int numDevs = midiInGetNumDevs();
     if (numDevs == 0) {
@@ -93,7 +108,7 @@ MidiDeviceList WinMidiInPort::devices() const
         std::string str(wstr.begin(), wstr.end());
 
         MidiDevice dev;
-        dev.id = std::to_string(i);
+        dev.id = makeUniqueDeviceId(i, devCaps.wMid, devCaps.wPid);
         dev.name = str;
 
         ret.push_back(std::move(dev));
@@ -102,12 +117,12 @@ MidiDeviceList WinMidiInPort::devices() const
     return ret;
 }
 
-mu::async::Notification WinMidiInPort::devicesChanged() const
+mu::async::Notification WinMidiInPort::availableDevicesChanged() const
 {
-    return m_devicesChanged;
+    return m_availableDevicesChanged;
 }
 
-static void CALLBACK proccess(HMIDIIN hMidiIn, UINT wMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2)
+static void CALLBACK process(HMIDIIN hMidiIn, UINT wMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2)
 {
     UNUSED(hMidiIn);
 
@@ -134,22 +149,43 @@ void WinMidiInPort::doProcess(uint32_t message, tick_t timing)
 
 mu::Ret WinMidiInPort::connect(const MidiDeviceID& deviceID)
 {
+    DEFER {
+        m_deviceChanged.notify();
+    };
+
     if (isConnected()) {
         disconnect();
     }
 
-    m_win->deviceID = std::stoi(deviceID);
-    MMRESULT ret = midiInOpen(&m_win->midiIn, m_win->deviceID,
-                              reinterpret_cast<DWORD_PTR>(&proccess),
-                              reinterpret_cast<DWORD_PTR>(this),
-                              CALLBACK_FUNCTION | MIDI_IO_STATUS);
+    Ret ret = make_ok();
 
-    if (ret != MMSYSERR_NOERROR) {
-        return make_ret(Err::MidiFailedConnect, "failed open port, error: " + wmidi_prv::errorString(ret));
+    if (!deviceID.empty() && deviceID != NONE_DEVICE_ID) {
+        std::vector<int> deviceParams = splitDeviceId(deviceID);
+        IF_ASSERT_FAILED(deviceParams.size() == 3) {
+            return make_ret(Err::MidiInvalidDeviceID, "invalid device id: " + deviceID);
+        }
+
+        m_win->deviceID = deviceParams.at(0);
+        MMRESULT ret = midiInOpen(&m_win->midiIn, m_win->deviceID,
+                                  reinterpret_cast<DWORD_PTR>(&process),
+                                  reinterpret_cast<DWORD_PTR>(this),
+                                  CALLBACK_FUNCTION | MIDI_IO_STATUS);
+
+        if (ret != MMSYSERR_NOERROR) {
+            return make_ret(Err::MidiFailedConnect, "failed open port, error: " + wmidi_prv::errorString(ret));
+        }
+
+        m_deviceID = deviceID;
+        ret = run();
+    } else {
+        m_deviceID = deviceID;
     }
 
-    m_deviceID = deviceID;
-    return run();
+    if (ret) {
+        LOGD() << "Connected to " << m_deviceID;
+    }
+
+    return ret;
 }
 
 void WinMidiInPort::disconnect()
@@ -161,6 +197,8 @@ void WinMidiInPort::disconnect()
     midiInClose(m_win->midiIn);
 
     stop();
+
+    LOGD() << "Disconnected from " << m_deviceID;
 
     m_win->midiIn = nullptr;
     m_win->deviceID = -1;
@@ -176,6 +214,16 @@ bool WinMidiInPort::isConnected() const
 MidiDeviceID WinMidiInPort::deviceID() const
 {
     return m_deviceID;
+}
+
+mu::async::Notification WinMidiInPort::deviceChanged() const
+{
+    return m_deviceChanged;
+}
+
+mu::async::Channel<tick_t, Event> WinMidiInPort::eventReceived() const
+{
+    return m_eventReceived;
 }
 
 mu::Ret WinMidiInPort::run()
@@ -208,9 +256,4 @@ void WinMidiInPort::stop()
 
     midiInStop(m_win->midiIn);
     m_running = false;
-}
-
-mu::async::Channel<tick_t, Event> WinMidiInPort::eventReceived() const
-{
-    return m_eventReceived;
 }

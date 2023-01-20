@@ -70,21 +70,26 @@ void MixerChannel::applyOutputParams(const AudioOutputParams& requiredParams)
 
     AudioOutputParams resultParams = requiredParams;
 
-    auto filterOutInvalidFxParams = [this](const std::pair<AudioFxChainOrder, AudioFxParams>& params) {
+    auto findFxProcessor = [this](const std::pair<AudioFxChainOrder, AudioFxParams>& params) -> IFxProcessorPtr {
         for (IFxProcessorPtr& fx : m_fxProcessors) {
-            if (fx->params() == params.second) {
-                return false;
+            if (fx->params().chainOrder != params.first) {
+                continue;
+            }
+
+            if (fx->params().resourceMeta == params.second.resourceMeta) {
+                return fx;
             }
         }
 
-        return true;
+        return nullptr;
     };
 
     for (auto it = resultParams.fxChain.begin(); it != resultParams.fxChain.end();) {
-        if (filterOutInvalidFxParams(*it)) {
-            it = resultParams.fxChain.erase(it);
-        } else {
+        if (IFxProcessorPtr fx = findFxProcessor(*it)) {
+            fx->setActive(it->second.active);
             ++it;
+        } else {
+            it = resultParams.fxChain.erase(it);
         }
     }
 
@@ -166,10 +171,6 @@ samples_t MixerChannel::process(float* buffer, samples_t samplesPerChannel)
     ONLY_AUDIO_WORKER_THREAD;
 
     IF_ASSERT_FAILED(m_audioSource) {
-        return 0;
-    }
-
-    if (m_params.muted) {
         return 0;
     }
 

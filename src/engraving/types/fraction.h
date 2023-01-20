@@ -24,9 +24,10 @@
 #define MU_ENGRAVING_FRACTION_H
 
 #include <cstdint>
+#include <limits>
 #include <numeric>
 
-#include <QString>
+#include "types/string.h"
 
 #include "constants.h"
 
@@ -48,8 +49,8 @@ public:
     int numerator() const { return static_cast<int>(m_numerator); }
     int denominator() const { return static_cast<int>(m_denominator); }
 
-    static constexpr Fraction max() { return Fraction(10000, 1); }
-    // Use this when you need to initialize a Fraction to an arbitrary high value
+    /// Use this when you need to initialize a Fraction to an arbitrary high value
+    static constexpr Fraction max() { return Fraction(std::numeric_limits<int>::max(), 1); }
 
     void setNumerator(int v) { m_numerator = v; }
     void setDenominator(int v)
@@ -89,7 +90,7 @@ public:
 
     Fraction absValue() const
     {
-        return Fraction(static_cast<int>(qAbs(m_numerator)), static_cast<int>(m_denominator));
+        return Fraction(static_cast<int>(std::abs(m_numerator)), static_cast<int>(m_denominator));
     }
 
     Fraction inverse() const
@@ -226,16 +227,16 @@ public:
     Fraction operator/(const Fraction& v) const { return Fraction(*this) /= v; }
     Fraction operator/(int v)             const { return Fraction(*this) /= v; }
 
-    // convertion
+    // conversion
     int ticks() const
     {
         if (m_numerator == -1 && m_denominator == 1) {                  // HACK
             return -1;
         }
 
-        // Constant::division     - ticks per quarter note
-        // Constant::division * 4 - ticks per whole note
-        // result: rounded (Constant::division * 4 * m_numerator * 1.0 / m_denominator) value
+        // Constants::division     - ticks per quarter note
+        // Constants::division * 4 - ticks per whole note
+        // result: rounded (Constants::division * 4 * m_numerator * 1.0 / m_denominator) value
         const int sgn = (m_numerator < 0) ? -1 : 1;
         const auto result = sgn * (static_cast<int_least64_t>(sgn * m_numerator) * Constants::division * 4 + (m_denominator / 2))
                             / m_denominator;
@@ -253,21 +254,18 @@ public:
     // A very small fraction, corresponds to 1 MIDI tick
     static Fraction eps() { return Fraction(1, Constants::division * 4); }
 
-    QString toString() const { return QString("%1/%2").arg(m_numerator).arg(m_denominator); }
-    static Fraction fromString(const QString& str)
+    String toString() const { return String(u"%1/%2").arg(m_numerator, m_denominator); }
+    static Fraction fromString(const String& str)
     {
-        const int i = str.indexOf('/');
-        return (i == -1) ? Fraction(str.toInt(), 1) : Fraction(str.leftRef(i).toInt(), str.midRef(i + 1).toInt());
+        const size_t i = str.indexOf(u'/');
+        return (i == mu::nidx) ? Fraction(str.toInt(), 1) : Fraction(str.left(i).toInt(), str.mid(i + 1).toInt());
     }
+
+    constexpr double toDouble() const { return static_cast<double>(m_numerator) / static_cast<double>(m_denominator); }
 };
 
 inline Fraction operator*(const Fraction& f, int v) { return Fraction(f) *= v; }
 inline Fraction operator*(int v, const Fraction& f) { return Fraction(f) *= v; }
-}
-
-//! NOTE compat
-namespace Ms {
-using Fraction = mu::engraving::Fraction;
 }
 
 #endif // MU_ENGRAVING_FRACTION_H

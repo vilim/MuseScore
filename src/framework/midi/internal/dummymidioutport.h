@@ -31,13 +31,15 @@ public:
 
     void init();
 
-    MidiDeviceList devices() const override;
-    async::Notification devicesChanged() const override;
+    MidiDeviceList availableDevices() const override;
+    async::Notification availableDevicesChanged() const override;
 
     Ret connect(const MidiDeviceID& deviceID) override;
     void disconnect() override;
     bool isConnected() const override;
     MidiDeviceID deviceID() const override;
+
+    bool supportsMIDI20Output() const override;
 
     Ret sendEvent(const Event& e) override;
 

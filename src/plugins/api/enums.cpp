@@ -22,8 +22,10 @@
 
 #include "enums.h"
 
-namespace Ms {
-namespace PluginAPI {
+#include "log.h"
+
+using namespace mu::plugins::api;
+
 //---------------------------------------------------------
 //   Enum::Enum
 //---------------------------------------------------------
@@ -31,10 +33,12 @@ namespace PluginAPI {
 Enum::Enum(const QMetaEnum& _enum, QObject* parent)
     : QQmlPropertyMap(this, parent)
 {
+    IF_ASSERT_FAILED(_enum.isValid()) {
+        return;
+    }
+
     const int nkeys = _enum.keyCount();
     for (int i = 0; i < nkeys; ++i) {
         insert(_enum.key(i), _enum.value(i));
     }
 }
-} // namespace PluginAPI
-} // namespace Ms

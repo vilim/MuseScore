@@ -25,12 +25,10 @@
 
 #include "ui_symboldialog.h"
 
+#include "engraving/iengravingfontsprovider.h"
+
 namespace mu::palette {
 class PaletteWidget;
-}
-
-namespace Ms {
-class EngravingItem;
 
 //---------------------------------------------------------
 //   SymbolDialog
@@ -39,6 +37,8 @@ class EngravingItem;
 class SymbolDialog : public QWidget, Ui::SymbolDialogBase
 {
     Q_OBJECT
+    INJECT(palette, engraving::IEngravingFontsProvider, engravingFonts)
+
 public:
     SymbolDialog(const QString&, QWidget* parent = 0);
 
@@ -57,7 +57,7 @@ private:
     void createSymbols();
 
     QString range;
-    mu::palette::PaletteWidget* m_symbolsWidget = nullptr;
+    PaletteWidget* m_symbolsWidget = nullptr;
 };
 }
 

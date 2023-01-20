@@ -52,11 +52,19 @@ private:
     uicomponents::MenuItemList makeSelectItems();
     uicomponents::MenuItemList makeElementItems();
     uicomponents::MenuItemList makeInsertMeasuresItems();
+    uicomponents::MenuItemList makeChangeInstrumentItems();
+    uicomponents::MenuItemList makeVerticalBoxItems();
+    uicomponents::MenuItemList makeHorizontalBoxItems();
 
     bool isSingleSelection() const;
     bool canSelectSimilarInRange() const;
     bool canSelectSimilar() const;
     bool isDrumsetStaff() const;
+
+    INotationInteractionPtr interaction() const;
+    INotationSelectionPtr selection() const;
+
+    const INotationInteraction::HitElementContext& hitElementContext() const;
 };
 }
 

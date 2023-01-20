@@ -29,7 +29,9 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/diagnosticsmodule.h
     ${CMAKE_CURRENT_LIST_DIR}/diagnosticutils.h
     ${CMAKE_CURRENT_LIST_DIR}/idiagnosticspathsregister.h
+    ${CMAKE_CURRENT_LIST_DIR}/idiagnosticsconfiguration.h
     ${CMAKE_CURRENT_LIST_DIR}/iengravingelementsprovider.h
+    ${CMAKE_CURRENT_LIST_DIR}/iengravingdrawprovider.h
 
     ${CMAKE_CURRENT_LIST_DIR}/internal/diagnosticsconfiguration.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/diagnosticsconfiguration.h
@@ -41,6 +43,19 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/internal/diagnosticspathsregister.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/engravingelementsprovider.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/engravingelementsprovider.h
+
+    ${CMAKE_CURRENT_LIST_DIR}/internal/drawdata/engravingdrawprovider.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/drawdata/engravingdrawprovider.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/drawdata/drawdatagenerator.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/drawdata/drawdatagenerator.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/drawdata/drawdataconverter.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/drawdata/drawdataconverter.h
+
+    ${CMAKE_CURRENT_LIST_DIR}/internal/isavediagnosticfilesscenario.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/savediagnosticfilesscenario.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/savediagnosticfilesscenario.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/diagnosticfileswriter.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/diagnosticfileswriter.h
 
     ${CMAKE_CURRENT_LIST_DIR}/view/diagnosticspathsmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/diagnosticspathsmodel.h
@@ -71,7 +86,6 @@ set(MODULE_SRC
 # --- Crashpad ---
 # Not building with MinGW, so turned off for MinGW
 include(GetCompilerInfo)
-set(BUILD_CRASHPAD_CLIENT ON)
 if (CC_IS_MINGW)
     set(BUILD_CRASHPAD_CLIENT OFF)
 endif(CC_IS_MINGW)
@@ -97,17 +111,32 @@ if (BUILD_CRASHPAD_CLIENT)
         gcrashpad
     )
 
+    # Install crashpad handler
+    set(CPAD_ROOT_PATH ${CMAKE_CURRENT_LIST_DIR}/crashpad_handler)
+    if (OS_IS_LIN)
+        if (NOT CRASHPAD_HANDLER_PATH)
+            set(CRASHPAD_HANDLER_PATH ${CPAD_ROOT_PATH}/linux/x86-64/crashpad_handler)
+        endif()
+
+        install(PROGRAMS ${CRASHPAD_HANDLER_PATH} DESTINATION bin)
+    elseif(OS_IS_WIN)
+        if (NOT CRASHPAD_HANDLER_PATH)
+            set(CRASHPAD_HANDLER_PATH ${CPAD_ROOT_PATH}/windows/x86-64/crashpad_handler.exe)
+        endif()
+
+        install(PROGRAMS ${CRASHPAD_HANDLER_PATH} DESTINATION bin)
+    elseif(OS_IS_MAC)
+        if (NOT CRASHPAD_HANDLER_PATH)
+            set(CRASHPAD_HANDLER_PATH ${CPAD_ROOT_PATH}/macos/x86-64/crashpad_handler)
+        endif()
+
+        install(PROGRAMS ${CRASHPAD_HANDLER_PATH} DESTINATION ${Mscore_SHARE_NAME}Contents/MacOS)
+    endif()
 endif(BUILD_CRASHPAD_CLIENT)
 # ----------------
 
-include(${PROJECT_SOURCE_DIR}/build/module.cmake)
+set(MODULE_INCLUDE ${MODULE_INCLUDE}
+    ${PROJECT_SOURCE_DIR}/src/importexport/guitarpro
+)
 
-# === Install crashpad handler ===
-set(CPAD_ROOT_PATH ${CMAKE_CURRENT_LIST_DIR}/crashpad_handler)
-if (OS_IS_LIN)
-    install(PROGRAMS ${CPAD_ROOT_PATH}/linux/x86-64/crashpad_handler DESTINATION bin)
-elseif(OS_IS_WIN)
-    install(PROGRAMS ${CPAD_ROOT_PATH}/windows/x86-64/crashpad_handler.exe DESTINATION bin)
-elseif(OS_IS_MAC)
-    install(PROGRAMS ${CPAD_ROOT_PATH}/macos/x86-64/crashpad_handler DESTINATION ${Mscore_SHARE_NAME}Contents/MacOS)
-endif()
+include(SetupModule)

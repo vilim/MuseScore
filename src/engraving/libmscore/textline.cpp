@@ -24,14 +24,12 @@
 #include "rw/xml.h"
 
 #include "score.h"
-#include "staff.h"
 #include "system.h"
 #include "undo.h"
-#include "musescoreCore.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   textLineSegmentStyle
 //---------------------------------------------------------
@@ -70,6 +68,7 @@ static const ElementStyle textLineStyle {
     { Sid::textLineTextAlign,                  Pid::END_TEXT_ALIGN },
     { Sid::textLinePlacement,                  Pid::PLACEMENT },
     { Sid::textLinePosAbove,                   Pid::OFFSET },
+    { Sid::textLineFontSpatiumDependent,       Pid::TEXT_SIZE_SPATIUM_DEPENDENT },
 };
 
 //---------------------------------------------------------
@@ -145,9 +144,9 @@ TextLine::TextLine(EngravingItem* parent, bool system)
 
     initStyle();
 
-    setBeginText("");
-    setContinueText("");
-    setEndText("");
+    setBeginText(u"");
+    setContinueText(u"");
+    setEndText(u"");
     setBeginTextOffset(PointF(0, 0));
     setContinueTextOffset(PointF(0, 0));
     setEndTextOffset(PointF(0, 0));
@@ -189,19 +188,19 @@ void TextLine::initStyle()
 
 void TextLine::write(XmlWriter& xml) const
 {
-    if (!xml.canWrite(this)) {
+    if (!xml.context()->canWrite(this)) {
         return;
     }
     if (systemFlag()) {
-        xml.startObject(QString("TextLine"), this, QString("system=\"1\""));
+        xml.startElement(this, { { "system", "1" } });
     } else {
-        xml.startObject(this);
+        xml.startElement(this);
     }
     // other styled properties are included in TextLineBase pids list
     writeProperty(xml, Pid::PLACEMENT);
     writeProperty(xml, Pid::OFFSET);
     TextLineBase::writeProperties(xml);
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -359,25 +358,4 @@ void TextLine::undoChangeProperty(Pid id, const engraving::PropertyValue& v, Pro
     }
     TextLineBase::undoChangeProperty(id, v, ps);
 }
-
-//---------------------------------------------------------
-//   layoutSystem
-//    layout spannersegment for system
-//---------------------------------------------------------
-
-SpannerSegment* TextLine::layoutSystem(System* system)
-{
-    TextLineSegment* tls = toTextLineSegment(TextLineBase::layoutSystem(system));
-
-    if (tls->spanner()) {
-        for (SpannerSegment* ss : tls->spanner()->spannerSegments()) {
-            ss->setFlag(ElementFlag::SYSTEM, systemFlag());
-            ss->setTrack(systemFlag() ? 0 : track());
-        }
-        tls->spanner()->setFlag(ElementFlag::SYSTEM, systemFlag());
-        tls->spanner()->setTrack(systemFlag() ? 0 : track());
-    }
-
-    return tls;
-}
-}     // namespace Ms
+} // namespace mu::engraving

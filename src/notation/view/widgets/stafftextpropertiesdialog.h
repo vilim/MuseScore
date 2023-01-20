@@ -26,24 +26,17 @@
 
 #include "modularity/ioc.h"
 #include "context/iglobalcontext.h"
-#include "inotationconfiguration.h"
-#include "ui/iuiconfiguration.h"
 
-class QPushButton;
-class QToolButton;
-class QComboBox;
-class QTreeWidgetItem;
-
-namespace Ms {
+namespace mu::engraving {
 class StaffTextBase;
+}
 
+namespace mu::notation {
 class StaffTextPropertiesDialog : public QDialog, public Ui::StaffTextPropertiesDialog
 {
     Q_OBJECT
 
-    INJECT(Ms, mu::context::IGlobalContext, globalContext)
-    INJECT(Ms, mu::notation::INotationConfiguration, configuration)
-    INJECT(Ms, mu::ui::IUiConfiguration, uiConfiguration)
+    INJECT(notation, context::IGlobalContext, globalContext)
 
 public:
     StaffTextPropertiesDialog(QWidget* parent = nullptr);
@@ -54,25 +47,18 @@ public:
 
 private slots:
     void saveValues();
-    void channelItemChanged(QTreeWidgetItem*, QTreeWidgetItem*);
-    void voiceButtonClicked(int);
-    void tabChanged(int tab);
     void setSwingControls(bool);
 
 private:
     void hideEvent(QHideEvent*) override;
 
-    void saveChannel(int channel);
+    INotationUndoStackPtr undoStack() const;
 
-    StaffTextBase* m_originStaffText = nullptr;
-    StaffTextBase* m_staffText = nullptr;
-    QToolButton* m_vb[VOICES][VOICES];
-    QComboBox* m_channelCombo[VOICES];
-    QPushButton* m_stops[4][16];
-    int m_curTabIndex = 0;
+    engraving::StaffTextBase* m_originStaffText = nullptr;
+    engraving::StaffTextBase* m_staffText = nullptr;
 };
 }
 
-Q_DECLARE_METATYPE(Ms::StaffTextPropertiesDialog)
+Q_DECLARE_METATYPE(mu::notation::StaffTextPropertiesDialog)
 
 #endif // MU_NOTATION_STAFFTEXTPROPERTIESDIALOG_H

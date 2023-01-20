@@ -23,11 +23,12 @@
 #ifndef __SELECT_H__
 #define __SELECT_H__
 
-#include "pitchspelling.h"
-#include "mscore.h"
 #include "durationtype.h"
+#include "mscore.h"
+#include "pitchspelling.h"
+#include "types.h"
 
-namespace Ms {
+namespace mu::engraving {
 class Score;
 class Page;
 class System;
@@ -43,7 +44,7 @@ class Chord;
 //---------------------------------------------------------
 
 struct ElementPattern {
-    std::list<EngravingItem*> el;
+    std::vector<EngravingItem*> el;
     int type = 0;
     int subtype = 0;
     staff_idx_t staffStart = 0;
@@ -171,10 +172,10 @@ class Selection
     Fraction _currentTick;    // tracks the most recent selection
     track_idx_t _currentTrack = 0;
 
-    QString _lockReason;
+    String _lockReason;
 
-    QByteArray staffMimeData() const;
-    QByteArray symbolListMimeData() const;
+    mu::ByteArray staffMimeData() const;
+    mu::ByteArray symbolListMimeData() const;
     SelectionFilter selectionFilter() const;
     bool canSelect(EngravingItem* e) const { return selectionFilter().canSelect(e); }
     bool canSelectVoice(track_idx_t track) const { return selectionFilter().canSelectVoice(track); }
@@ -192,12 +193,13 @@ public:
     void setState(SelState s);
 
     //! NOTE If locked, the selected items should not be changed.
-    void lock(const QString& reason) { _lockReason = reason; }
-    void unlock(const QString& reason) { Q_UNUSED(reason); _lockReason.clear(); }    // reason for clarity
+    void lock(const String& reason) { _lockReason = reason; }
+    void unlock(const String& /*reason*/) { _lockReason.clear(); }    // reason for clarity
     bool isLocked() const { return !_lockReason.isEmpty(); }
-    const QString& lockReason() const { return _lockReason; }
+    const String& lockReason() const { return _lockReason; }
 
     const std::vector<EngravingItem*>& elements() const { return _el; }
+    std::vector<EngravingItem*> elements(ElementType type) const;
     std::vector<Note*> noteList(track_idx_t track = mu::nidx) const;
 
     const std::list<EngravingItem*> uniqueElements() const;
@@ -218,8 +220,8 @@ public:
     void update();
     void updateState();
     void dump();
-    QString mimeType() const;
-    QByteArray mimeData() const;
+    String mimeType() const;
+    mu::ByteArray mimeData() const;
 
     Segment* startSegment() const { return _startSegment; }
     Segment* endSegment() const { return _endSegment; }
@@ -247,5 +249,5 @@ public:
     void extendRangeSelection(ChordRest* cr);
     void extendRangeSelection(Segment* seg, Segment* segAfter, staff_idx_t staffIdx, const Fraction& tick, const Fraction& etick);
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

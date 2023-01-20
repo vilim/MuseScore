@@ -21,6 +21,7 @@
  */
 
 #include "dynamichairpingroup.h"
+
 #include "dynamic.h"
 #include "hairpin.h"
 #include "score.h"
@@ -28,7 +29,7 @@
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 static std::pair<Hairpin*, Hairpin*> findAdjacentHairpins(Dynamic* d)
 {
     Score* score = d->score();
@@ -216,4 +217,4 @@ void DynamicNearHairpinsDragGroup::endDrag(EditData& ed)
     dynamic->endDrag(ed);
     dynamic->triggerLayout();
 }
-} // namespace Ms
+} // namespace mu::engraving

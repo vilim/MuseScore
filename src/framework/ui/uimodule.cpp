@@ -22,6 +22,7 @@
 #include "uimodule.h"
 
 #include <QtQml>
+#include <QFontDatabase>
 
 #include "modularity/ioc.h"
 
@@ -53,6 +54,8 @@
 #include "view/navigationevent.h"
 #include "view/qmlaccessible.h"
 #include "view/focuslistener.h"
+
+#include "view/internal/errordetailsmodel.h"
 
 #include "dev/interactivetestsmodel.h"
 #include "dev/testdialog.h"
@@ -140,15 +143,24 @@ void UiModule::registerUiTypes()
     qmlRegisterType<MainWindowProvider>("MuseScore.Ui", 1, 0, "MainWindowProvider");
 #endif
 
+    qmlRegisterType<ErrorDetailsModel>("MuseScore.Ui", 1, 0, "ErrorDetailsModel");
+
     qmlRegisterType<InteractiveTestsModel>("MuseScore.Ui", 1, 0, "InteractiveTestsModel");
     qRegisterMetaType<TestDialog>("TestDialog");
 
     modularity::ioc()->resolve<ui::IUiEngine>(moduleName())->addSourceImportPath(ui_QML_IMPORT);
 }
 
+void UiModule::onPreInit(const framework::IApplication::RunMode&)
+{
+    s_configuration->initSettings();
+}
+
 void UiModule::onInit(const framework::IApplication::RunMode&)
 {
-    s_configuration->init();
+    QFontDatabase::addApplicationFont(":/fonts/mscore/MusescoreIcon.ttf"); // icons
+
+    s_configuration->initThemes();
     s_keyNavigationController->init();
 }
 

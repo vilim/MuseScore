@@ -75,15 +75,22 @@ void VstFxResolver::refresh()
     pluginModulesRepo()->refresh();
 }
 
+void VstFxResolver::clearAllFx()
+{
+    pluginsRegister()->unregisterAllFx();
+
+    m_tracksFxMap.clear();
+    m_masterFxMap.clear();
+    m_pluginsToUnload.clear();
+}
+
 VstFxPtr VstFxResolver::createMasterFx(const audio::AudioFxParams& fxParams) const
 {
-    PluginModulePtr modulePtr = pluginModulesRepo()->pluginModule(fxParams.resourceMeta.id);
-
-    IF_ASSERT_FAILED(modulePtr) {
+    if (!pluginModulesRepo()->exists(fxParams.resourceMeta.id)) {
         return nullptr;
     }
 
-    VstPluginPtr pluginPtr = std::make_shared<VstPlugin>(modulePtr);
+    VstPluginPtr pluginPtr = std::make_shared<VstPlugin>(fxParams.resourceMeta.id);
     pluginsRegister()->registerMasterFxPlugin(fxParams.resourceMeta.id, fxParams.chainOrder, pluginPtr);
 
     pluginPtr->load();
@@ -96,16 +103,14 @@ VstFxPtr VstFxResolver::createMasterFx(const audio::AudioFxParams& fxParams) con
 
 VstFxPtr VstFxResolver::createTrackFx(const audio::TrackId trackId, const audio::AudioFxParams& fxParams) const
 {
-    PluginModulePtr modulePtr = pluginModulesRepo()->pluginModule(fxParams.resourceMeta.id);
-
-    if (!modulePtr) {
+    if (!pluginModulesRepo()->exists(fxParams.resourceMeta.id)) {
         LOGE() << "Unable to create VST plugin"
                << ", pluginId: " << fxParams.resourceMeta.id
                << ", trackId: " << trackId;
         return nullptr;
     }
 
-    VstPluginPtr pluginPtr = std::make_shared<VstPlugin>(modulePtr);
+    VstPluginPtr pluginPtr = std::make_shared<VstPlugin>(fxParams.resourceMeta.id);
     pluginsRegister()->registerFxPlugin(trackId, fxParams.resourceMeta.id, fxParams.chainOrder, pluginPtr);
 
     pluginPtr->load();
@@ -127,9 +132,13 @@ void VstFxResolver::updateTrackFxMap(FxMap& fxMap, const audio::TrackId trackId,
     fxChainToRemove(currentFxChain, newFxChain, fxToRemove);
 
     for (const auto& pair : fxToRemove) {
+        VstPluginPtr plugin = pluginsRegister()->fxPlugin(trackId, pair.second.resourceMeta.id, pair.second.chainOrder);
         pluginsRegister()->unregisterFxPlugin(trackId, pair.second.resourceMeta.id, pair.second.chainOrder);
+
         currentFxChain.erase(pair.first);
         fxMap.erase(pair.first);
+
+        unloadPlugin(plugin);
     }
 
     audio::AudioFxChain fxToCreate;
@@ -155,16 +164,23 @@ void VstFxResolver::updateMasterFxMap(const AudioFxChain& newFxChain)
     fxChainToRemove(currentFxChain, newFxChain, fxToRemove);
 
     for (const auto& pair : fxToRemove) {
+        VstPluginPtr plugin = pluginsRegister()->masterFxPlugin(pair.second.resourceMeta.id, pair.second.chainOrder);
         pluginsRegister()->unregisterMasterFxPlugin(pair.second.resourceMeta.id, pair.second.chainOrder);
+
         currentFxChain.erase(pair.first);
         m_masterFxMap.erase(pair.first);
+
+        unloadPlugin(plugin);
     }
 
     audio::AudioFxChain fxToCreate;
     fxChainToCreate(currentFxChain, newFxChain, fxToCreate);
 
     for (const auto& pair : fxToCreate) {
-        m_masterFxMap.emplace(pair.first, createMasterFx(pair.second));
+        VstFxPtr fx = createMasterFx(pair.second);
+        if (fx) {
+            m_masterFxMap.emplace(pair.first, fx);
+        }
     }
 }
 
@@ -180,7 +196,7 @@ void VstFxResolver::fxChainToRemove(const AudioFxChain& currentFxChain,
             continue;
         }
 
-        if (it->second != newIt->second) {
+        if (it->second.resourceMeta != newIt->second.resourceMeta) {
             resultChain.insert({ it->first, it->second });
         }
     }
@@ -199,4 +215,15 @@ void VstFxResolver::fxChainToCreate(const AudioFxChain& currentFxChain,
             resultChain.insert({ it->first, it->second });
         }
     }
+}
+
+void VstFxResolver::unloadPlugin(VstPluginPtr plugin)
+{
+    m_pluginsToUnload.push_back(plugin);
+
+    plugin->unloadingCompleted().onNotify(this, [this, plugin]() {
+        mu::remove(m_pluginsToUnload, plugin);
+    });
+
+    plugin->unload();
 }

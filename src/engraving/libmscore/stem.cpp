@@ -24,20 +24,20 @@
 #include <cmath>
 
 #include "rw/xml.h"
-#include "draw/brush.h"
+#include "draw/types/brush.h"
 
-#include "staff.h"
+#include "beam.h"
 #include "chord.h"
-#include "score.h"
-#include "stafftype.h"
 #include "hook.h"
-#include "tremolo.h"
 #include "note.h"
+#include "score.h"
+#include "staff.h"
+#include "stafftype.h"
+#include "tremolo.h"
 
 using namespace mu;
 using namespace mu::draw;
 using namespace mu::engraving;
-using namespace Ms;
 
 static const ElementStyle stemStyle {
     { Sid::stemWidth, Pid::LINE_WIDTH }
@@ -105,7 +105,7 @@ void Stem::layout()
                 y1 = note->stemDownNW().y();
             }
 
-            rypos() = note->rypos();
+            setPosY(note->ypos());
         }
 
         if (chord()->hook() && !chord()->beam()) {
@@ -121,8 +121,11 @@ void Stem::layout()
     double lineX = isTabStaff ? 0.0 : _up * lineWidthCorrection;
     m_line.setLine(lineX, y1, lineX, y2);
 
+    // HACK: if there is a beam, extend the bounding box of the stem (NOT the stem itself) by half beam width.
+    // This way the bbox of the stem covers also the beam position. Hugely helps with all the collision checks.
+    double beamCorrection = (chord() && chord()->beam()) ? _up * score()->styleMM(Sid::beamWidth) * mag() / 2 : 0.0;
     // compute line and bounding rectangle
-    RectF rect(m_line.p1(), m_line.p2());
+    RectF rect(m_line.p1(), m_line.p2() + PointF(0.0, beamCorrection));
     setbbox(rect.normalized().adjusted(-lineWidthCorrection, 0, lineWidthCorrection, 0));
 }
 
@@ -168,26 +171,26 @@ void Stem::draw(mu::draw::Painter* painter) const
     }
 
     // TODO: adjust bounding rectangle in layout() for dots and for slash
-    qreal sp = spatium();
+    double sp = spatium();
     bool isUp = up();
 
     // slashed half note stem
     if (chord()->durationType().type() == DurationType::V_HALF
         && staffType->minimStyle() == TablatureMinimStyle::SLASHED) {
         // position slashes onto stem
-        qreal y = isUp ? -length() + STAFFTYPE_TAB_SLASH_2STARTY_UP * sp
-                  : length() - STAFFTYPE_TAB_SLASH_2STARTY_DN * sp;
+        double y = isUp ? -length() + STAFFTYPE_TAB_SLASH_2STARTY_UP * sp
+                   : length() - STAFFTYPE_TAB_SLASH_2STARTY_DN * sp;
         // if stems through, try to align slashes within or across lines
         if (staffType->stemThrough()) {
-            qreal halfLineDist = staffType->lineDistance().val() * sp * 0.5;
-            qreal halfSlashHgt = STAFFTYPE_TAB_SLASH_2TOTHEIGHT * sp * 0.5;
+            double halfLineDist = staffType->lineDistance().val() * sp * 0.5;
+            double halfSlashHgt = STAFFTYPE_TAB_SLASH_2TOTHEIGHT * sp * 0.5;
             y = lrint((y + halfSlashHgt) / halfLineDist) * halfLineDist - halfSlashHgt;
         }
         // draw slashes
-        qreal hlfWdt= sp * STAFFTYPE_TAB_SLASH_WIDTH * 0.5;
-        qreal sln   = sp * STAFFTYPE_TAB_SLASH_SLANTY;
-        qreal thk   = sp * STAFFTYPE_TAB_SLASH_THICK;
-        qreal displ = sp * STAFFTYPE_TAB_SLASH_DISPL;
+        double hlfWdt= sp * STAFFTYPE_TAB_SLASH_WIDTH * 0.5;
+        double sln   = sp * STAFFTYPE_TAB_SLASH_SLANTY;
+        double thk   = sp * STAFFTYPE_TAB_SLASH_THICK;
+        double displ = sp * STAFFTYPE_TAB_SLASH_DISPL;
         PainterPath path;
         for (int i = 0; i < 2; ++i) {
             path.moveTo(hlfWdt, y);                   // top-right corner
@@ -207,9 +210,9 @@ void Stem::draw(mu::draw::Painter* painter) const
     // with tablatures and stems beside staves, dots are not drawn near 'notes', but near stems
     int nDots = chord()->dots();
     if (nDots > 0 && !staffType->stemThrough()) {
-        qreal x     = chord()->dotPosX();
-        qreal y     = ((STAFFTYPE_TAB_DEFAULTSTEMLEN_DN * 0.2) * sp) * (isUp ? -1.0 : 1.0);
-        qreal step  = score()->styleS(Sid::dotDotDistance).val() * sp;
+        double x     = chord()->dotPosX();
+        double y     = ((STAFFTYPE_TAB_DEFAULTSTEMLEN_DN * 0.2) * sp) * (isUp ? -1.0 : 1.0);
+        double step  = score()->styleS(Sid::dotDotDistance).val() * sp;
         for (int dot = 0; dot < nDots; dot++, x += step) {
             drawSymbol(SymId::augmentationDot, painter, PointF(x, y));
         }
@@ -218,11 +221,11 @@ void Stem::draw(mu::draw::Painter* painter) const
 
 void Stem::write(XmlWriter& xml) const
 {
-    xml.startObject(this);
+    xml.startElement(this);
     EngravingItem::writeProperties(xml);
     writeProperty(xml, Pid::USER_LEN);
     writeProperty(xml, Pid::LINE_WIDTH);
-    xml.endObject();
+    xml.endElement();
 }
 
 void Stem::read(XmlReader& e)
@@ -236,7 +239,7 @@ void Stem::read(XmlReader& e)
 
 bool Stem::readProperties(XmlReader& e)
 {
-    const QStringRef& tag(e.name());
+    const AsciiStringView tag(e.name());
 
     if (readProperty(tag, e, Pid::USER_LEN)) {
     } else if (readStyledProperty(e, tag)) {
@@ -255,6 +258,13 @@ std::vector<mu::PointF> Stem::gripsPositions(const EditData&) const
 void Stem::startEdit(EditData& ed)
 {
     EngravingItem::startEdit(ed);
+    ElementEditDataPtr eed = ed.getData(this);
+    eed->pushProperty(Pid::USER_LEN);
+}
+
+void Stem::startEditDrag(EditData& ed)
+{
+    EngravingItem::startEditDrag(ed);
     ElementEditDataPtr eed = ed.getData(this);
     eed->pushProperty(Pid::USER_LEN);
 }

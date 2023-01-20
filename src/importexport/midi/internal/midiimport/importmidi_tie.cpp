@@ -36,10 +36,12 @@
 
 #include "log.h"
 
-namespace Ms {
+using namespace mu::engraving;
+
+namespace mu::iex::midi {
 namespace MidiTie {
 static bool isTied(const Segment* seg, track_idx_t strack, voice_idx_t voice,
-                   Ms::Tie* (Note::* tieFunc)() const)
+                   mu::engraving::Tie* (Note::* tieFunc)() const)
 {
     ChordRest* cr = static_cast<ChordRest*>(seg->element(strack + voice));
     if (cr && cr->isChord()) {
@@ -150,4 +152,4 @@ bool areTiesConsistent(const Staff* staff)
 
 #endif
 } // namespace MidiTie
-} // namespace Ms
+} // namespace mu::iex::midi

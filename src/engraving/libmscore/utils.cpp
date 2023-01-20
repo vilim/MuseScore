@@ -23,35 +23,31 @@
 #include "utils.h"
 
 #include <cmath>
-#include <QtMath>
-#include <QRegularExpression>
 #include <map>
 
 #include "containers.h"
-#include "translation.h"
 
-#include "config.h"
-#include "score.h"
-#include "page.h"
-#include "segment.h"
-#include "clef.h"
-#include "system.h"
-#include "measure.h"
-#include "pitchspelling.h"
-#include "chordrest.h"
-#include "part.h"
-#include "staff.h"
-#include "note.h"
 #include "chord.h"
-#include "key.h"
+#include "chordrest.h"
+#include "clef.h"
+#include "config.h"
+#include "measure.h"
+#include "note.h"
+#include "page.h"
+#include "part.h"
+#include "pitchspelling.h"
+#include "score.h"
+#include "segment.h"
 #include "sig.h"
+#include "staff.h"
+#include "system.h"
 #include "tuplet.h"
 
 #include "log.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   handleRect
 //---------------------------------------------------------
@@ -77,7 +73,7 @@ Measure* Score::tick2measure(const Fraction& tick) const
     Measure* lm = 0;
     for (Measure* m = firstMeasure(); m; m = m->nextMeasure()) {
         if (tick < m->tick()) {
-            Q_ASSERT(lm);
+            assert(lm);
             return lm;
         }
         lm = m;
@@ -108,7 +104,7 @@ Measure* Score::tick2measureMM(const Fraction& t) const
 
     for (Measure* m = firstMeasureMM(); m; m = m->nextMeasureMM()) {
         if (tick < m->tick()) {
-            Q_ASSERT(lm);
+            assert(lm);
             return lm;
         }
         lm = m;
@@ -278,7 +274,7 @@ int getStaff(System* system, const PointF& p)
 {
     PointF pp = p - system->page()->pos() - system->pos();
     for (size_t i = 0; i < system->page()->score()->nstaves(); ++i) {
-        qreal sp = system->spatium();
+        double sp = system->spatium();
         RectF r = system->bboxStaff(static_cast<int>(i)).adjusted(0.0, -sp, 0.0, sp);
         if (r.contains(pp)) {
             return static_cast<int>(i);
@@ -442,7 +438,7 @@ int pitchKeyAdjust(int step, Key key)
 //   y2pitch
 //---------------------------------------------------------
 
-int y2pitch(qreal y, ClefType clef, qreal _spatium)
+int y2pitch(double y, ClefType clef, double _spatium)
 {
     int l = lrint(y / _spatium * 2.0);
     return line2pitch(l, clef, Key::C);
@@ -457,10 +453,10 @@ int line2pitch(int line, ClefType clef, Key key)
 {
     int l      = ClefInfo::pitchOffset(clef) - line;
     int octave = 0;
-    while (l < 0) {
-        l += 7;
-        octave++;
+    if (l < 0) {
+        l = 0;
     }
+
     octave += l / 7;
     l       = l % 7;
 
@@ -486,33 +482,33 @@ int quantizeLen(int len, int raster)
     return int(((float)len / raster) + 0.5) * raster;   //round to the closest multiple of raster
 }
 
-static const char* vall[] = {
-    QT_TRANSLATE_NOOP("utils", "c"),
-    QT_TRANSLATE_NOOP("utils", "c♯"),
-    QT_TRANSLATE_NOOP("utils", "d"),
-    QT_TRANSLATE_NOOP("utils", "d♯"),
-    QT_TRANSLATE_NOOP("utils", "e"),
-    QT_TRANSLATE_NOOP("utils", "f"),
-    QT_TRANSLATE_NOOP("utils", "f♯"),
-    QT_TRANSLATE_NOOP("utils", "g"),
-    QT_TRANSLATE_NOOP("utils", "g♯"),
-    QT_TRANSLATE_NOOP("utils", "a"),
-    QT_TRANSLATE_NOOP("utils", "a♯"),
-    QT_TRANSLATE_NOOP("utils", "b")
+static const char16_t* vall[] = {
+    u"c",
+    u"c♯",
+    u"d",
+    u"d♯",
+    u"e",
+    u"f",
+    u"f♯",
+    u"g",
+    u"g♯",
+    u"a",
+    u"a♯",
+    u"b"
 };
-static const char* valu[] = {
-    QT_TRANSLATE_NOOP("utils", "C"),
-    QT_TRANSLATE_NOOP("utils", "C♯"),
-    QT_TRANSLATE_NOOP("utils", "D"),
-    QT_TRANSLATE_NOOP("utils", "D♯"),
-    QT_TRANSLATE_NOOP("utils", "E"),
-    QT_TRANSLATE_NOOP("utils", "F"),
-    QT_TRANSLATE_NOOP("utils", "F♯"),
-    QT_TRANSLATE_NOOP("utils", "G"),
-    QT_TRANSLATE_NOOP("utils", "G♯"),
-    QT_TRANSLATE_NOOP("utils", "A"),
-    QT_TRANSLATE_NOOP("utils", "A♯"),
-    QT_TRANSLATE_NOOP("utils", "B")
+static const char16_t* valu[] = {
+    u"C",
+    u"C♯",
+    u"D",
+    u"D♯",
+    u"E",
+    u"F",
+    u"F♯",
+    u"G",
+    u"G♯",
+    u"A",
+    u"A♯",
+    u"B"
 };
 
 /*!
@@ -527,16 +523,16 @@ static const char* valu[] = {
  * @return
  *  The string representation of the note.
  */
-QString pitch2string(int v)
+String pitch2string(int v)
 {
     if (v < 0 || v > 127) {
-        return QString("----");
+        return String(u"----");
     }
     int octave = (v / 12) - 1;
-    QString o;
-    o = QString::asprintf("%d", octave);
+    String o;
+    o = String::number(octave);
     int i = v % 12;
-    return qtrc("utils", octave < 0 ? valu[i] : vall[i]) + o;
+    return (octave < 0 ? valu[i] : vall[i]) + o;
 }
 
 /*!
@@ -579,7 +575,7 @@ Interval intervalList[intervalListSize] = {
     Interval(6, 11),          // 22 Major Seventh
     Interval(6, 12),          // 23 Augmented Seventh
 
-    Interval(7, 11),          // 24 Diminshed Octave
+    Interval(7, 11),          // 24 Diminished Octave
     Interval(7, 12)           // 25 Perfect Octave
 };
 
@@ -638,63 +634,6 @@ int searchInterval(int steps, int semitones)
         }
     }
     return -1;
-}
-
-static int _majorVersion, _minorVersion, _patchVersion;
-
-/*!
- * Returns the program version
- *
- * @return
- *  Version in the format: MMmmpp
- *  Where M=Major, m=minor, and p=patch
- */
-
-int version()
-{
-    QRegularExpression versionRegEx("(\\d+)\\.(\\d+)\\.(\\d+)");
-    QRegularExpressionMatch versionMatch = versionRegEx.match(VERSION);
-    if (versionMatch.hasMatch()) {
-        QStringList versionStringList = versionMatch.capturedTexts();
-        if (versionStringList.size() == 4) {
-            _majorVersion = versionStringList[1].toInt();
-            _minorVersion = versionStringList[2].toInt();
-            _patchVersion = versionStringList[3].toInt();
-            return _majorVersion * 10000 + _minorVersion * 100 + _patchVersion;
-        }
-    }
-    LOGD() << "Could not parse version:" << VERSION;
-    return 0;
-}
-
-//---------------------------------------------------------
-//   majorVersion
-//---------------------------------------------------------
-
-int majorVersion()
-{
-    version();
-    return _majorVersion;
-}
-
-//---------------------------------------------------------
-//   minorVersion
-//---------------------------------------------------------
-
-int minorVersion()
-{
-    version();
-    return _minorVersion;
-}
-
-//---------------------------------------------------------
-//   patchVersion
-//---------------------------------------------------------
-
-int patchVersion()
-{
-    version();
-    return _patchVersion;
 }
 
 //---------------------------------------------------------
@@ -1011,6 +950,118 @@ int step2pitch(int step)
 }
 
 //---------------------------------------------------------
+//   convertLine
+// find the line in clefF corresponding to lineL2 in clefR
+//---------------------------------------------------------
+
+int convertLine(int lineL2, ClefType clefL, ClefType clefR)
+{
+    int lineR2 = lineL2;
+    int goalpitch = line2pitch(lineL2, clefL, Key::C);
+    int p;
+    while ((p = line2pitch(lineR2, clefR, Key::C)) > goalpitch && p < 127) {
+        lineR2++;
+    }
+    while ((p = line2pitch(lineR2, clefR, Key::C)) < goalpitch && p > 0) {
+        lineR2--;
+    }
+    return lineR2;
+}
+
+//---------------------------------------------------------
+//   convertLine
+// find the line in clef for NoteL corresponding to lineL2 in clef for noteR
+// for example middle C is line 10 in Treble clef, but is line -2 in Bass clef.
+//---------------------------------------------------------
+
+int convertLine(int lineL2, const Note* noteL, const Note* noteR)
+{
+    return convertLine(lineL2,
+                       noteL->chord()->staff()->clef(noteL->chord()->tick()),
+                       noteR->chord()->staff()->clef(noteR->chord()->tick()));
+}
+
+//---------------------------------------------------------
+//   chromaticPitchSteps -- an articulation such as a trill, or mordant consists of several notes
+// played in succession.  The pitch offsets of each such note in the sequence can be represented either
+// as a number of steps in the diatonic scale, or in half steps as on a piano keyboard.
+// this function, articulationExcursion, takes deltastep indicating the number of steps in the
+// diatonic scale, and calculates (and returns) the number of half steps, taking several things into account.
+// E.g., the key signature, a trill from e to f, is to be understood as a trill between E and F# if we are
+// in the key of G.
+// E.g., if previously (looking backward in time) in the same measure there is another note on the same
+// staff line/space, and that note has an accidental (sharp,flat,natural,etc), then we want to match that
+// tone exactly.
+// E.g., If there are multiple notes on the same line/space, then we only consider the most
+// recent one, but avoid looking forward in time after the current note.
+// E.g., Also if there is an accidental     // on a note one (or more) octaves above or below we
+// observe its accidental as well.
+// E.g., Still another case is that if two staves are involved (such as a glissando between two
+// notes on different staves) then we have to search both staves for the most recent accidental.
+//
+// noteL is the note to measure the deltastep from, i.e., ornaments are w.r.t. this note
+// noteR is the note to search backward from to find accidentals.
+//    for ornament calculation noteL and noteR are the same, but for glissando they are
+//     the start and end note of glissando.
+// nominalDiatonicSteps is the desired number of diatonic steps between the base note and this articulation step.
+//---------------------------------------------------------
+
+int chromaticPitchSteps(const Note* noteL, const Note* noteR, const int nominalDiatonicSteps)
+{
+    if (0 == nominalDiatonicSteps) {
+        return 0;
+    }
+    Chord* chordL = noteL->chord();
+    Chord* chordR = noteR->chord();
+    int epitchL = noteL->epitch();
+    Fraction tickL = chordL->tick();
+    // we cannot use staffL = chord->staff() because that won't correspond to the noteL->line()
+    //   in the case the user has pressed Shift-Cmd->Up or Shift-Cmd-Down.
+    //   Therefore we have to take staffMove() into account using vStaffIdx().
+    Staff* staffL = noteL->score()->staff(chordL->vStaffIdx());
+    ClefType clefL = staffL->clef(tickL);
+    // line represents the ledger line of the staff.  0 is the top line, 1, is the space between the top 2 lines,
+    //  ... 8 is the bottom line.
+    int lineL     = noteL->line();
+    // we use line - deltastep, because lines are oriented from top to bottom, while step is oriented from bottom to top.
+    int lineL2    = lineL - nominalDiatonicSteps;
+    Measure* measureR = chordR->segment()->measure();
+
+    Segment* segment = noteL->chord()->segment();
+    int lineR2 = convertLine(lineL2, noteL, noteR);
+    // is there another note in this segment on the same line?
+    // if so, use its pitch exactly.
+    int halfsteps = 0;
+    staff_idx_t staffIdx = noteL->chord()->staff()->idx();   // cannot use staffL->idx() because of staffMove()
+    track_idx_t startTrack = staffIdx * VOICES;
+    track_idx_t endTrack   = startTrack + VOICES;
+    bool done = false;
+    for (track_idx_t track = startTrack; track < endTrack; ++track) {
+        EngravingItem* e = segment->element(track);
+        if (!e || e->type() != ElementType::CHORD) {
+            continue;
+        }
+        Chord* chord = toChord(e);
+        if (chord->vStaffIdx() != chordL->vStaffIdx()) {
+            continue;
+        }
+        if (!done) {
+            if (staffL->isPitchedStaff(segment->tick())) {
+                bool error = false;
+                AccidentalVal acciv2 = measureR->findAccidental(chordR->segment(), chordR->vStaffIdx(), lineR2, error);
+                int acci2 = int(acciv2);
+                // epitch (effective pitch) is a visible pitch so line2pitch returns exactly that.
+                halfsteps = line2pitch(lineL - nominalDiatonicSteps, clefL, Key::C) + acci2 - epitchL;
+            } else {
+                // cannot rely on accidentals or key signatures
+                halfsteps = nominalDiatonicSteps;
+            }
+        }
+    }
+    return halfsteps;
+}
+
+//---------------------------------------------------------
 //   skipTuplet
 //    return segment of rightmost chord/rest in a
 //    (possible nested) tuplet
@@ -1031,9 +1082,9 @@ Segment* skipTuplet(Tuplet* tuplet)
 //    replace ascii with bravura symbols
 //---------------------------------------------------------
 
-SymIdList timeSigSymIdsFromString(const QString& string)
+SymIdList timeSigSymIdsFromString(const String& string)
 {
-    static const std::map<QChar, SymId> dict = {
+    static const std::map<Char, SymId> dict = {
         { 43,    SymId::timeSigPlusSmall },             // '+'
         { 48,    SymId::timeSig0 },                     // '0'
         { 49,    SymId::timeSig1 },                     // '1'
@@ -1065,8 +1116,8 @@ SymIdList timeSigSymIdsFromString(const QString& string)
     };
 
     SymIdList list;
-    for (const QChar& c : string) {
-        SymId sym = mu::value(dict, c, SymId::noSym);
+    for (size_t i = 0; i < string.size(); ++i) {
+        SymId sym = mu::value(dict, string.at(i), SymId::noSym);
         if (sym != SymId::noSym) {
             list.push_back(sym);
         }

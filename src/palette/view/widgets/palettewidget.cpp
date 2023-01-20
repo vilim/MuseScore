@@ -27,21 +27,25 @@
 #include <QAccessible>
 #include <QAccessibleEvent>
 #include <QAction>
+#include <QApplication>
 #include <QContextMenuEvent>
 #include <QDrag>
+#include <QFileInfo>
 #include <QMenu>
 #include <QMimeData>
 #include <QResizeEvent>
 #include <QToolTip>
 
-#include "thirdparty/qzip/qzipreader_p.h"
-#include "thirdparty/qzip/qzipwriter_p.h"
+#include "translation.h"
+#include "types/bytearray.h"
+#include "global/deprecated/qzipreader_p.h"
+#include "global/deprecated/qzipwriter_p.h"
 
 #include "actions/actiontypes.h"
 #include "commonscene/commonscenetypes.h"
 
-#include "engraving/infrastructure/draw/color.h"
-#include "engraving/infrastructure/draw/pen.h"
+#include "draw/types/color.h"
+#include "draw/types/pen.h"
 #include "engraving/rw/xml.h"
 #include "engraving/libmscore/actionicon.h"
 #include "engraving/libmscore/chord.h"
@@ -60,14 +64,13 @@
 #include "internal/palettecelliconengine.h"
 
 #include "log.h"
-#include "translation.h"
 
 using namespace mu;
+using namespace mu::io;
 using namespace mu::palette;
 using namespace mu::engraving;
 using namespace mu::framework;
 using namespace mu::draw;
-using namespace Ms;
 
 PaletteWidget::PaletteWidget(QWidget* parent)
     : QWidget(parent)
@@ -152,9 +155,10 @@ ElementPtr PaletteWidget::elementForCellAt(int idx) const
     return cell ? cell->element : nullptr;
 }
 
-PaletteCellPtr PaletteWidget::insertElement(int idx, ElementPtr element, const QString& name, qreal mag, const QString& tag)
+PaletteCellPtr PaletteWidget::insertElement(int idx, ElementPtr element, const QString& name, qreal mag, const QPointF offset,
+                                            const QString& tag)
 {
-    PaletteCellPtr cell = m_palette->insertElement(idx, element, name, mag, tag);
+    PaletteCellPtr cell = m_palette->insertElement(idx, element, name, mag, offset, tag);
 
     update();
     updateGeometry();
@@ -162,9 +166,9 @@ PaletteCellPtr PaletteWidget::insertElement(int idx, ElementPtr element, const Q
     return cell;
 }
 
-PaletteCellPtr PaletteWidget::appendElement(ElementPtr element, const QString& name, qreal mag, const QString& tag)
+PaletteCellPtr PaletteWidget::appendElement(ElementPtr element, const QString& name, qreal mag, const QPointF offset, const QString& tag)
 {
-    PaletteCellPtr cell = m_palette->appendElement(element, name, mag, tag);
+    PaletteCellPtr cell = m_palette->appendElement(element, name, mag, offset, tag);
 
     setFixedHeight(heightForWidth(width()));
     updateGeometry();
@@ -173,7 +177,7 @@ PaletteCellPtr PaletteWidget::appendElement(ElementPtr element, const QString& n
     return cell;
 }
 
-PaletteCellPtr PaletteWidget::appendActionIcon(Ms::ActionIconType type, actions::ActionCode code)
+PaletteCellPtr PaletteWidget::appendActionIcon(mu::engraving::ActionIconType type, actions::ActionCode code)
 {
     PaletteCellPtr cell = m_palette->appendActionIcon(type, code);
 
@@ -724,9 +728,10 @@ void PaletteWidget::mousePressEvent(QMouseEvent* ev)
     if (m_selectable) {
         if (m_dragIdx != m_selectedIdx) {
             update(rectForCellAt(m_dragIdx) | rectForCellAt(m_selectedIdx));
-            m_selectedIdx = m_dragIdx;
         }
+
         emit boxClicked(m_dragIdx);
+        m_selectedIdx = m_dragIdx;
     }
 
     update();
@@ -749,7 +754,7 @@ void PaletteWidget::mouseMoveEvent(QMouseEvent* ev)
             QMimeData* mimeData = new QMimeData;
             const ElementPtr el   = cell->element;
 
-            mimeData->setData(mu::commonscene::MIME_SYMBOL_FORMAT, el->mimeData(PointF()));
+            mimeData->setData(mu::commonscene::MIME_SYMBOL_FORMAT, el->mimeData().toQByteArray());
             drag->setMimeData(mimeData);
 
             drag->setPixmap(pixmapForCellAt(m_currentIdx));
@@ -874,7 +879,8 @@ void PaletteWidget::dropEvent(QDropEvent* event)
         }
     } else if (datap->hasFormat(mu::commonscene::MIME_SYMBOL_FORMAT)) {
         QByteArray dta(event->mimeData()->data(mu::commonscene::MIME_SYMBOL_FORMAT));
-        XmlReader xml(dta);
+        ByteArray ba = ByteArray::fromQByteArrayNoCopy(dta);
+        XmlReader xml(ba);
         PointF dragOffset;
         Fraction duration;
         ElementType type = EngravingItem::readType(xml, &dragOffset, &duration);
@@ -1028,7 +1034,7 @@ void PaletteWidget::paintEvent(QPaintEvent* /*event*/)
         if (!tag.isEmpty()) {
             painter.setPen(QColor(Qt::darkGray));
             Font font(painter.font());
-            font.setPointSizeF(uiConfiguration()->fontSize(ui::FontSizeType::BODY));
+            font.setPixelSize(uiConfiguration()->fontSize(ui::FontSizeType::BODY));
             painter.setFont(font);
             painter.drawText(rShift, Qt::AlignLeft | Qt::AlignTop, tag);
         }

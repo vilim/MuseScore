@@ -22,22 +22,21 @@
 
 #include "instrchange.h"
 
+#include "translation.h"
 #include "rw/xml.h"
 
+#include "keysig.h"
+#include "measure.h"
+#include "mscore.h"
+#include "part.h"
 #include "score.h"
 #include "segment.h"
 #include "staff.h"
-#include "part.h"
 #include "undo.h"
-#include "mscore.h"
-#include "measure.h"
-#include "system.h"
-#include "chord.h"
-#include "keysig.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   instrumentChangeStyle
 //---------------------------------------------------------
@@ -90,20 +89,24 @@ void InstrumentChange::setupInstrument(const Instrument* instrument)
         Fraction tickStart = segment()->tick();
         Part* part = staff()->part();
         Interval oldV = part->instrument(tickStart)->transpose();
+        bool concPitch = score()->styleB(Sid::concertPitch);
 
         // change the clef for each staff
         for (size_t i = 0; i < part->nstaves(); i++) {
-            if (part->instrument(tickStart)->clefType(i) != instrument->clefType(i)) {
-                ClefType clefType
-                    = score()->styleB(Sid::concertPitch) ? instrument->clefType(i)._concertClef : instrument->clefType(i)._transposingClef;
+            ClefType oldClefType = concPitch ? part->instrument(tickStart)->clefType(i)._concertClef
+                                   : part->instrument(tickStart)->clefType(i)._transposingClef;
+            ClefType newClefType = concPitch ? instrument->clefType(i)._concertClef
+                                   : instrument->clefType(i)._transposingClef;
+            // Introduce cleff change only if the new clef *symbol* is different from the old one
+            if (ClefInfo::symId(oldClefType) != ClefInfo::symId(newClefType)) {
                 // If instrument change is at the start of a measure, use the measure as the element, as this will place the instrument change before the barline.
                 EngravingItem* element = rtick().isZero() ? toEngravingItem(findMeasure()) : toEngravingItem(this);
-                score()->undoChangeClef(part->staff(i), element, clefType, true);
+                score()->undoChangeClef(part->staff(i), element, newClefType, true);
             }
         }
 
-        // Change key signature if necessary
-        if (instrument->transpose() != oldV) {
+        // Change key signature if necessary. CAUTION: not necessary in case of octave-transposing!
+        if ((instrument->transpose().chromatic - oldV.chromatic) % 12) {
             for (size_t i = 0; i < part->nstaves(); i++) {
                 if (!part->staff(i)->keySigEvent(tickStart).isAtonal()) {
                     KeySigEvent ks;
@@ -138,7 +141,8 @@ void InstrumentChange::setupInstrument(const Instrument* instrument)
             score()->transpositionChanged(part, oldV, tickStart, tickEnd);
         }
 
-        const QString newInstrChangeText = tr("To %1").arg(instrument->trackName());
+        //: The text of an "instrument change" marking. It is an instruction to the player to switch to another instrument.
+        const String newInstrChangeText = mtrc("engraving", "To %1").arg(instrument->trackName());
         undoChangeProperty(Pid::TEXT, TextBase::plainToXmlText(newInstrChangeText));
     }
 }
@@ -193,13 +197,13 @@ std::vector<Clef*> InstrumentChange::clefs() const
 
 void InstrumentChange::write(XmlWriter& xml) const
 {
-    xml.startObject(this);
+    xml.startElement(this);
     _instrument->write(xml, part());
     if (_init) {
         xml.tag("init", _init);
     }
     TextBase::writeProperties(xml);
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -209,7 +213,7 @@ void InstrumentChange::write(XmlWriter& xml) const
 void InstrumentChange::read(XmlReader& e)
 {
     while (e.readNextStartElement()) {
-        const QStringRef& tag(e.name());
+        const AsciiStringView tag(e.name());
         if (tag == "Instrument") {
             _instrument->read(e, part());
         } else if (tag == "init") {

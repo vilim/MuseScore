@@ -40,46 +40,49 @@ class IProjectConfiguration : MODULE_EXPORT_INTERFACE
 public:
     virtual ~IProjectConfiguration() = default;
 
-    virtual io::paths recentProjectPaths() const = 0;
-    virtual void setRecentProjectPaths(const io::paths& recentScorePaths) = 0;
-    virtual async::Channel<io::paths> recentProjectPathsChanged() const = 0;
+    virtual io::paths_t recentProjectPaths() const = 0;
+    virtual void setRecentProjectPaths(const io::paths_t& recentScorePaths) = 0;
+    virtual async::Channel<io::paths_t> recentProjectPathsChanged() const = 0;
 
-    virtual io::path myFirstProjectPath() const = 0;
+    virtual io::path_t myFirstProjectPath() const = 0;
 
-    virtual io::paths availableTemplateDirs() const = 0;
-    virtual io::path templateCategoriesJsonPath(const io::path& templatesDir) const = 0;
+    virtual io::paths_t availableTemplateDirs() const = 0;
+    virtual io::path_t templateCategoriesJsonPath(const io::path_t& templatesDir) const = 0;
 
-    virtual io::path userTemplatesPath() const = 0;
-    virtual void setUserTemplatesPath(const io::path& path) = 0;
-    virtual async::Channel<io::path> userTemplatesPathChanged() const = 0;
+    virtual io::path_t userTemplatesPath() const = 0;
+    virtual void setUserTemplatesPath(const io::path_t& path) = 0;
+    virtual async::Channel<io::path_t> userTemplatesPathChanged() const = 0;
 
-    virtual io::path defaultProjectsPath() const = 0;
-    virtual void setDefaultProjectsPath(const io::path& path) = 0;
+    virtual io::path_t defaultProjectsPath() const = 0;
+    virtual void setDefaultProjectsPath(const io::path_t& path) = 0;
 
-    virtual io::path lastOpenedProjectsPath() const = 0;
-    virtual void setLastOpenedProjectsPath(const io::path& path) = 0;
+    virtual io::path_t lastOpenedProjectsPath() const = 0;
+    virtual void setLastOpenedProjectsPath(const io::path_t& path) = 0;
 
-    virtual io::path lastSavedProjectsPath() const = 0;
-    virtual void setLastSavedProjectsPath(const io::path& path) = 0;
+    virtual io::path_t lastSavedProjectsPath() const = 0;
+    virtual void setLastSavedProjectsPath(const io::path_t& path) = 0;
 
-    virtual io::path userProjectsPath() const = 0;
-    virtual void setUserProjectsPath(const io::path& path) = 0;
-    virtual async::Channel<io::path> userProjectsPathChanged() const = 0;
-
-    virtual io::path cloudProjectsPath() const = 0;
-    virtual bool isCloudProject(const io::path& path) const = 0;
-
-    virtual io::path defaultSavingFilePath(INotationProjectPtr project,
-                                           const QString& filenameAddition = QString(), const QString& suffix = QString()) const = 0;
+    virtual io::path_t userProjectsPath() const = 0;
+    virtual void setUserProjectsPath(const io::path_t& path) = 0;
+    virtual async::Channel<io::path_t> userProjectsPathChanged() const = 0;
 
     virtual bool shouldAskSaveLocationType() const = 0;
     virtual void setShouldAskSaveLocationType(bool shouldAsk) = 0;
 
+    virtual bool isCloudProject(const io::path_t& projectPath) const = 0;
+
+    virtual io::path_t cloudProjectSavingFilePath(const io::path_t& projectName) const = 0;
+    virtual io::path_t defaultSavingFilePath(INotationProjectPtr project, const std::string& filenameAddition = "",
+                                             const std::string& suffix = "") const = 0;
+
     virtual SaveLocationType lastUsedSaveLocationType() const = 0;
     virtual void setLastUsedSaveLocationType(SaveLocationType type) = 0;
 
-    virtual bool shouldWarnBeforePublishing() const = 0;
-    virtual void setShouldWarnBeforePublishing(bool shouldWarn) = 0;
+    virtual bool shouldWarnBeforePublish() const = 0;
+    virtual void setShouldWarnBeforePublish(bool shouldWarn) = 0;
+
+    virtual bool shouldWarnBeforeSavingPubliclyToCloud() const = 0;
+    virtual void setShouldWarnBeforeSavingPubliclyToCloud(bool shouldWarn) = 0;
 
     virtual QColor templatePreviewBackgroundColor() const = 0;
     virtual async::Notification templatePreviewBackgroundChanged() const = 0;
@@ -103,12 +106,34 @@ public:
     virtual void setAutoSaveInterval(int minutes) = 0;
     virtual async::Channel<int> autoSaveIntervalChanged() const = 0;
 
-    virtual io::path newProjectTemporaryPath() const = 0;
+    virtual io::path_t newProjectTemporaryPath() const = 0;
 
     virtual bool isAccessibleEnabled() const = 0;
 
     virtual bool shouldDestinationFolderBeOpenedOnExport() const = 0;
     virtual void setShouldDestinationFolderBeOpenedOnExport(bool shouldDestinationFolderBeOpenedOnExport) = 0;
+
+    virtual QUrl scoreManagerUrl() const = 0;
+    virtual QUrl supportForumUrl() const = 0;
+
+    virtual bool openDetailedProjectUploadedDialog() const = 0;
+    virtual void setOpenDetailedProjectUploadedDialog(bool show) = 0;
+
+    virtual bool hasAskedAudioGenerationSettings() const = 0;
+    virtual void setHasAskedAudioGenerationSettings(bool has) = 0;
+
+    virtual GenerateAudioTimePeriodType generateAudioTimePeriodType() const = 0;
+    virtual void setGenerateAudioTimePeriodType(GenerateAudioTimePeriodType type) = 0;
+
+    virtual int numberOfSavesToGenerateAudio() const = 0;
+    virtual void setNumberOfSavesToGenerateAudio(int number) = 0;
+
+    virtual io::path_t temporaryMp3FilePathTemplate() const = 0;
+
+    virtual io::path_t projectBackupPath(const io::path_t& projectPath) const = 0;
+
+    virtual bool showCloudIsNotAvailableWarning() const = 0;
+    virtual void setShowCloudIsNotAvailableWarning(bool show) = 0;
 };
 }
 

@@ -24,8 +24,6 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/guitarpromodule.cpp
     ${CMAKE_CURRENT_LIST_DIR}/guitarpromodule.h
     ${CMAKE_CURRENT_LIST_DIR}/iguitarproconfiguration.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/guitarproconfiguration.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/guitarproconfiguration.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/guitarproreader.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/guitarproreader.h
 
@@ -54,14 +52,16 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/internal/gtp/gpconverter.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/gtp/gpdommodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/gtp/gpdommodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/gtp/gpdrumsetresolver.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/gtp/gpdrumsetresolver.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/gtp/gpmasterbar.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/gtp/gpmasterbar.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/gtp/gpmastertracks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/gtp/gpmastertracks.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/gtp/gpnote.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/gtp/gpnote.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/gtp/gprhytm.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/gtp/gprhytm.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/gtp/gprhythm.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/gtp/gprhythm.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/gtp/gpscore.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/gtp/gpscore.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/gtp/gptrack.cpp
@@ -72,10 +72,13 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/internal/gtp/inoteproperty.h
     )
 
-set(MODULE_LINK
-    engraving
-    qzip
+set(MODULE_SRC ${MODULE_SRC}
+    ${CMAKE_CURRENT_LIST_DIR}/internal/guitarproconfiguration.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/guitarproconfiguration.h
     )
 
-include(${PROJECT_SOURCE_DIR}/build/module.cmake)
+set(MODULE_LINK
+    engraving
+    )
 
+include(SetupModule)

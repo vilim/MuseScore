@@ -21,11 +21,13 @@
  */
 #include "notationviewinputcontroller.h"
 
+#include <QApplication>
 #include <QMimeData>
+#include <QQuickItem>
+#include <QTimer>
 #include <QtMath>
 
 #include "log.h"
-#include "notationpaintview.h"
 #include "commonscene/commonscenetypes.h"
 
 using namespace mu;
@@ -51,8 +53,8 @@ void NotationViewInputController::init()
         dispatcher()->reg(this, "zoom-page-width", this, &NotationViewInputController::zoomToPageWidth);
         dispatcher()->reg(this, "zoom-whole-page", this, &NotationViewInputController::zoomToWholePage);
         dispatcher()->reg(this, "zoom-two-pages", this, &NotationViewInputController::zoomToTwoPages);
-        dispatcher()->reg(this, "zoom100", [this]() { setZoom(100); });
-        dispatcher()->reg(this, "zoom-x-percent", [this](const ActionData& args) { setZoom(args.arg<int>(0)); });
+        dispatcher()->reg(this, "zoom100", [this]() { setZoom(100, findZoomFocusPoint()); });
+        dispatcher()->reg(this, "zoom-x-percent", [this](const ActionData& args) { setZoom(args.arg<int>(0), findZoomFocusPoint()); });
 
         dispatcher()->reg(this, "view-mode-page", [this]() {
             setViewMode(ViewMode::PAGE);
@@ -74,38 +76,56 @@ void NotationViewInputController::init()
         dispatcher()->reg(this, "page-end", this, &NotationViewInputController::endOfScore);
 
         dispatcher()->reg(this, "notation-context-menu", [this]() {
-            m_view->showContextMenu(selectionType(),
-                                    m_view->fromLogical(selectionElementPos()).toQPointF(), true);
+            m_view->showContextMenu(selectionType(), m_view->fromLogical(selectionElementPos()).toQPointF(), true);
         });
     }
-
-    globalContext()->currentMasterNotationChanged().onNotify(this, [this]() {
-        m_isZoomInited = false;
-        initZoom();
-    });
-}
-
-bool NotationViewInputController::isZoomInited()
-{
-    return m_isZoomInited;
 }
 
 void NotationViewInputController::initZoom()
 {
+    IF_ASSERT_FAILED(currentNotation()) {
+        return;
+    }
+
     ZoomType defaultZoomType = configuration()->defaultZoomType();
+
+    currentNotation()->viewState()->setZoomType(defaultZoomType);
+
     switch (defaultZoomType) {
     case ZoomType::Percentage:
         setZoom(configuration()->defaultZoom());
-        m_isZoomInited = true;
         break;
     case ZoomType::PageWidth:
-        zoomToPageWidth();
+        doZoomToPageWidth();
         break;
     case ZoomType::WholePage:
-        zoomToWholePage();
+        doZoomToWholePage();
         break;
     case ZoomType::TwoPages:
-        zoomToTwoPages();
+        doZoomToTwoPages();
+        break;
+    }
+
+    currentNotation()->viewState()->setMatrixInited(true);
+}
+
+void NotationViewInputController::updateZoomAfterSizeChange()
+{
+    IF_ASSERT_FAILED(currentNotation()) {
+        return;
+    }
+
+    switch (currentNotation()->viewState()->zoomType().val) {
+    case ZoomType::Percentage:
+        break;
+    case ZoomType::PageWidth:
+        doZoomToPageWidth();
+        break;
+    case ZoomType::WholePage:
+        doZoomToWholePage();
+        break;
+    case ZoomType::TwoPages:
+        doZoomToTwoPages();
         break;
     }
 }
@@ -183,35 +203,63 @@ PointF NotationViewInputController::findZoomFocusPoint() const
 
 void NotationViewInputController::zoomToPageWidth()
 {
-    if (!notationStyle()) {
+    IF_ASSERT_FAILED(currentNotation()) {
         return;
     }
 
-    qreal pageWidth = notationStyle()->styleValue(Ms::Sid::pageWidth).toDouble() * Ms::DPI;
-
-    qreal scale = m_view->width() / pageWidth;
-    setScaling(scale);
-    m_isZoomInited = true;
+    currentNotation()->viewState()->setZoomType(ZoomType::PageWidth);
+    doZoomToPageWidth();
 }
 
-void NotationViewInputController::zoomToWholePage()
+void NotationViewInputController::doZoomToPageWidth()
 {
     if (!notationStyle()) {
         return;
     }
 
-    qreal pageWidth = notationStyle()->styleValue(Ms::Sid::pageWidth).toDouble() * Ms::DPI;
-    qreal pageHeight = notationStyle()->styleValue(Ms::Sid::pageHeight).toDouble() * Ms::DPI;
+    qreal pageWidth = notationStyle()->styleValue(mu::engraving::Sid::pageWidth).toDouble() * mu::engraving::DPI;
+
+    qreal scale = m_view->width() / pageWidth;
+    setScaling(scale, PointF(), false);
+}
+
+void NotationViewInputController::zoomToWholePage()
+{
+    IF_ASSERT_FAILED(currentNotation()) {
+        return;
+    }
+
+    currentNotation()->viewState()->setZoomType(ZoomType::WholePage);
+    doZoomToWholePage();
+}
+
+void NotationViewInputController::doZoomToWholePage()
+{
+    if (!notationStyle()) {
+        return;
+    }
+
+    qreal pageWidth = notationStyle()->styleValue(mu::engraving::Sid::pageWidth).toDouble() * mu::engraving::DPI;
+    qreal pageHeight = notationStyle()->styleValue(mu::engraving::Sid::pageHeight).toDouble() * mu::engraving::DPI;
 
     qreal pageWidthScale = m_view->width() / pageWidth;
     qreal pageHeightScale = m_view->height() / pageHeight;
 
     qreal scale = std::min(pageWidthScale, pageHeightScale);
-    setScaling(scale, PointF());
-    m_isZoomInited = true;
+    setScaling(scale, PointF(), false);
 }
 
 void NotationViewInputController::zoomToTwoPages()
+{
+    IF_ASSERT_FAILED(currentNotation()) {
+        return;
+    }
+
+    currentNotation()->viewState()->setZoomType(ZoomType::TwoPages);
+    doZoomToTwoPages();
+}
+
+void NotationViewInputController::doZoomToTwoPages()
 {
     if (!notationStyle()) {
         return;
@@ -219,8 +267,8 @@ void NotationViewInputController::zoomToTwoPages()
 
     qreal viewWidth = m_view->width();
     qreal viewHeight = m_view->height();
-    qreal pageWidth = notationStyle()->styleValue(Ms::Sid::pageWidth).toDouble() * Ms::DPI;
-    qreal pageHeight = notationStyle()->styleValue(Ms::Sid::pageHeight).toDouble() * Ms::DPI;
+    qreal pageWidth = notationStyle()->styleValue(mu::engraving::Sid::pageWidth).toDouble() * mu::engraving::DPI;
+    qreal pageHeight = notationStyle()->styleValue(mu::engraving::Sid::pageHeight).toDouble() * mu::engraving::DPI;
 
     qreal pageHeightScale = 0.0;
     qreal pageWidthScale = 0.0;
@@ -236,8 +284,7 @@ void NotationViewInputController::zoomToTwoPages()
     }
 
     qreal scale = std::min(pageHeightScale, pageWidthScale);
-    setScaling(scale, PointF());
-    m_isZoomInited = true;
+    setScaling(scale, PointF(), false);
 }
 
 int NotationViewInputController::currentZoomIndex() const
@@ -256,18 +303,13 @@ int NotationViewInputController::currentZoomPercentage() const
     return zoomPercentageFromScaling(m_view->currentScaling());
 }
 
-void NotationViewInputController::setScaling(qreal scaling, const PointF& pos)
+void NotationViewInputController::setScaling(qreal scaling, const PointF& pos, bool overrideZoomType)
 {
     qreal minScaling = scalingFromZoomPercentage(m_possibleZoomPercentages.first());
     qreal maxScaling = scalingFromZoomPercentage(m_possibleZoomPercentages.last());
     qreal correctedScaling = std::clamp(scaling, minScaling, maxScaling);
 
-    if (!m_readonly) {
-        int zoomPercentage = zoomPercentageFromScaling(correctedScaling);
-        configuration()->setCurrentZoom(zoomPercentage);
-    }
-
-    m_view->setScaling(correctedScaling, pos);
+    m_view->setScaling(correctedScaling, pos, overrideZoomType);
 }
 
 void NotationViewInputController::setZoom(int zoomPercentage, const PointF& pos)
@@ -276,34 +318,26 @@ void NotationViewInputController::setZoom(int zoomPercentage, const PointF& pos)
     int maxZoom = m_possibleZoomPercentages.last();
     int correctedZoom = std::clamp(zoomPercentage, minZoom, maxZoom);
 
-    if (!m_readonly) {
-        configuration()->setCurrentZoom(correctedZoom);
-    }
-
     qreal scaling = scalingFromZoomPercentage(correctedZoom);
     m_view->setScaling(scaling, pos);
 }
 
 qreal NotationViewInputController::scalingFromZoomPercentage(int zoomPercentage) const
 {
-    return zoomPercentage / 100.0 * configuration()->notationScaling();
+    return configuration()->scalingFromZoomPercentage(zoomPercentage);
 }
 
 int NotationViewInputController::zoomPercentageFromScaling(qreal scaling) const
 {
-    return qRound(scaling * 100.0 / configuration()->notationScaling());
+    return configuration()->zoomPercentageFromScaling(scaling);
 }
 
 void NotationViewInputController::setViewMode(const ViewMode& viewMode)
 {
-    auto project = globalContext()->currentProject();
-    if (project) {
-        project->viewSettings()->setNotationViewMode(viewMode);
-    }
-
     auto notation = globalContext()->currentNotation();
     if (notation) {
-        notation->setViewMode(viewMode);
+        notation->viewState()->setViewMode(viewMode);
+        notation->painting()->setViewMode(viewMode);
     }
 }
 
@@ -392,12 +426,13 @@ void NotationViewInputController::endOfScore()
     if (!notation) {
         return;
     }
-    Ms::MeasureBase* lastMeasure = notation->elements()->msScore()->lastMeasureMM();
+    mu::engraving::MeasureBase* lastMeasure = notation->elements()->msScore()->lastMeasureMM();
     auto lmRect = lastMeasure->canvasBoundingRect();
     auto scale = m_view->currentScaling();
     qreal desiredX = std::max(-notationScreenPadding, lmRect.right() + notationScreenPadding - m_view->width() / scale);
     qreal desiredY
-        = std::max(-notationScreenPadding, lmRect.bottom() + lastMeasure->score()->styleD(Ms::Sid::spatium) * 5 - m_view->height() / scale);
+        = std::max(-notationScreenPadding, lmRect.bottom() + lastMeasure->score()->styleD(
+                       mu::engraving::Sid::spatium) * 5 - m_view->height() / scale);
     auto offset = m_view->toLogical(QPoint());
     m_view->moveCanvas(offset.x() - desiredX, offset.y() - desiredY);
 }
@@ -417,6 +452,15 @@ void NotationViewInputController::wheelEvent(QWheelEvent* event)
     int dy = 0;
     qreal stepsX = 0.0;
     qreal stepsY = 0.0;
+
+// pixelDelta is unreliable on X11
+#ifdef Q_OS_LINUX
+    if (std::getenv("WAYLAND_DISPLAY") == NULL) {
+        // Ignore pixelsScrolled unless Wayland is used
+        pixelsScrolled.setX(0);
+        pixelsScrolled.setY(0);
+    }
+#endif
 
     if (!pixelsScrolled.isNull()) {
         dx = pixelsScrolled.x();
@@ -474,6 +518,13 @@ void NotationViewInputController::mousePressEvent(QMouseEvent* event)
         return;
     }
 
+    if (m_tripleClickPending) {
+        if (viewInteraction()->isTextEditingStarted()) {
+            viewInteraction()->selectText(mu::engraving::SelectTextType::All);
+            return;
+        }
+    }
+
     m_beginPoint = logicPos;
 
     EngravingItem* hitElement = nullptr;
@@ -491,15 +542,15 @@ void NotationViewInputController::mousePressEvent(QMouseEvent* event)
         hitStaffIndex = context.staff ? context.staff->idx() : mu::nidx;
     }
 
-    if (hitElement) {
-        RetVal<midi::tick_t> tick = m_view->notationPlayback()->playPositionTickByElement(hitElement);
-
-        if (tick.ret) {
-            playbackController()->seek(tick.val);
+    if (playbackController()->isPlaying()) {
+        if (hitElement) {
+            playbackController()->seekElement(hitElement);
         }
+        return;
     }
 
-    if (playbackController()->isPlaying()) {
+    if (keyState == (Qt::ShiftModifier | Qt::ControlModifier)) {
+        viewInteraction()->startDragCopy(hitElement, m_view->asItem());
         return;
     }
 
@@ -519,9 +570,10 @@ void NotationViewInputController::mousePressEvent(QMouseEvent* event)
             selectType = SelectType::ADD;
         }
         viewInteraction()->select({ hitElement }, selectType, hitStaffIndex);
-    } else if (hitElement && event->button() == Qt::LeftButton
-               && event->modifiers() == Qt::KeyboardModifier::ControlModifier) {
-        viewInteraction()->select({ hitElement }, SelectType::ADD, hitStaffIndex);
+    }
+
+    if (hitElement && !viewInteraction()->selection()->isRange()) {
+        playbackController()->seekElement(hitElement);
     }
 
     if (button == Qt::LeftButton) {
@@ -541,19 +593,17 @@ bool NotationViewInputController::needSelect(const ClickContext& ctx) const
         return false;
     }
 
-    bool hitElementSelected = ctx.hitElement->selected();
-
-    if (ctx.event->modifiers() & Qt::ControlModifier) {
-        return !hitElementSelected;
-    }
-
     INotationSelectionPtr selection = viewInteraction()->selection();
 
-    if (selection->isRange()) {
+    if (ctx.event->button() == Qt::LeftButton && ctx.event->modifiers() & Qt::ControlModifier) {
+        return true;
+    } else if (ctx.event->button() == Qt::RightButton && selection->isRange()) {
         return !selection->range()->containsPoint(ctx.logicClickPos);
+    } else if (!ctx.hitElement->selected()) {
+        return true;
     }
 
-    return !hitElementSelected;
+    return false;
 }
 
 void NotationViewInputController::handleLeftClick(const ClickContext& ctx)
@@ -563,9 +613,17 @@ void NotationViewInputController::handleLeftClick(const ClickContext& ctx)
     if (ctx.isHitGrip) {
         viewInteraction()->startEditGrip(ctx.logicClickPos);
         return;
-    } else if (ctx.hitElement && ctx.hitElement->hasGrips() && ctx.hitElement->needStartEditingAfterSelecting()) {
-        viewInteraction()->startEditGrip(ctx.hitElement, ctx.hitElement->defaultGrip());
-        return;
+    } else {
+        viewInteraction()->endEditGrip();
+    }
+
+    INotationSelectionPtr selection = viewInteraction()->selection();
+
+    if (!selection->isRange()) {
+        if (ctx.hitElement && ctx.hitElement->needStartEditingAfterSelecting()) {
+            viewInteraction()->startEditElement(ctx.hitElement);
+            return;
+        }
     }
 
     if (!ctx.hitElement) {
@@ -574,14 +632,12 @@ void NotationViewInputController::handleLeftClick(const ClickContext& ctx)
     }
 
     if (ctx.hitElement->isPlayable()) {
-        playbackController()->playElement(ctx.hitElement);
+        playbackController()->playElements({ ctx.hitElement });
     }
 
-    if (!viewInteraction()->isTextSelected()) {
-        return;
+    if (viewInteraction()->isTextSelected()) {
+        updateTextCursorPosition();
     }
-
-    updateTextCursorPosition();
 }
 
 void NotationViewInputController::handleRightClick(const ClickContext& ctx)
@@ -592,8 +648,6 @@ void NotationViewInputController::handleRightClick(const ClickContext& ctx)
         viewInteraction()->endEditElement();
         return;
     }
-
-    updateTextCursorPosition();
 }
 
 bool NotationViewInputController::startTextEditingAllowed() const
@@ -611,6 +665,10 @@ void NotationViewInputController::updateTextCursorPosition()
 
 void NotationViewInputController::mouseMoveEvent(QMouseEvent* event)
 {
+    if (viewInteraction()->isDragCopyStarted()) {
+        return;
+    }
+
     PointF logicPos = m_view->toLogical(event->pos());
     Qt::KeyboardModifiers keyState = event->modifiers();
 
@@ -622,7 +680,7 @@ void NotationViewInputController::mouseMoveEvent(QMouseEvent* event)
     }
 
     bool isNoteEnterMode = m_view->isNoteEnterMode();
-    bool isDragObjectsAllowed = !(isNoteEnterMode || playbackController()->isPlaying());
+    bool isDragObjectsAllowed = !(isNoteEnterMode || playbackController()->isPlaying() || (event->buttons() & Qt::MiddleButton));
     if (isDragObjectsAllowed) {
         const EngravingItem* hitElement = hitElementContext().element;
 
@@ -634,8 +692,9 @@ void NotationViewInputController::mouseMoveEvent(QMouseEvent* event)
             }
 
             if (viewInteraction()->isGripEditStarted() && !viewInteraction()->isDragStarted()) {
-                EngravingItem* selectedElement = viewInteraction()->selection()->element();
-                startDragElements(selectedElement->type(), selectedElement->offset());
+                const EngravingItem* selectedElement = viewInteraction()->selection()->element();
+                ElementType type = selectedElement ? selectedElement->type() : ElementType::INVALID;
+                startDragElements(type, selectedElement->offset());
             }
 
             DragMode mode = DragMode::BothXY;
@@ -648,11 +707,11 @@ void NotationViewInputController::mouseMoveEvent(QMouseEvent* event)
             viewInteraction()->drag(m_beginPoint, logicPos, mode);
 
             return;
-        } else if (hitElement == nullptr && (keyState & (Qt::ShiftModifier | Qt::ControlModifier))) {
+        } else if (hitElement == nullptr && (keyState & Qt::ShiftModifier)) {
             if (!viewInteraction()->isDragStarted()) {
                 viewInteraction()->startDrag(std::vector<EngravingItem*>(), PointF(), [](const EngravingItem*) { return false; });
             }
-            viewInteraction()->drag(m_beginPoint, logicPos, keyState & Qt::ControlModifier ? DragMode::LassoList : DragMode::BothXY);
+            viewInteraction()->drag(m_beginPoint, logicPos, DragMode::BothXY);
 
             return;
         }
@@ -667,8 +726,12 @@ void NotationViewInputController::mouseMoveEvent(QMouseEvent* event)
 
 void NotationViewInputController::startDragElements(ElementType elementsType, const PointF& elementsOffset)
 {
+    if (elementsType == ElementType::INVALID) {
+        return;
+    }
+
     std::vector<EngravingItem*> elements = viewInteraction()->selection()->elements();
-    IF_ASSERT_FAILED(!elements.empty()) {
+    if (elements.empty()) {
         return;
     }
 
@@ -700,10 +763,18 @@ void NotationViewInputController::mouseReleaseEvent(QMouseEvent* event)
     if (interaction->isDragStarted()) {
         interaction->endDrag();
     }
+
+    if (interaction->isDragCopyStarted()) {
+        interaction->endDragCopy();
+    }
 }
 
 void NotationViewInputController::handleLeftClickRelease(const QPointF& releasePoint)
 {
+    if (m_view->isNoteEnterMode() || playbackController()->isPlaying()) {
+        return;
+    }
+
     const INotationInteraction::HitElementContext& ctx = hitElementContext();
     if (!ctx.element) {
         return;
@@ -719,6 +790,11 @@ void NotationViewInputController::handleLeftClickRelease(const QPointF& releaseP
     INotationInteractionPtr interaction = viewInteraction();
     interaction->select({ ctx.element }, SelectType::SINGLE, staffIndex);
 
+    if (ctx.element && ctx.element->needStartEditingAfterSelecting()) {
+        viewInteraction()->startEditElement(ctx.element);
+        return;
+    }
+
     if (ctx.element != m_prevHitElement) {
         return;
     }
@@ -727,22 +803,46 @@ void NotationViewInputController::handleLeftClickRelease(const QPointF& releaseP
         return;
     }
 
-    if (interaction->isTextSelected() && interaction->textEditingAllowed(ctx.element)) {
-        dispatcher()->dispatch("edit-text", ActionData::make_arg1<PointF>(m_beginPoint));
+    if (interaction->textEditingAllowed(ctx.element)) {
+        interaction->startEditText(ctx.element, m_beginPoint);
     }
 }
 
-void NotationViewInputController::mouseDoubleClickEvent(QMouseEvent*)
+void NotationViewInputController::mouseDoubleClickEvent(QMouseEvent* event)
 {
     if (m_view->isNoteEnterMode()) {
         return;
     }
 
-    if (viewInteraction()->isElementEditStarted()) {
+    QTimer::singleShot(QApplication::doubleClickInterval(), [this]() {
+        m_tripleClickPending = false;
+    });
+
+    m_tripleClickPending = true;
+
+    if (viewInteraction()->isTextEditingStarted()) {
+        viewInteraction()->selectText(mu::engraving::SelectTextType::Word);
         return;
     }
 
-    dispatcher()->dispatch("edit-element", ActionData::make_arg1<PointF>(m_beginPoint));
+    PointF logicPos = m_view->toLogical(event->pos());
+    const EngravingItem* hitElement = viewInteraction()->hitElement(logicPos, hitWidth());
+
+    if (!hitElement) {
+        return;
+    }
+
+    ActionCode actionCode;
+
+    if (hitElement->isMeasure() && event->modifiers() == Qt::NoModifier) {
+        actionCode = "note-input";
+    } else if (hitElement->isInstrumentName()) {
+        actionCode = "edit-element";
+    }
+
+    if (!actionCode.empty()) {
+        dispatcher()->dispatch(actionCode, ActionData::make_arg1<PointF>(m_beginPoint));
+    }
 }
 
 void NotationViewInputController::hoverMoveEvent(QHoverEvent* event)
@@ -936,12 +1036,9 @@ ElementType NotationViewInputController::selectionType() const
         return ElementType::STAFF;
     } else if (auto selectedElement = selection->element()) {
         return selectedElement->type();
-    } else {
-        return ElementType::PAGE;
     }
 
-    UNREACHABLE;
-    return type;
+    return ElementType::PAGE;
 }
 
 mu::PointF NotationViewInputController::selectionElementPos() const

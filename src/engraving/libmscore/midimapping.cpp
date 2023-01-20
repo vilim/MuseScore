@@ -20,18 +20,17 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "score.h"
 #include "excerpt.h"
 #include "instrument.h"
-#include "part.h"
-
 #include "masterscore.h"
+#include "part.h"
+#include "score.h"
 
 #include "log.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   rebuildMidiMapping
 //---------------------------------------------------------
@@ -58,7 +57,7 @@ void MasterScore::rebuildMidiMapping()
 
 void MasterScore::checkMidiMapping()
 {
-    isSimpleMidiMaping = true;
+    isSimpleMidiMapping = true;
     rebuildMidiMapping();
 
     std::vector<bool> drum;
@@ -81,7 +80,7 @@ void MasterScore::checkMidiMapping()
         if (drum[index]) {
             lastDrumPort++;
             if (m.port() != lastDrumPort) {
-                isSimpleMidiMaping = false;
+                isSimpleMidiMapping = false;
                 return;
             }
         } else {
@@ -92,7 +91,7 @@ void MasterScore::checkMidiMapping()
             int p = lastChannel / 16;
             int c = lastChannel % 16;
             if (m.port() != p || m.channel() != c) {
-                isSimpleMidiMaping = false;
+                isSimpleMidiMapping = false;
                 return;
             }
         }
@@ -104,20 +103,20 @@ void MasterScore::checkMidiMapping()
 //   getNextFreeMidiMapping
 //---------------------------------------------------------
 
-int MasterScore::getNextFreeMidiMapping(int p, int ch)
+int MasterScore::getNextFreeMidiMapping(std::set<int>& occupiedMidiChannels, unsigned int& searchMidiMappingFrom, int p, int ch)
 {
     if (ch != -1 && p != -1) {
         return p * 16 + ch;
     } else if (ch != -1 && p == -1) {
         for (int port = 0;; port++) {
-            if (!occupiedMidiChannels.contains(port * 16 + ch)) {
+            if (!mu::contains(occupiedMidiChannels, port * 16 + ch)) {
                 occupiedMidiChannels.insert(port * 16 + ch);
                 return port * 16 + ch;
             }
         }
     } else if (ch == -1 && p != -1) {
         for (int channel = 0; channel < 16; channel++) {
-            if (channel != 9 && !occupiedMidiChannels.contains(p * 16 + channel)) {
+            if (channel != 9 && !mu::contains(occupiedMidiChannels, p * 16 + channel)) {
                 occupiedMidiChannels.insert(p * 16 + channel);
                 return p * 16 + channel;
             }
@@ -125,7 +124,7 @@ int MasterScore::getNextFreeMidiMapping(int p, int ch)
     }
 
     for (;; searchMidiMappingFrom++) {
-        if (searchMidiMappingFrom % 16 != 9 && !occupiedMidiChannels.contains(searchMidiMappingFrom)) {
+        if (searchMidiMappingFrom % 16 != 9 && !mu::contains(occupiedMidiChannels, int(searchMidiMappingFrom))) {
             occupiedMidiChannels.insert(searchMidiMappingFrom);
             return searchMidiMappingFrom;
         }
@@ -136,10 +135,10 @@ int MasterScore::getNextFreeMidiMapping(int p, int ch)
 //   getNextFreeDrumMidiMapping
 //---------------------------------------------------------
 
-int MasterScore::getNextFreeDrumMidiMapping()
+int MasterScore::getNextFreeDrumMidiMapping(std::set<int>& occupiedMidiChannels)
 {
     for (int i = 0;; i++) {
-        if (!occupiedMidiChannels.contains(i * 16 + 9)) {
+        if (!mu::contains(occupiedMidiChannels, i * 16 + 9)) {
             occupiedMidiChannels.insert(i * 16 + 9);
             return i * 16 + 9;
         }
@@ -159,8 +158,8 @@ void MasterScore::rebuildExcerptsMidiMapping()
                 LOGW() << "rebuildExcerptsMidiMapping: no part in master score is linked with " << p->partName();
                 continue;
             }
-            Q_ASSERT(p->instruments().size() == masterPart->instruments().size());
-            for (const auto [tick, iMaster] : masterPart->instruments()) {
+            assert(p->instruments().size() == masterPart->instruments().size());
+            for (const auto&[tick, iMaster] : masterPart->instruments()) {
                 Instrument* iLocal = p->instrument(Fraction::fromTicks(tick));
                 const size_t nchannels = iMaster->channel().size();
                 if (iLocal->channel().size() != nchannels) {
@@ -169,8 +168,8 @@ void MasterScore::rebuildExcerptsMidiMapping()
                     continue;
                 }
                 for (size_t c = 0; c < nchannels; ++c) {
-                    Channel* cLocal = iLocal->channel(static_cast<int>(c));
-                    const Channel* cMaster = iMaster->channel(static_cast<int>(c));
+                    InstrChannel* cLocal = iLocal->channel(static_cast<int>(c));
+                    const InstrChannel* cMaster = iMaster->channel(static_cast<int>(c));
                     cLocal->setChannel(cMaster->channel());
                 }
             }
@@ -190,7 +189,7 @@ void MasterScore::reorderMidiMapping()
     for (Part* part : parts()) {
         for (const auto& pair : part->instruments()) {
             const Instrument* instr = pair.second;
-            for (Channel* channel : instr->channel()) {
+            for (InstrChannel* channel : instr->channel()) {
                 if (!(_midiMapping[sequenceNumber].part() == part
                       && _midiMapping[sequenceNumber].masterChannel == channel)) {
                     int shouldBe = channel->channel();
@@ -257,9 +256,8 @@ void MasterScore::removeDeletedMidiMapping()
 int MasterScore::updateMidiMapping()
 {
     int maxport = 0;
-    occupiedMidiChannels.clear();
-    searchMidiMappingFrom = 0;
-    occupiedMidiChannels.reserve(int(_midiMapping.size()));   // Bringing down the complexity of insertion to amortized O(1)
+    std::set<int> occupiedMidiChannels;// each entry is port*16+channel, port range: 0-inf, channel: 0-15
+    unsigned int searchMidiMappingFrom = 0;           // makes getting next free MIDI mapping faster
 
     for (const MidiMapping& mm :_midiMapping) {
         if (mm.port() == -1 || mm.channel() == -1) {
@@ -275,7 +273,7 @@ int MasterScore::updateMidiMapping()
         for (const auto& pair : part->instruments()) {
             const Instrument* instr = pair.second;
             bool drum = instr->useDrumset();
-            for (Channel* channel : instr->channel()) {
+            for (InstrChannel* channel : instr->channel()) {
                 bool channelExists = false;
                 for (const MidiMapping& mapping: _midiMapping) {
                     if (channel == mapping.masterChannel && channel->channel() != -1) {
@@ -286,15 +284,18 @@ int MasterScore::updateMidiMapping()
                 // Channel could already exist, but have unassigned port or channel. Repair and continue
                 if (channelExists) {
                     if (_midiMapping[channel->channel()].port() == -1) {
-                        const int nm = getNextFreeMidiMapping(-1, _midiMapping[channel->channel()].channel());
+                        const int nm
+                            = getNextFreeMidiMapping(occupiedMidiChannels, searchMidiMappingFrom, -1,
+                                                     _midiMapping[channel->channel()].channel());
                         _midiMapping[channel->channel()]._port = nm / 16;
                     } else if (_midiMapping[channel->channel()].channel() == -1) {
                         if (drum) {
-                            _midiMapping[channel->channel()]._port = getNextFreeDrumMidiMapping() / 16;
+                            _midiMapping[channel->channel()]._port = getNextFreeDrumMidiMapping(occupiedMidiChannels) / 16;
                             _midiMapping[channel->channel()]._channel = 9;
                             continue;
                         }
-                        int nm = getNextFreeMidiMapping(_midiMapping[channel->channel()].port());
+                        int nm = getNextFreeMidiMapping(occupiedMidiChannels, searchMidiMappingFrom,
+                                                        _midiMapping[channel->channel()].port());
                         _midiMapping[channel->channel()]._port    = nm / 16;
                         _midiMapping[channel->channel()]._channel = nm % 16;
                     }
@@ -304,10 +305,10 @@ int MasterScore::updateMidiMapping()
                 int midiPort;
                 int midiChannel;
                 if (drum) {
-                    midiPort = getNextFreeDrumMidiMapping() / 16;
+                    midiPort = getNextFreeDrumMidiMapping(occupiedMidiChannels) / 16;
                     midiChannel = 9;
                 } else {
-                    int nm = getNextFreeMidiMapping();
+                    int nm = getNextFreeMidiMapping(occupiedMidiChannels, searchMidiMappingFrom);
                     midiPort    = nm / 16;
                     midiChannel = nm % 16;
                 }
@@ -327,7 +328,7 @@ int MasterScore::updateMidiMapping()
 //   addMidiMapping
 //---------------------------------------------------------
 
-void MasterScore::addMidiMapping(Channel* channel, Part* part, int midiPort, int midiChannel)
+void MasterScore::addMidiMapping(InstrChannel* channel, Part* part, int midiPort, int midiChannel)
 {
     if (!part->score()->isMaster()) {
         return;
@@ -336,7 +337,7 @@ void MasterScore::addMidiMapping(Channel* channel, Part* part, int midiPort, int
     MidiMapping mm;
     mm._part = part;
     mm.masterChannel = channel;
-    mm._articulation.reset(new Channel(*channel));
+    mm._articulation.reset(new InstrChannel(*channel));
     mm.link = PartChannelSettingsLink(mm.articulation(), mm.masterChannel, /* excerpt */ false);
 
     mm._port = midiPort;
@@ -353,7 +354,7 @@ void MasterScore::addMidiMapping(Channel* channel, Part* part, int midiPort, int
 //   updateMidiMapping
 //---------------------------------------------------------
 
-void MasterScore::updateMidiMapping(Channel* channel, Part* part, int midiPort, int midiChannel)
+void MasterScore::updateMidiMapping(InstrChannel* channel, Part* part, int midiPort, int midiChannel)
 {
     const int c = channel->channel();
     if (c < 0) {
@@ -375,4 +376,4 @@ void MasterScore::updateMidiMapping(Channel* channel, Part* part, int midiPort, 
         mm._part = part->masterPart();
     }
 }
-} // namespace Ms
+} // namespace mu::engraving

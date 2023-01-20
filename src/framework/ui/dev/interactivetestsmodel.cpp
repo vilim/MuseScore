@@ -127,8 +127,8 @@ void InteractiveTestsModel::customQuestion()
 
 void InteractiveTestsModel::information()
 {
-    IInteractive::Result result = interactive()->info("Tuplet cannot cross barlines", "", {}, 0,
-                                                      IInteractive::Option::WithIcon | IInteractive::Option::WithShowAgain);
+    IInteractive::Result result = interactive()->info("Tuplet cannot cross barlines", std::string(), {}, 0,
+                                                      IInteractive::Option::WithIcon | IInteractive::Option::WithDontShowAgainCheckBox);
     LOGD() << interactive()->buttonData(result.standardButton()).text;
 }
 
@@ -141,8 +141,7 @@ void InteractiveTestsModel::warning()
                                                          "Your changes will be lost if you don’t save them.",
                                                          { IInteractive::ButtonData(noSaveButton, "Don’t save"),
                                                            interactive()->buttonData(IInteractive::Button::Cancel),
-                                                           IInteractive::ButtonData(saveButton, "Save", true) }, saveButton,
-                                                         IInteractive::Option::WithIcon);
+                                                           IInteractive::ButtonData(saveButton, "Save", true) }, saveButton);
 
     if (result.button() == noSaveButton) {
         LOGI() << "Don’t save!!";
@@ -156,8 +155,7 @@ void InteractiveTestsModel::warning()
 void InteractiveTestsModel::critical()
 {
     IInteractive::Result result = interactive()->error("Cannot read file C:/Users/Username/Desktop/Composition.mscz",
-                                                       "An error has occured when trying to open this file",  {}, 0,
-                                                       IInteractive::Option::WithIcon);
+                                                       std::string("An error has occurred when trying to open this file"));
     LOGD() << interactive()->buttonData(result.standardButton()).text;
 }
 

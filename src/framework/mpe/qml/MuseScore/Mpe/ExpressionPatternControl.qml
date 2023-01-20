@@ -45,7 +45,7 @@ Column {
 
             Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
 
-            text: qsTrc("mpe", "Point index")
+            text: /*qsTrc*/ "Point index"
         }
 
         StyledSlider {
@@ -80,7 +80,7 @@ Column {
 
             Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
 
-            text: qsTrc("mpe", "Dynamic offset")
+            text: /*qsTrc*/ "Dynamic offset"
         }
 
         StyledSlider {
@@ -119,7 +119,7 @@ Column {
                 bottom: 0
             }
 
-            onCurrentTextEdited: function(newTextValue) {
+            onTextChanged: function(newTextValue) {
                 if (root.patternModel) {
                     root.patternModel.updateDynamicOffsetValue(offsetPointIndexSlider.value,
                                                                newTextValue * 100)

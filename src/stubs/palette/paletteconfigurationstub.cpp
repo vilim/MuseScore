@@ -23,21 +23,35 @@
 
 using namespace mu::palette;
 
-double PaletteConfigurationStub::paletteScaling() const
+double PaletteConfigurationStub::paletteSpatium() const
 {
     return 0.f;
+}
+
+double PaletteConfigurationStub::paletteScaling() const
+{
+    return 1.f;
 }
 
 void PaletteConfigurationStub::setPaletteScaling(double)
 {
 }
 
-bool PaletteConfigurationStub::isSinglePalette() const
+mu::ValCh<bool> PaletteConfigurationStub::isSinglePalette() const
 {
-    return false;
+    return mu::ValCh<bool>();
 }
 
 void PaletteConfigurationStub::setIsSinglePalette(bool)
+{
+}
+
+mu::ValCh<bool> PaletteConfigurationStub::isSingleClickToOpenPalette() const
+{
+    return mu::ValCh<bool>();
+}
+
+void PaletteConfigurationStub::setIsSingleClickToOpenPalette(bool)
 {
 }
 
@@ -66,14 +80,14 @@ mu::async::Notification PaletteConfigurationStub::colorsChanged() const
     return mu::async::Notification();
 }
 
-mu::io::path PaletteConfigurationStub::keySignaturesDirPath() const
+mu::io::path_t PaletteConfigurationStub::keySignaturesDirPath() const
 {
-    return mu::io::path();
+    return mu::io::path_t();
 }
 
-mu::io::path PaletteConfigurationStub::timeSignaturesDirPath() const
+mu::io::path_t PaletteConfigurationStub::timeSignaturesDirPath() const
 {
-    return mu::io::path();
+    return mu::io::path_t();
 }
 
 bool PaletteConfigurationStub::useFactorySettings() const

@@ -21,9 +21,6 @@
  */
 #include "globalmodule.h"
 
-#include <QTimer>
-#include <QDateTime>
-
 #include "modularity/ioc.h"
 #include "internal/globalconfiguration.h"
 
@@ -35,7 +32,8 @@
 
 #include "internal/application.h"
 #include "internal/interactive.h"
-#include "invoker.h"
+#include "internal/invoker.h"
+#include "internal/cryptographichash.h"
 
 #include "runtime.h"
 #include "async/processevents.h"
@@ -67,9 +65,10 @@ void GlobalModule::registerExports()
     ioc()->registerExport<IGlobalConfiguration>(moduleName(), s_globalConf);
     ioc()->registerExport<IInteractive>(moduleName(), new Interactive());
     ioc()->registerExport<IFileSystem>(moduleName(), new FileSystem());
+    ioc()->registerExport<ICryptographicHash>(moduleName(), new CryptographicHash());
 }
 
-void GlobalModule::onInit(const IApplication::RunMode& mode)
+void GlobalModule::onPreInit(const IApplication::RunMode& mode)
 {
     mu::runtime::mainThreadId(); //! NOTE Needs only call
     mu::runtime::setThreadName("main");
@@ -84,20 +83,20 @@ void GlobalModule::onInit(const IApplication::RunMode& mode)
     logger->clearDests();
 
     //! Console
-    if (mode == IApplication::RunMode::Editor) {
+    if (mode == IApplication::RunMode::Editor || mu::runtime::isDebug()) {
         logger->addDest(new ConsoleLogDest(LogLayout("${time} | ${type|5} | ${thread} | ${tag|10} | ${message}")));
     }
 
-    io::path logPath = s_globalConf->userAppDataPath() + "/logs";
+    io::path_t logPath = s_globalConf->userAppDataPath() + "/logs";
     fileSystem()->makePath(logPath);
 
     //! Remove old logs
-    LogRemover::removeLogs(logPath, 7, "MuseScore_yyMMdd_HHmmss.log");
+    LogRemover::removeLogs(logPath, 7, u"MuseScore_yyMMdd_HHmmss.log");
 
     //! File, this creates a file named "data/logs/MuseScore_yyMMdd_HHmmss.log"
-    io::path logFilePath = logPath + "/MuseScore_"
-                           + QDateTime::currentDateTime().toString("yyMMdd_HHmmss")
-                           + ".log";
+    io::path_t logFilePath = logPath + "/MuseScore_"
+                             + QDateTime::currentDateTime().toString("yyMMdd_HHmmss")
+                             + ".log";
 
     FileLogDest* logFile = new FileLogDest(logFilePath.toStdString(),
                                            LogLayout("${datetime} | ${type|5} | ${thread} | ${tag|10} | ${message}"));
@@ -151,4 +150,9 @@ void GlobalModule::onInit(const IApplication::RunMode& mode)
         pr->reg("log file", logFile->filePath());
         pr->reg("settings file", settings()->filePath());
     }
+}
+
+void GlobalModule::onInit(const IApplication::RunMode&)
+{
+    s_globalConf->init();
 }

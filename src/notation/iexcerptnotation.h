@@ -34,10 +34,12 @@ class IExcerptNotation
 public:
     virtual ~IExcerptNotation() = default;
 
-    virtual bool isCreated() const = 0;
+    virtual bool isCustom() const = 0;
+    virtual bool isEmpty() const = 0;
 
     virtual QString name() const = 0;
     virtual void setName(const QString& name) = 0;
+    virtual async::Notification nameChanged() const = 0;
 
     virtual INotationPtr notation() = 0;
     virtual IExcerptNotationPtr clone() const = 0;

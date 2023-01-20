@@ -27,7 +27,7 @@
 #include "libmscore/staff.h"
 #include "libmscore/masterscore.h"
 #include "engraving/types/fraction.h"
-#include "libmscore/duration.h"
+#include "libmscore/durationelement.h"
 #include "libmscore/measure.h"
 #include "libmscore/tuplet.h"
 #include "libmscore/mscore.h"
@@ -35,7 +35,9 @@
 
 #include "log.h"
 
-namespace Ms {
+using namespace mu::engraving;
+
+namespace mu::iex::midi {
 namespace MidiTuplet {
 void addElementToTuplet(int voice,
                         const ReducedFraction& onTime,
@@ -141,4 +143,4 @@ bool haveTupletsEnoughElements(const Staff* staff)
 
 #endif
 } // namespace MidiTuplet
-} // namespace Ms
+} // namespace mu::iex::midi

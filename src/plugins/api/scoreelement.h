@@ -29,10 +29,11 @@
 
 #include "libmscore/property.h"
 
-namespace Ms {
+namespace mu::engraving {
 class EngravingObject;
+}
 
-namespace PluginAPI {
+namespace mu::plugins::api {
 //---------------------------------------------------------
 //   Ownership
 ///   \cond PLUGIN_API \private \endcond
@@ -72,12 +73,12 @@ class ScoreElement : public QObject
 
 protected:
     /// \cond MS_INTERNAL
-    Ms::EngravingObject* const e;
+    mu::engraving::EngravingObject* const e;
     /// \endcond
 
 public:
     /// \cond MS_INTERNAL
-    ScoreElement(Ms::EngravingObject* _e = nullptr, Ownership own = Ownership::PLUGIN)
+    ScoreElement(mu::engraving::EngravingObject* _e = nullptr, Ownership own = Ownership::PLUGIN)
         : QObject(), _ownership(own), e(_e) {}
     ScoreElement(const ScoreElement&) = delete;
     ScoreElement& operator=(const ScoreElement&) = delete;
@@ -86,19 +87,19 @@ public:
     Ownership ownership() const { return _ownership; }
     void setOwnership(Ownership o) { _ownership = o; }
 
-    Ms::EngravingObject* element() { return e; }
-    const Ms::EngravingObject* element() const { return e; }
+    mu::engraving::EngravingObject* element() { return e; }
+    const mu::engraving::EngravingObject* element() const { return e; }
 
     QString name() const;
     int type() const;
 
-    QVariant get(Ms::Pid pid) const;
-    void set(Ms::Pid pid, QVariant val);
+    QVariant get(mu::engraving::Pid pid) const;
+    void set(mu::engraving::Pid pid, const QVariant& val);
     /// \endcond
 
     Q_INVOKABLE QString userName() const;
     /// Checks whether two variables represent the same object. \since MuseScore 3.3
-    Q_INVOKABLE bool is(Ms::PluginAPI::ScoreElement* other) { return other && element() == other->element(); }
+    Q_INVOKABLE bool is(mu::plugins::api::ScoreElement* other) { return other && element() == other->element(); }
 };
 
 //---------------------------------------------------------
@@ -117,7 +118,7 @@ Wrapper* wrap(T* t, Ownership own = Ownership::SCORE)
     return w;
 }
 
-extern ScoreElement* wrap(Ms::EngravingObject* se, Ownership own = Ownership::SCORE);
+extern ScoreElement* wrap(mu::engraving::EngravingObject* se, Ownership own = Ownership::SCORE);
 
 //---------------------------------------------------------
 //   customWrap
@@ -173,6 +174,6 @@ QmlListAccess<T, Container> wrapContainerProperty(QObject* obj, Container& c)
 {
     return QmlListAccess<T, Container>(obj, c);
 }
-} // namespace PluginAPI
-} // namespace Ms
+} // namespace mu::plugins::api
+
 #endif

@@ -25,13 +25,14 @@
 
 #include "libmscore/undo.h"
 
-namespace Ms {
-namespace PluginAPI {
+using namespace mu::engraving;
+
+namespace mu::plugins::api {
 //---------------------------------------------------------
 //   QmlPlayEventsListAccess::append
 //---------------------------------------------------------
 
-Selection* selectionWrap(Ms::Selection* select)
+Selection* selectionWrap(mu::engraving::Selection* select)
 {
     Selection* w = new Selection(select);
     // All wrapper objects should belong to JavaScript code.
@@ -78,11 +79,11 @@ bool Selection::select(EngravingItem* elWrapper, bool add)
         return false;
     }
 
-    Ms::EngravingItem* e = elWrapper->element();
+    mu::engraving::EngravingItem* e = elWrapper->element();
 
     // Check whether it's safe to select this element:
     // use types list from UndoMacro for now
-    if (!Ms::UndoMacro::canRecordSelectedElement(e)) {
+    if (!mu::engraving::UndoMacro::canRecordSelectedElement(e)) {
         LOGW("Cannot select element of type %s", e->typeName());
         return false;
     }
@@ -104,7 +105,7 @@ bool Selection::select(EngravingItem* elWrapper, bool add)
 ///   \param startTick start tick to be included in selection
 ///   \param endTick end tick of selection, excluded from selection
 ///   \param startStaff start staff index, included in selection
-///   \param endStaff end staff index, excluded from seleciton
+///   \param endStaff end staff index, excluded from selection
 ///   \return \p true on success, \p false if selection
 ///   cannot be changed, e.g. due to the ongoing operation
 ///   on a score (like dragging elements) or incorrect
@@ -118,7 +119,7 @@ bool Selection::selectRange(int startTick, int endTick, int startStaff, int endS
         return false;
     }
 
-    const int nstaves = _select->score()->nstaves();
+    const int nstaves = static_cast<int>(_select->score()->nstaves());
 
     startStaff = qBound(0, startStaff, nstaves - 1);
     endStaff = qBound(1, endStaff, nstaves);
@@ -127,8 +128,8 @@ bool Selection::selectRange(int startTick, int endTick, int startStaff, int endS
         return false;
     }
 
-    Ms::Segment* segStart = _select->score()->tick2leftSegmentMM(Ms::Fraction::fromTicks(startTick));
-    Ms::Segment* segEnd = _select->score()->tick2leftSegmentMM(Ms::Fraction::fromTicks(endTick));
+    mu::engraving::Segment* segStart = _select->score()->tick2leftSegmentMM(mu::engraving::Fraction::fromTicks(startTick));
+    mu::engraving::Segment* segEnd = _select->score()->tick2leftSegmentMM(mu::engraving::Fraction::fromTicks(endTick));
 
     if (!segStart || (segEnd && !((*segEnd) > (*segStart)))) {
         return false;
@@ -184,5 +185,4 @@ bool Selection::clear()
     _select->deselectAll();
     return true;
 }
-}
-}
+} // namespace mu::plugins::api

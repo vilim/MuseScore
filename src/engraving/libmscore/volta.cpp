@@ -25,7 +25,6 @@
 #include <algorithm>
 #include <vector>
 
-#include "style/style.h"
 #include "rw/xml.h"
 #include "types/typesconv.h"
 
@@ -35,14 +34,13 @@
 #include "staff.h"
 #include "system.h"
 #include "tempo.h"
-#include "text.h"
 
 #include "log.h"
 
 using namespace mu;
 using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 static const ElementStyle voltaStyle {
     { Sid::voltaFontFace,                      Pid::BEGIN_FONT_FACE },
     { Sid::voltaFontFace,                      Pid::CONTINUE_FONT_FACE },
@@ -61,9 +59,12 @@ static const ElementStyle voltaStyle {
     { Sid::voltaOffset,                        Pid::END_TEXT_OFFSET },
     { Sid::voltaLineWidth,                     Pid::LINE_WIDTH },
     { Sid::voltaLineStyle,                     Pid::LINE_STYLE },
+    { Sid::voltaDashLineLen,                   Pid::DASH_LINE_LEN },
+    { Sid::voltaDashGapLen,                    Pid::DASH_GAP_LEN },
     { Sid::voltaHook,                          Pid::BEGIN_HOOK_HEIGHT },
     { Sid::voltaHook,                          Pid::END_HOOK_HEIGHT },
     { Sid::voltaPosAbove,                      Pid::OFFSET },
+    { Sid::voltaFontSpatiumDependent,          Pid::TEXT_SIZE_SPATIUM_DEPENDENT },
 };
 
 //---------------------------------------------------------
@@ -135,7 +136,7 @@ void Volta::setEndings(const std::vector<int>& l)
 //   setText
 //---------------------------------------------------------
 
-void Volta::setText(const QString& s)
+void Volta::setText(const String& s)
 {
     setBeginText(s);
 }
@@ -144,7 +145,7 @@ void Volta::setText(const QString& s)
 //   text
 //---------------------------------------------------------
 
-QString Volta::text() const
+String Volta::text() const
 {
     return beginText();
 }
@@ -158,9 +159,9 @@ void Volta::read(XmlReader& e)
     eraseSpannerSegments();
 
     while (e.readNextStartElement()) {
-        const QStringRef& tag(e.name());
+        const AsciiStringView tag(e.name());
         if (tag == "endings") {
-            QString s = e.readElementText();
+            String s = e.readText();
             _endings = TConv::fromXml(s, std::vector<int>());
         } else if (readStyledProperty(e, tag)) {
         } else if (!readProperties(e)) {
@@ -194,10 +195,10 @@ bool Volta::readProperties(XmlReader& e)
 
 void Volta::write(XmlWriter& xml) const
 {
-    xml.startObject(this);
+    xml.startElement(this);
     TextLineBase::writeProperties(xml);
     xml.tag("endings", TConv::toXml(_endings));
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -330,7 +331,7 @@ PropertyValue Volta::propertyDefault(Pid propertyId) const
 
 SpannerSegment* Volta::layoutSystem(System* system)
 {
-    SpannerSegment* voltaSegment= SLine::layoutSystem(system);
+    SpannerSegment* voltaSegment = TextLineBase::layoutSystem(system);
 
     // we need set tempo in layout because all tempos of score is set in layout
     // so fermata in seconda volta works correct because fermata apply itself tempo during layouting
@@ -410,9 +411,9 @@ void Volta::setTempo() const
 //   accessibleInfo
 //---------------------------------------------------------
 
-QString Volta::accessibleInfo() const
+String Volta::accessibleInfo() const
 {
-    return QString("%1: %2").arg(EngravingItem::accessibleInfo(), text());
+    return String(u"%1: %2").arg(EngravingItem::accessibleInfo(), text());
 }
 
 //---------------------------------------------------------

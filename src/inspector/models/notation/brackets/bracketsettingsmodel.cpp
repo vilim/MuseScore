@@ -28,10 +28,10 @@
 #include "translation.h"
 
 using namespace mu::inspector;
-using namespace Ms;
+using namespace mu::engraving;
 
 BracketSettingsModel::BracketSettingsModel(QObject* parent, IElementRepositoryService* repository)
-    : AbstractInspectorModel(parent, repository, Ms::ElementType::BRACKET)
+    : AbstractInspectorModel(parent, repository, mu::engraving::ElementType::BRACKET)
 {
     setModelType(InspectorModelType::TYPE_BRACKET);
     setTitle(qtrc("inspector", "Bracket"));
@@ -44,21 +44,25 @@ BracketSettingsModel::BracketSettingsModel(QObject* parent, IElementRepositorySe
 
 void BracketSettingsModel::createProperties()
 {
-    m_bracketColumnPosition = buildPropertyItem(Ms::Pid::BRACKET_COLUMN);
-    m_bracketSpanStaves = buildPropertyItem(Ms::Pid::BRACKET_SPAN);
+    m_bracketColumnPosition = buildPropertyItem(mu::engraving::Pid::BRACKET_COLUMN);
+    m_bracketSpanStaves = buildPropertyItem(mu::engraving::Pid::BRACKET_SPAN);
 }
 
 void BracketSettingsModel::requestElements()
 {
-    m_elementList = m_repository->findElementsByType(Ms::ElementType::BRACKET);
+    m_elementList = m_repository->findElementsByType(mu::engraving::ElementType::BRACKET);
 
     emit selectionChanged();
 }
 
 void BracketSettingsModel::loadProperties()
 {
-    loadPropertyItem(m_bracketColumnPosition);
-    loadPropertyItem(m_bracketSpanStaves);
+    static const PropertyIdSet propertyIdSet {
+        Pid::BRACKET_COLUMN,
+        Pid::BRACKET_SPAN,
+    };
+
+    loadProperties(propertyIdSet);
 }
 
 void BracketSettingsModel::resetProperties()
@@ -67,9 +71,20 @@ void BracketSettingsModel::resetProperties()
     m_bracketSpanStaves->resetToDefault();
 }
 
-void BracketSettingsModel::updatePropertiesOnNotationChanged()
+void BracketSettingsModel::onNotationChanged(const PropertyIdSet& changedPropertyIdSet, const StyleIdSet&)
 {
-    loadPropertyItem(m_bracketSpanStaves);
+    loadProperties(changedPropertyIdSet);
+}
+
+void BracketSettingsModel::loadProperties(const PropertyIdSet& propertyIdSet)
+{
+    if (mu::contains(propertyIdSet, Pid::BRACKET_COLUMN)) {
+        loadPropertyItem(m_bracketColumnPosition);
+    }
+
+    if (mu::contains(propertyIdSet, Pid::BRACKET_SPAN)) {
+        loadPropertyItem(m_bracketSpanStaves);
+    }
 }
 
 PropertyItem* BracketSettingsModel::bracketColumnPosition() const

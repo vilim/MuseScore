@@ -21,34 +21,29 @@
  */
 
 #include "containers.h"
-#include "style/style.h"
 #include "rw/xml.h"
 #include "types/typesconv.h"
 
-#include "factory.h"
-#include "mscore.h"
-#include "staff.h"
-#include "part.h"
-#include "clef.h"
-#include "score.h"
-#include "bracket.h"
-#include "keysig.h"
-#include "segment.h"
-#include "measure.h"
-#include "stringdata.h"
-#include "stafftype.h"
-#include "undo.h"
-#include "cleflist.h"
-#include "timesig.h"
-#include "instrtemplate.h"
 #include "barline.h"
-#include "ottava.h"
-#include "harmony.h"
+#include "bracket.h"
 #include "bracketItem.h"
 #include "chord.h"
-#include "masterscore.h"
-#include "excerpt.h"
+#include "clef.h"
+#include "cleflist.h"
+#include "factory.h"
+#include "instrtemplate.h"
 #include "linkedobjects.h"
+#include "masterscore.h"
+#include "measure.h"
+#include "mscore.h"
+#include "note.h"
+#include "ottava.h"
+#include "part.h"
+#include "score.h"
+#include "segment.h"
+#include "staff.h"
+#include "stafftype.h"
+#include "timesig.h"
 
 // #define DEBUG_CLEFS
 
@@ -63,7 +58,7 @@ using namespace mu::engraving;
 #define DUMP_CLEFS(s)
 #endif
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   Staff
 //---------------------------------------------------------
@@ -83,15 +78,6 @@ Staff::Staff(const Staff& staff)
 {
     init(&staff);
     _part = staff._part;
-}
-
-//---------------------------------------------------------
-//   ~Staff
-//---------------------------------------------------------
-
-Staff::~Staff()
-{
-    qDeleteAll(brackets());
 }
 
 //---------------------------------------------------------
@@ -195,7 +181,7 @@ void Staff::setBracketType(size_t idx, BracketType val)
 
 void Staff::swapBracket(size_t oldIdx, size_t newIdx)
 {
-    size_t idx = qMax(oldIdx, newIdx);
+    size_t idx = std::max(oldIdx, newIdx);
     fillBrackets(idx);
     _brackets[oldIdx]->setColumn(newIdx);
     _brackets[newIdx]->setColumn(oldIdx);
@@ -209,7 +195,7 @@ void Staff::swapBracket(size_t oldIdx, size_t newIdx)
 
 void Staff::changeBracketColumn(size_t oldColumn, size_t newColumn)
 {
-    size_t idx = qMax(oldColumn, newColumn);
+    size_t idx = std::max(oldColumn, newColumn);
     fillBrackets(idx);
     int step = newColumn > oldColumn ? 1 : -1;
     for (size_t i = oldColumn; i != newColumn; i += step) {
@@ -331,13 +317,8 @@ bool Staff::canDisableVoice() const
     return countOfVisibleVoices > 1;
 }
 
-void Staff::updateVisibilityVoices(Staff* masterStaff)
+void Staff::updateVisibilityVoices(Staff* masterStaff, const TracksMap& tracks)
 {
-    if (!score()->excerpt()) {
-        return;
-    }
-
-    auto tracks = score()->excerpt()->tracksMapping();
     if (tracks.empty()) {
         _visibilityVoices = { true, true, true, true };
         return;
@@ -404,7 +385,7 @@ size_t Staff::bracketLevels() const
 {
     size_t columns = 0;
     for (auto bi : _brackets) {
-        columns = qMax(columns, bi->column());
+        columns = std::max(columns, bi->column());
     }
     return columns;
 }
@@ -413,7 +394,7 @@ size_t Staff::bracketLevels() const
 //   partName
 //---------------------------------------------------------
 
-QString Staff::partName() const
+String Staff::partName() const
 {
     return _part->partName();
 }
@@ -487,9 +468,9 @@ Fraction Staff::currentClefTick(const Fraction& tick) const
     return Fraction::fromTicks(clefs.currentClefTick(tick.ticks()));
 }
 
-QString Staff::staffName() const
+String Staff::staffName() const
 {
-    return TConv::toUserName(clefType(Fraction())._transposingClef);
+    return TConv::translatedUserName(clefType(Fraction())._transposingClef);
 }
 
 #ifndef NDEBUG
@@ -680,7 +661,9 @@ void Staff::addTimeSig(TimeSig* timesig)
 void Staff::removeTimeSig(TimeSig* timesig)
 {
     if (timesig->segment()->segmentType() == SegmentType::TimeSig) {
-        timesigs.erase(timesig->segment()->tick().ticks());
+        if (timesigs[timesig->segment()->tick().ticks()] == timesig) {
+            timesigs.erase(timesig->segment()->tick().ticks());
+        }
     }
 //      dumpTimeSigs("after removeTimeSig");
 }
@@ -764,7 +747,7 @@ Fraction Staff::currentKeyTick(const Fraction& tick) const
 
 void Staff::write(XmlWriter& xml) const
 {
-    xml.startObject(this, QString("id=\"%1\"").arg(idx() + 1));
+    xml.startElement(this, { { "id", idx() + 1 } });
 
     if (links()) {
         Score* s = masterScore();
@@ -777,7 +760,7 @@ void Staff::write(XmlWriter& xml) const
     }
 
     // for copy/paste we need to know the actual transposition
-    if (xml.clipboardmode()) {
+    if (xml.context()->clipboardmode()) {
         Interval v = part()->instrument()->transpose();     // TODO: tick?
         if (v.diatonic) {
             xml.tag("transposeDiatonic", v.diatonic);
@@ -816,14 +799,16 @@ void Staff::write(XmlWriter& xml) const
     if (_mergeMatchingRests) {
         xml.tag("mergeMatchingRests", _mergeMatchingRests);
     }
+    if (!visible()) {
+        xml.tag("isStaffVisible", visible());
+    }
 
     for (const BracketItem* i : _brackets) {
         BracketType a = i->bracketType();
         size_t b = i->bracketSpan();
         size_t c = i->column();
         if (a != BracketType::NO_BRACKET || b > 0) {
-            xml.tagE(QString("bracket type=\"%1\" span=\"%2\" col=\"%3\"").arg(static_cast<int>(a)).arg(static_cast<int>(b)).arg(static_cast
-                                                                                                                                 <int>(c)));
+            xml.tag("bracket", { { "type", static_cast<int>(a) }, { "span", b }, { "col", c } });
         }
     }
 
@@ -836,7 +821,7 @@ void Staff::write(XmlWriter& xml) const
     writeProperty(xml, Pid::PLAYBACK_VOICE2);
     writeProperty(xml, Pid::PLAYBACK_VOICE3);
     writeProperty(xml, Pid::PLAYBACK_VOICE4);
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -858,18 +843,18 @@ void Staff::read(XmlReader& e)
 
 bool Staff::readProperties(XmlReader& e)
 {
-    const QStringRef& tag(e.name());
+    const AsciiStringView tag(e.name());
     if (tag == "StaffType") {
         StaffType st;
         st.read(e);
         setStaffType(Fraction(0, 1), st);
     } else if (tag == "defaultClef") {           // sets both default transposing and concert clef
-        ClefType ct = TConv::fromXml(e.readElementText(), ClefType::G);
+        ClefType ct = TConv::fromXml(e.readAsciiText(), ClefType::G);
         setDefaultClefType(ClefTypeList(ct, ct));
     } else if (tag == "defaultConcertClef") {
-        setDefaultClefType(ClefTypeList(TConv::fromXml(e.readElementText(), ClefType::G), defaultClefType()._transposingClef));
+        setDefaultClefType(ClefTypeList(TConv::fromXml(e.readAsciiText(), ClefType::G), defaultClefType()._transposingClef));
     } else if (tag == "defaultTransposingClef") {
-        setDefaultClefType(ClefTypeList(defaultClefType()._concertClef, TConv::fromXml(e.readElementText(), ClefType::G)));
+        setDefaultClefType(ClefTypeList(defaultClefType()._concertClef, TConv::fromXml(e.readAsciiText(), ClefType::G)));
     } else if (tag == "small") {                // obsolete
         staffType(Fraction(0, 1))->setSmall(e.readInt());
     } else if (tag == "invisible") {
@@ -884,12 +869,14 @@ bool Staff::readProperties(XmlReader& e)
         _hideSystemBarLine = e.readInt();
     } else if (tag == "mergeMatchingRests") {
         _mergeMatchingRests = e.readInt();
+    } else if (tag == "isStaffVisible") {
+        setVisible(e.readBool());
     } else if (tag == "keylist") {
         _keys.read(e, score());
     } else if (tag == "bracket") {
         int col = e.intAttribute("col", -1);
         if (col == -1) {
-            col = _brackets.size();
+            col = static_cast<int>(_brackets.size());
         }
         setBracketType(col, BracketType(e.intAttribute("type", -1)));
         setBracketSpan(col, e.intAttribute("span", 0));
@@ -928,9 +915,9 @@ bool Staff::readProperties(XmlReader& e)
     } else if (tag == "color") {
         staffType(Fraction(0, 1))->setColor(e.readColor());
     } else if (tag == "transposeDiatonic") {
-        e.setTransposeDiatonic(static_cast<int8_t>(e.readInt()));
+        e.context()->setTransposeDiatonic(static_cast<int8_t>(e.readInt()));
     } else if (tag == "transposeChromatic") {
-        e.setTransposeChromatic(static_cast<int8_t>(e.readInt()));
+        e.context()->setTransposeChromatic(static_cast<int8_t>(e.readInt()));
     } else if (tag == "playbackVoice1") {
         setPlaybackVoice(0, e.readInt());
     } else if (tag == "playbackVoice2") {
@@ -949,7 +936,7 @@ bool Staff::readProperties(XmlReader& e)
 //   height
 //---------------------------------------------------------
 
-qreal Staff::height() const
+double Staff::height() const
 {
     Fraction tick = Fraction(0, 1);
     return (lines(tick) - 1) * spatium(tick) * staffType(tick)->lineDistance().val();
@@ -959,12 +946,12 @@ qreal Staff::height() const
 //   spatium
 //---------------------------------------------------------
 
-qreal Staff::spatium(const Fraction& tick) const
+double Staff::spatium(const Fraction& tick) const
 {
     return score()->spatium() * staffMag(tick);
 }
 
-qreal Staff::spatium(const EngravingItem* e) const
+double Staff::spatium(const EngravingItem* e) const
 {
     return score()->spatium() * staffMag(e);
 }
@@ -973,17 +960,17 @@ qreal Staff::spatium(const EngravingItem* e) const
 //   mag
 //---------------------------------------------------------
 
-qreal Staff::staffMag(const StaffType* stt) const
+double Staff::staffMag(const StaffType* stt) const
 {
     return (stt->isSmall() ? score()->styleD(Sid::smallStaffMag) : 1.0) * stt->userMag();
 }
 
-qreal Staff::staffMag(const Fraction& tick) const
+double Staff::staffMag(const Fraction& tick) const
 {
     return staffMag(staffType(tick));
 }
 
-qreal Staff::staffMag(const EngravingItem* element) const
+double Staff::staffMag(const EngravingItem* element) const
 {
     return staffMag(staffTypeForElement(element));
 }
@@ -996,12 +983,13 @@ SwingParameters Staff::swing(const Fraction& tick) const
 {
     SwingParameters sp;
     int swingUnit = 0;
-    DurationType unit = TConv::fromXml(score()->styleSt(Sid::swingUnit), DurationType::V_INVALID);
+    ByteArray ba = score()->styleSt(Sid::swingUnit).toAscii();
+    DurationType unit = TConv::fromXml(ba.constChar(), DurationType::V_INVALID);
     int swingRatio = score()->styleI(Sid::swingRatio);
     if (unit == DurationType::V_EIGHTH) {
-        swingUnit = Constant::division / 2;
+        swingUnit = Constants::division / 2;
     } else if (unit == DurationType::V_16TH) {
-        swingUnit = Constant::division / 4;
+        swingUnit = Constants::division / 4;
     } else if (unit == DurationType::V_ZERO) {
         swingUnit = 0;
     }
@@ -1196,6 +1184,17 @@ const StaffType* Staff::staffTypeForElement(const EngravingItem* e) const
     return &_staffTypeList.staffType(e->tick());
 }
 
+bool Staff::isStaffTypeStartFrom(const Fraction& tick) const
+{
+    return _staffTypeList.isStaffTypeStartFrom(tick);
+}
+
+void Staff::moveStaffType(const Fraction& from, const Fraction& to)
+{
+    _staffTypeList.moveStaffType(from, to);
+    staffTypeListChanged(from);
+}
+
 //---------------------------------------------------------
 //   staffTypeListChanged
 //    Signal that the staffTypeList has changed at
@@ -1238,7 +1237,7 @@ StaffType* Staff::setStaffType(const Fraction& tick, const StaffType& nst)
 
 void Staff::removeStaffType(const Fraction& tick)
 {
-    qreal old = spatium(tick);
+    double old = spatium(tick);
     const bool removed = _staffTypeList.removeStaffType(tick);
     if (!removed) {
         return;
@@ -1280,13 +1279,6 @@ void Staff::init(const Staff* s)
     _id                = s->_id;
     _staffTypeList     = s->_staffTypeList;
     setDefaultClefType(s->defaultClefType());
-    for (BracketItem* i : s->_brackets) {
-        BracketItem* ni = new BracketItem(*i);
-        ni->setScore(score());
-        ni->setStaff(this);
-        _brackets.push_back(ni);
-    }
-    _barLineSpan       = s->_barLineSpan;
     _barLineFrom       = s->_barLineFrom;
     _barLineTo         = s->_barLineTo;
     _hideWhenEmpty     = s->_hideWhenEmpty;
@@ -1299,7 +1291,7 @@ void Staff::init(const Staff* s)
     _visibilityVoices = s->_visibilityVoices;
 }
 
-ID Staff::id() const
+const ID& Staff::id() const
 {
     return _id;
 }
@@ -1337,7 +1329,7 @@ void Staff::initFromStaffType(const StaffType* staffType)
 //   spatiumChanged
 //---------------------------------------------------------
 
-void Staff::spatiumChanged(qreal oldValue, qreal newValue)
+void Staff::spatiumChanged(double oldValue, double newValue)
 {
     _userDist = (_userDist / oldValue) * newValue;
 }
@@ -1503,7 +1495,7 @@ std::list<Staff*> Staff::staffList() const
 
 Staff* Staff::primaryStaff() const
 {
-    const Ms::LinkedObjects* linkedElements = links();
+    const LinkedObjects* linkedElements = links();
     if (!linkedElements) {
         return nullptr;
     }
@@ -1587,13 +1579,13 @@ bool Staff::setProperty(Pid id, const PropertyValue& v)
 {
     switch (id) {
     case Pid::SMALL: {
-        qreal _spatium = spatium(Fraction(0, 1));
+        double _spatium = spatium(Fraction(0, 1));
         staffType(Fraction(0, 1))->setSmall(v.toBool());
         setLocalSpatium(_spatium, spatium(Fraction(0, 1)), Fraction(0, 1));
         break;
     }
     case Pid::MAG: {
-        qreal _spatium = spatium(Fraction(0, 1));
+        double _spatium = spatium(Fraction(0, 1));
         staffType(Fraction(0, 1))->setUserMag(v.toReal());
         setLocalSpatium(_spatium, spatium(Fraction(0, 1)), Fraction(0, 1));
     }
@@ -1772,7 +1764,7 @@ void Staff::setLines(const Fraction& tick, int val)
 //    distance between staff lines
 //---------------------------------------------------------
 
-qreal Staff::lineDistance(const Fraction& tick) const
+double Staff::lineDistance(const Fraction& tick) const
 {
     return staffType(tick)->lineDistance().val();
 }

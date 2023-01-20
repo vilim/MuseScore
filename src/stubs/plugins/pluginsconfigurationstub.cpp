@@ -21,28 +21,42 @@
  */
 #include "pluginsconfigurationstub.h"
 
+#include <QColor>
+
 using namespace mu::plugins;
 using namespace mu;
 
-io::paths PluginsConfigurationStub::availablePluginsPaths() const
+io::paths_t PluginsConfigurationStub::availablePluginsPaths() const
 {
     return {};
 }
 
-ValCh<io::path> PluginsConfigurationStub::pluginsPath() const
+io::path_t PluginsConfigurationStub::userPluginsPath() const
 {
-    return ValCh<io::path>();
+    return io::path_t();
 }
 
-void PluginsConfigurationStub::setPluginsPath(const io::path&)
+void PluginsConfigurationStub::setUserPluginsPath(const io::path_t&)
 {
 }
 
-ValCh<CodeKeyList> PluginsConfigurationStub::installedPlugins() const
+async::Channel<io::path_t> PluginsConfigurationStub::userPluginsPathChanged() const
 {
-    return mu::ValCh<CodeKeyList>();
+    return async::Channel<io::path_t>();
 }
 
-void PluginsConfigurationStub::setInstalledPlugins(const CodeKeyList&)
+const IPluginsConfiguration::PluginsConfigurationHash& PluginsConfigurationStub::pluginsConfiguration() const
 {
+    static const PluginsConfigurationHash h;
+    return h;
+}
+
+Ret PluginsConfigurationStub::setPluginsConfiguration(const PluginsConfigurationHash&)
+{
+    return make_ret(Ret::Code::NotSupported);
+}
+
+QColor PluginsConfigurationStub::viewBackgroundColor() const
+{
+    return QColor();
 }

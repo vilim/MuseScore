@@ -25,24 +25,19 @@
 #include "rw/xml.h"
 
 #include "factory.h"
-#include "measure.h"
-#include "staff.h"
-#include "score.h"
-#include "chord.h"
-#include "note.h"
 #include "layoutbreak.h"
-#include "image.h"
-#include "segment.h"
-#include "tempo.h"
-#include "system.h"
+#include "measure.h"
+#include "score.h"
+#include "staff.h"
 #include "stafftypechange.h"
+#include "system.h"
 
 #include "log.h"
 
 using namespace mu;
 using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   MeasureBase
 //---------------------------------------------------------
@@ -73,7 +68,7 @@ MeasureBase::MeasureBase(const MeasureBase& m)
 
 void MeasureBase::clearElements()
 {
-    qDeleteAll(_el);
+    DeleteAll(_el);
     _el.clear();
 }
 
@@ -106,7 +101,7 @@ void MeasureBase::setScore(Score* score)
 
 MeasureBase::~MeasureBase()
 {
-    qDeleteAll(_el);
+    DeleteAll(_el);
 }
 
 //---------------------------------------------------------
@@ -283,7 +278,7 @@ const MeasureBase* MeasureBase::findPotentialSectionBreak() const
 //   pause
 //---------------------------------------------------------
 
-qreal MeasureBase::pause() const
+double MeasureBase::pause() const
 {
     const LayoutBreak* layoutBreak = sectionBreakElement();
     return layoutBreak ? layoutBreak->pause() : 0.0;
@@ -302,9 +297,9 @@ void MeasureBase::layout()
             continue;
         }
         if (element->isLayoutBreak()) {
-            qreal _spatium = spatium();
-            qreal x;
-            qreal y;
+            double _spatium = spatium();
+            double x;
+            double y;
             if (toLayoutBreak(element)->isNoBreak()) {
                 x = width() + score()->styleMM(Sid::barWidth) - element->width() * .5;
             } else {
@@ -348,6 +343,11 @@ Fraction MeasureBase::tick() const
     return mb ? mb->_tick : Fraction(-1, 1);
 }
 
+void MeasureBase::setTick(const Fraction& f)
+{
+    _tick = f;
+}
+
 //---------------------------------------------------------
 //   triggerLayout
 //---------------------------------------------------------
@@ -371,10 +371,11 @@ void MeasureBase::scanElements(void* data, void (* func)(void*, EngravingItem*),
     if (isMeasure()) {
         for (EngravingItem* e : _el) {
             if (score()->tagIsValid(e->tag())) {
-                if (e->staffIdx() >= score()->staves().size()) {
-                    LOGD("MeasureBase::scanElements: bad staffIdx %zu in element %s", e->staffIdx(), e->typeName());
+                staff_idx_t staffIdx = e->staffIdx();
+                if (staffIdx != mu::nidx && staffIdx >= score()->staves().size()) {
+                    LOGD("MeasureBase::scanElements: bad staffIdx %zu in element %s", staffIdx, e->typeName());
                 }
-                if ((e->track() == mu::nidx) || e->systemFlag() || ((Measure*)this)->visible(e->staffIdx())) {
+                if ((e->track() == mu::nidx) || e->systemFlag() || toMeasure(this)->visible(staffIdx)) {
                     e->scanElements(data, func, all);
                 }
             }
@@ -626,7 +627,7 @@ void MeasureBase::writeProperties(XmlWriter& xml) const
 
 bool MeasureBase::readProperties(XmlReader& e)
 {
-    const QStringRef& tag(e.name());
+    const AsciiStringView tag(e.name());
     if (tag == "LayoutBreak") {
         LayoutBreak* lb = Factory::createLayoutBreak(this);
         lb->read(e);
@@ -661,7 +662,7 @@ bool MeasureBase::readProperties(XmlReader& e)
         }
     } else if (tag == "StaffTypeChange") {
         StaffTypeChange* stc = Factory::createStaffTypeChange(this);
-        stc->setTrack(e.track());
+        stc->setTrack(e.context()->track());
         stc->setParent(this);
         stc->read(e);
         add(stc);
@@ -680,8 +681,12 @@ int MeasureBase::index() const
 {
     int idx = 0;
     MeasureBase* m = score()->first();
+    Measure* mmRestFirst = nullptr;
+    if (isMeasure() && toMeasure(this)->isMMRest()) {
+        mmRestFirst = toMeasure(this)->mmRestFirst();
+    }
     while (m) {
-        if (m == this) {
+        if (m == this || m == mmRestFirst) {
             return idx;
         }
         m = m->next();

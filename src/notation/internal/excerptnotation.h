@@ -30,29 +30,29 @@ namespace mu::notation {
 class ExcerptNotation : public IExcerptNotation, public Notation, public std::enable_shared_from_this<ExcerptNotation>
 {
 public:
-    explicit ExcerptNotation() = default;
-    explicit ExcerptNotation(Ms::Excerpt* excerpt);
+    explicit ExcerptNotation(mu::engraving::Excerpt* excerpt);
 
     ~ExcerptNotation() override;
 
-    bool isCreated() const override;
-    void setIsCreated(bool created);
+    void init();
 
-    Ms::Excerpt* excerpt() const;
+    mu::engraving::Excerpt* excerpt() const;
+
+    bool isCustom() const override;
+    bool isEmpty() const override;
 
     QString name() const override;
     void setName(const QString& name) override;
+    async::Notification nameChanged() const override;
 
     INotationPtr notation() override;
     IExcerptNotationPtr clone() const override;
 
 private:
-    bool isEmpty() const;
     void fillWithDefaultInfo();
 
-    Ms::Excerpt* m_excerpt = nullptr;
-    bool m_isCreated = false;
-    QString m_name;
+    mu::engraving::Excerpt* m_excerpt = nullptr;
+    bool m_inited = false;
 };
 }
 

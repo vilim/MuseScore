@@ -24,16 +24,15 @@
 #define __CHORDLINE_H__
 
 #include "engravingitem.h"
-#include "infrastructure/draw/painterpath.h"
+#include "draw/types/painterpath.h"
 
 #include "types/types.h"
 
 namespace mu::engraving {
 class Factory;
-}
 
-namespace Ms {
 class Chord;
+class Note;
 
 //---------------------------------------------------------
 //   @@ ChordLine
@@ -41,34 +40,46 @@ class Chord;
 ///    implements fall, doit, plop, bend
 //---------------------------------------------------------
 
-class ChordLine : public EngravingItem
+class ChordLine final : public EngravingItem
 {
-protected:
+    OBJECT_ALLOCATOR(engraving, ChordLine)
+private:
 
-    ChordLineType _chordLineType;
-    bool _straight;
-    mu::PainterPath path;
-    bool modified;
-    qreal _lengthX;
-    qreal _lengthY;
-    const int _initialLength = 2;
+    bool _straight = false;
+    bool _wavy = false;
 
-    friend class mu::engraving::Factory;
+    ChordLineType _chordLineType = ChordLineType::NOTYPE;
+    mu::draw::PainterPath path;
+    bool modified = false;
+    double _lengthX = 0.0;
+    double _lengthY = 0.0;
+    Note* _note = nullptr;
+    static constexpr double _baseLength = 1.0;
+    static constexpr double _waveAngle = 20;
 
-    ChordLine(Chord* parent, const ElementType& type = ElementType::CHORDLINE);
+    friend class Factory;
+
+    ChordLine(Chord* parent);
     ChordLine(const ChordLine&);
+
+    bool sameVoiceKerningLimited() const override { return true; }
 
 public:
 
     ChordLine* clone() const override { return new ChordLine(*this); }
 
+    Chord* chord() const { return (Chord*)(explicitParent()); }
+
     void setChordLineType(ChordLineType);
     ChordLineType chordLineType() const { return _chordLineType; }
-    Chord* chord() const { return (Chord*)(explicitParent()); }
     bool isStraight() const { return _straight; }
     void setStraight(bool straight) { _straight =  straight; }
-    void setLengthX(qreal length) { _lengthX = length; }
-    void setLengthY(qreal length) { _lengthY = length; }
+    bool isWavy() const { return _wavy; }
+    void setWavy(bool wavy) { _wavy =  wavy; }
+    void setLengthX(double length) { _lengthX = length; }
+    void setLengthY(double length) { _lengthY = length; }
+
+    const TranslatableString& chordLineTypeName() const;
 
     void read(XmlReader&) override;
     void write(XmlWriter& xml) const override;
@@ -78,20 +89,23 @@ public:
     void startEditDrag(EditData&) override;
     void editDrag(EditData&) override;
 
-    QString accessibleInfo() const override;
+    String accessibleInfo() const override;
 
-    mu::engraving::PropertyValue getProperty(Pid propertyId) const override;
-    bool setProperty(Pid propertyId, const mu::engraving::PropertyValue&) override;
-    mu::engraving::PropertyValue propertyDefault(Pid) const override;
-    Pid propertyId(const QStringRef& xmlName) const override;
+    PropertyValue getProperty(Pid propertyId) const override;
+    bool setProperty(Pid propertyId, const PropertyValue&) override;
+    PropertyValue propertyDefault(Pid) const override;
 
     bool needStartEditingAfterSelecting() const override { return true; }
     int gripsCount() const override { return _straight ? 1 : static_cast<int>(path.elementCount()); }
     Grip initialEditModeGrip() const override { return Grip(gripsCount() - 1); }
     Grip defaultGrip() const override { return initialEditModeGrip(); }
     std::vector<mu::PointF> gripsPositions(const EditData&) const override;
-};
 
-extern const char* scorelineNames[];
-}     // namespace Ms
+    bool isToTheLeft() const { return _chordLineType == ChordLineType::PLOP || _chordLineType == ChordLineType::SCOOP; }
+    bool isBelow() const { return _chordLineType == ChordLineType::SCOOP || _chordLineType == ChordLineType::FALL; }
+
+    void setNote(Note* note) { _note = note; }
+    Note* note() const { return _note; }
+};
+} // namespace mu::engraving
 #endif

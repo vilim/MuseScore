@@ -34,14 +34,16 @@ public:
     ~CoreMidiInPort() override;
 
     void init();
+    void deinit();
 
-    MidiDeviceList devices() const override;
-    async::Notification devicesChanged() const override;
+    MidiDeviceList availableDevices() const override;
+    async::Notification availableDevicesChanged() const override;
 
     Ret connect(const MidiDeviceID& deviceID) override;
     void disconnect() override;
     bool isConnected() const override;
     MidiDeviceID deviceID() const override;
+    async::Notification deviceChanged() const override;
 
     async::Channel<tick_t, Event> eventReceived() const override;
 
@@ -54,10 +56,12 @@ private:
     struct Core;
     std::unique_ptr<Core> m_core;
     MidiDeviceID m_deviceID;
-    async::Notification m_devicesChanged;
+    async::Notification m_deviceChanged;
+    async::Notification m_availableDevicesChanged;
 
     bool m_running = false;
-    async::Channel<tick_t, Event> m_eventReceived;
+
+    async::Channel<tick_t, Event > m_eventReceived;
 };
 }
 

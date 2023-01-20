@@ -21,35 +21,34 @@
  */
 
 #include "translation.h"
-#include "interactive/messagebox.h"
+#include "infrastructure/messagebox.h"
 
-#include "factory.h"
-#include "utils.h"
-#include "score.h"
+#include "accidental.h"
 #include "chord.h"
+#include "drumset.h"
+#include "excerpt.h"
+#include "factory.h"
+#include "masterscore.h"
 #include "measure.h"
+#include "measurerepeat.h"
+#include "navigate.h"
+#include "part.h"
+#include "range.h"
+#include "score.h"
+#include "slur.h"
+#include "staff.h"
+#include "stringdata.h"
 #include "tie.h"
 #include "tuplet.h"
-#include "staff.h"
-#include "part.h"
-#include "drumset.h"
-#include "slur.h"
-#include "navigate.h"
-#include "stringdata.h"
 #include "undo.h"
-#include "range.h"
-#include "excerpt.h"
-#include "accidental.h"
-#include "measurerepeat.h"
-
-#include "masterscore.h"
+#include "utils.h"
 
 #include "log.h"
 
 using namespace mu;
 using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   noteValForPosition
 //---------------------------------------------------------
@@ -141,7 +140,7 @@ NoteVal Score::noteValForPosition(Position pos, AccidentalType at, bool& error)
             if (v.isZero()) {
                 nval.tpc1 = nval.tpc2;
             } else {
-                nval.tpc1 = Ms::transposeTpc(nval.tpc2, v, true);
+                nval.tpc1 = mu::engraving::transposeTpc(nval.tpc2, v, true);
             }
         }
     }
@@ -179,8 +178,7 @@ Note* Score::addPitch(NoteVal& nval, bool addFlag, InputState* externalInputStat
     // insert note
     DirectionV stemDirection = DirectionV::AUTO;
     track_idx_t track = is.track();
-    if (is.drumNote() != -1) {
-        nval.pitch        = is.drumNote();
+    if (is.drumset()) {
         const Drumset* ds = is.drumset();
         nval.headGroup    = ds->noteHead(nval.pitch);
         stemDirection     = ds->stemDirection(nval.pitch);
@@ -188,6 +186,7 @@ Note* Score::addPitch(NoteVal& nval, bool addFlag, InputState* externalInputStat
         is.setTrack(track);
         expandVoice(is.segment(), is.track());
     }
+
     if (!is.cr()) {
         return 0;
     }
@@ -226,7 +225,7 @@ Note* Score::addPitch(NoteVal& nval, bool addFlag, InputState* externalInputStat
             std::vector<Note*> notes = chord->notes();
             // break all ties into current chord
             // these will exist only if user explicitly moved cursor to a tied-into note
-            // in ordinary use, cursor will autoamtically skip past these during note entry
+            // in ordinary use, cursor will automatically skip past these during note entry
             for (Note* n : notes) {
                 if (n->tieBack()) {
                     undoRemoveElement(n->tieBack());
@@ -333,13 +332,14 @@ Note* Score::addPitch(NoteVal& nval, bool addFlag, InputState* externalInputStat
 //    mouse click in state NoteType::ENTRY
 //---------------------------------------------------------
 
-void Score::putNote(const PointF& pos, bool replace, bool insert)
+Ret Score::putNote(const PointF& pos, bool replace, bool insert)
 {
     Position p;
     if (!getPosition(&p, pos, _is.voice())) {
         LOGD("cannot put note here, get position failed");
-        return;
+        return make_ret(Ret::Code::UnknownError);
     }
+
     Score* score = p.segment->score();
     // it is not safe to call Score::repitchNote() if p is on a TAB staff
     bool isTablature = staff(p.staffIdx)->isTabStaff(p.segment->tick());
@@ -347,22 +347,22 @@ void Score::putNote(const PointF& pos, bool replace, bool insert)
     //  calculate actual clicked line from staffType offset and stepOffset
     Staff* ss = score->staff(p.staffIdx);
     int stepOffset = ss->staffType(p.segment->tick())->stepOffset();
-    qreal stYOffset = ss->staffType(p.segment->tick())->yoffset().val();
-    qreal lineDist = ss->staffType(p.segment->tick())->lineDistance().val();
+    double stYOffset = ss->staffType(p.segment->tick())->yoffset().val();
+    double lineDist = ss->staffType(p.segment->tick())->lineDistance().val();
     p.line -= stepOffset + 2 * stYOffset / lineDist;
 
     if (score->inputState().usingNoteEntryMethod(NoteEntryMethod::REPITCH) && !isTablature) {
-        score->repitchNote(p, replace);
+        return score->repitchNote(p, replace);
     } else {
         if (insert || score->inputState().usingNoteEntryMethod(NoteEntryMethod::TIMEWISE)) {
-            score->insertChord(p);
+            return score->insertChord(p);
         } else {
-            score->putNote(p, replace);
+            return score->putNote(p, replace);
         }
     }
 }
 
-void Score::putNote(const Position& p, bool replace)
+Ret Score::putNote(const Position& p, bool replace)
 {
     Staff* st   = staff(p.staffIdx);
     Segment* s  = p.segment;
@@ -370,16 +370,19 @@ void Score::putNote(const Position& p, bool replace)
     _is.setTrack(p.staffIdx * VOICES + _is.voice());
     _is.setSegment(s);
 
-    if (score()->excerpt() && !score()->excerpt()->tracksMapping().empty()
-        && mu::key(score()->excerpt()->tracksMapping(), _is.track(), mu::nidx) == mu::nidx) {
-        return;
+    if (mu::engraving::Excerpt* excerpt = score()->excerpt()) {
+        const TracksMap& tracks = excerpt->tracksMapping();
+
+        if (!tracks.empty() && mu::key(tracks, _is.track(), mu::nidx) == mu::nidx) {
+            return make_ret(Ret::Code::UnknownError);
+        }
     }
 
     DirectionV stemDirection = DirectionV::AUTO;
-    bool error;
+    bool error = false;
     NoteVal nval = noteValForPosition(p, _is.accidentalType(), error);
     if (error) {
-        return;
+        return make_ret(Ret::Code::UnknownError);
     }
 
     // warn and delete MeasureRepeat if necessary
@@ -387,11 +390,13 @@ void Score::putNote(const Position& p, bool replace)
     staff_idx_t staffIdx = track2staff(_is.track());
     if (m->isMeasureRepeatGroup(staffIdx)) {
         auto b = MessageBox::warning(trc("engraving", "Note input will remove measure repeat"),
-                                     trc("engraving", "There is a measure repeat here.")
-                                     + trc("engraving", "\nContinue with adding note and delete measure repeat?"));
+                                     trc("engraving", "This measure contains a measure repeat."
+                                                      " If you enter notes here, it will be deleted."
+                                                      " Do you want to continue?"));
         if (b == MessageBox::Cancel) {
-            return;
+            return make_ret(Ret::Code::Cancel);
         }
+
         Score::deleteItem(m->measureRepeatElement(staffIdx));
     }
 
@@ -433,7 +438,7 @@ void Score::putNote(const Position& p, bool replace)
             && !_is.rest()) {
             if (st->isTabStaff(cr->tick())) {            // TAB
                 // if a note on same string already exists, update to new pitch/fret
-                foreach (Note* note, toChord(cr)->notes()) {
+                for (Note* note : toChord(cr)->notes()) {
                     if (note->string() == nval.string) {                 // if string is the same
                         // if adding a new digit will keep fret number within fret limit,
                         // add a digit to existing fret number
@@ -451,7 +456,7 @@ void Score::putNote(const Position& p, bool replace)
                         int tpc2 = note->tpc2default(nval.pitch);
                         undoChangeFretting(note, nval.pitch, nval.string, nval.fret, tpc1, tpc2);
                         setPlayNote(true);
-                        return;
+                        return make_ok();
                     }
                 }
             } else {                            // not TAB
@@ -462,7 +467,7 @@ void Score::putNote(const Position& p, bool replace)
                     if (chord->notes().size() > 1) {
                         undoRemoveElement(note);
                     }
-                    return;
+                    return make_ok();
                 }
             }
             addToChord = true;                  // if no special case, add note to chord
@@ -473,31 +478,45 @@ void Score::putNote(const Position& p, bool replace)
         NoteVal nval2 = noteValForPosition(p, AccidentalType::NONE, error);
         forceAccidental = (nval.pitch == nval2.pitch);
     }
+
+    Ret ret = make_ok();
+
     if (addToChord && cr->isChord()) {
         // if adding, add!
-        addNote(toChord(cr), nval, forceAccidental, _is.articulationIds());
+        Note* note = addNote(toChord(cr), nval, forceAccidental, _is.articulationIds());
+        if (!note) {
+            ret = make_ret(Ret::Code::UnknownError);
+        }
+
         _is.setAccidentalType(AccidentalType::NONE);
-        return;
+        return ret;
     } else {
         // if not adding, replace current chord (or create a new one)
-
         if (_is.rest()) {
             nval.pitch = -1;
         }
-        setNoteRest(_is.segment(), _is.track(), nval, _is.duration().fraction(), stemDirection, forceAccidental, _is.articulationIds());
+
+        Segment* seg = setNoteRest(_is.segment(), _is.track(), nval,
+                                   _is.duration().fraction(), stemDirection, forceAccidental, _is.articulationIds());
+        if (!seg) {
+            ret = make_ret(Ret::Code::UnknownError);
+        }
+
         _is.setAccidentalType(AccidentalType::NONE);
     }
 
     if (cr && !st->isTabStaff(cr->tick())) {
         _is.moveToNextInputPos();
     }
+
+    return ret;
 }
 
 //---------------------------------------------------------
 //   repitchNote
 //---------------------------------------------------------
 
-void Score::repitchNote(const Position& p, bool replace)
+Ret Score::repitchNote(const Position& p, bool replace)
 {
     Segment* s      = p.segment;
     Fraction tick   = s->tick();
@@ -513,7 +532,7 @@ void Score::repitchNote(const Position& p, bool replace)
         AccidentalVal acci
             = (at == AccidentalType::NONE ? s->measure()->findAccidental(s, p.staffIdx, p.line, error) : Accidental::subtype2value(at));
         if (error) {
-            return;
+            return make_ret(Ret::Code::UnknownError);
         }
 
         int step   = absStep(p.line, clef);
@@ -529,7 +548,7 @@ void Score::repitchNote(const Position& p, bool replace)
     }
 
     if (!_is.segment()) {
-        return;
+        return make_ret(Ret::Code::UnknownError);
     }
 
     Chord* chord;
@@ -537,7 +556,7 @@ void Score::repitchNote(const Position& p, bool replace)
     if (!cr) {
         cr = _is.segment()->nextChordRest(_is.track());
         if (!cr) {
-            return;
+            return make_ret(Ret::Code::UnknownError);
         }
     }
     if (cr->isRest()) {   //skip rests
@@ -548,7 +567,7 @@ void Score::repitchNote(const Position& p, bool replace)
         if (next) {
             _is.moveInputPos(next->segment());
         }
-        return;
+        return make_ok();
     } else {
         chord = toChord(cr);
     }
@@ -563,7 +582,7 @@ void Score::repitchNote(const Position& p, bool replace)
         std::vector<Note*> notes = chord->notes();
         // break all ties into current chord
         // these will exist only if user explicitly moved cursor to a tied-into note
-        // in ordinary use, cursor will autoamtically skip past these during note entry
+        // in ordinary use, cursor will automatically skip past these during note entry
         for (Note* n : notes) {
             if (n->tieBack()) {
                 undoRemoveElement(n->tieBack());
@@ -638,13 +657,15 @@ void Score::repitchNote(const Position& p, bool replace)
     if (next) {
         _is.moveInputPos(next->segment());
     }
+
+    return make_ok();
 }
 
 //---------------------------------------------------------
 //   insertChord
 //---------------------------------------------------------
 
-void Score::insertChord(const Position& pos)
+Ret Score::insertChord(const Position& pos)
 {
     // insert
     // TODO:
@@ -653,18 +674,20 @@ void Score::insertChord(const Position& pos)
 
     EngravingItem* el = selection().element();
     if (!el || !(el->isNote() || el->isRest())) {
-        return;
+        return make_ret(Ret::Code::UnknownError);
     }
     Segment* seg = pos.segment;
     if (seg->splitsTuplet()) {
         MScore::setError(MsError::CANNOT_INSERT_TUPLET);
-        return;
+        return make_ret(Ret::Code::UnknownError);
     }
     if (_is.insertMode()) {
         globalInsertChord(pos);
     } else {
         localInsertChord(pos);
     }
+
+    return make_ok();
 }
 
 //---------------------------------------------------------
@@ -814,4 +837,4 @@ void Score::globalInsertChord(const Position& pos)
         }
     }
 }
-} // namespace Ms
+} // namespace mu::engraving

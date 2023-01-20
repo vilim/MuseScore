@@ -23,36 +23,37 @@
 #ifndef __BRACKET_ITEM_H__
 #define __BRACKET_ITEM_H__
 
-#include "engravingobject.h"
-#include "mscore.h"
+#include "engravingitem.h"
+
+#include "types/types.h"
 
 namespace mu::engraving {
 class Factory;
-}
 
-namespace Ms {
 //---------------------------------------------------------
 //   BracketItem
 //---------------------------------------------------------
 
 class BracketItem final : public EngravingItem
 {
+    OBJECT_ALLOCATOR(engraving, BracketItem)
+
     BracketType _bracketType { BracketType::NO_BRACKET };
     size_t _column = 0;
     size_t _bracketSpan = 0;
     Staff* _staff = nullptr;
 
-    friend class mu::engraving::Factory;
+    friend class Factory;
 
     BracketItem(EngravingItem* parent);
     BracketItem(EngravingItem* parent, BracketType a, int b);
 
 public:
-    Ms::EngravingItem* clone() const override;
+    EngravingItem* clone() const override;
 
-    mu::engraving::PropertyValue getProperty(Pid) const override;
-    bool setProperty(Pid, const mu::engraving::PropertyValue&) override;
-    mu::engraving::PropertyValue propertyDefault(Pid id) const override;
+    PropertyValue getProperty(Pid) const override;
+    bool setProperty(Pid, const PropertyValue&) override;
+    PropertyValue propertyDefault(Pid id) const override;
 
     size_t bracketSpan() const { return _bracketSpan; }
     BracketType bracketType() const { return _bracketType; }

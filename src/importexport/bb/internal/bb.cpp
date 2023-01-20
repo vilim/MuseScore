@@ -20,8 +20,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "libmscore/mscore.h"
+#include <QFile>
+#include <QFileInfo>
+
 #include "bb.h"
+
+#include "engravingerrors.h"
+#include "libmscore/mscore.h"
 
 #include "libmscore/factory.h"
 #include "libmscore/masterscore.h"
@@ -49,7 +54,7 @@
 
 using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::iex::bb {
 //---------------------------------------------------------
 //   BBTrack
 //---------------------------------------------------------
@@ -356,7 +361,7 @@ bool BBFile::read(const QString& name)
                     continue;
                 }
                 Event note(ME_NOTE);
-                note.setOntime((tick.ticks() * Constant::division) / bbDivision);
+                note.setOntime((tick.ticks() * Constants::division) / bbDivision);
                 note.setPitch(a[idx + 5]);
                 note.setVelo(a[idx + 6]);
                 note.setChannel(channel);
@@ -369,7 +374,7 @@ bool BBFile::read(const QString& name)
                     len1 = lastLen;
                 }
                 lastLen = len1;
-                note.setDuration((len1* Constant::division) / bbDivision);
+                note.setDuration((len1* Constants::division) / bbDivision);
                 track->append(note);
             } else if (type == 0xb0 || type == 0xc0) {
                 // ignore controller
@@ -387,21 +392,20 @@ bool BBFile::read(const QString& name)
 
 //---------------------------------------------------------
 //   importBB
-//    return true on success
 //---------------------------------------------------------
 
-Score::FileError importBB(MasterScore* score, const QString& name)
+Err importBB(MasterScore* score, const QString& name)
 {
     BBFile bb;
     if (!QFileInfo::exists(name)) {
-        return Score::FileError::FILE_NOT_FOUND;
+        return engraving::Err::FileNotFound;
     }
     if (!bb.read(name)) {
         LOGD("Cannot open file <%s>", qPrintable(name));
-        return Score::FileError::FILE_OPEN_ERROR;
+        return engraving::Err::FileOpenError;
     }
     score->style().set(Sid::chordsXmlFile, true);
-    score->chordList()->read("chords.xml");
+    score->chordList()->read(u"chords.xml");
     *(score->sigmap()) = bb.siglist();
 
     QList<BBTrack*>* tracks = bb.tracks();
@@ -480,7 +484,7 @@ Score::FileError importBB(MasterScore* score, const QString& name)
 
     MeasureBase* measureB = score->first();
     Text* text = Factory::createText(measureB, TextStyleType::TITLE);
-    text->setPlainText(bb.title());
+    text->setPlainText(String::fromUtf8(bb.title()));
 
     if (measureB->type() != ElementType::VBOX) {
         measureB = Factory::createVBox(score->dummy()->system());
@@ -499,7 +503,7 @@ Score::FileError importBB(MasterScore* score, const QString& name)
         14, 9, 16, 11, 18, 13, 8, 15, 10, 17, 12, 19, 21, 23, 20, 22, 24
     };
     foreach (const BBChord& c, bb.chords()) {
-        Fraction tick = Fraction(c.beat, 4);          // c.beat  * Constant::division;
+        Fraction tick = Fraction(c.beat, 4);          // c.beat  * Constants::division;
 // LOGD("CHORD %d %d", c.beat, tick);
         Measure* m = score->tick2measure(tick);
         if (m == 0) {
@@ -562,7 +566,7 @@ Score::FileError importBB(MasterScore* score, const QString& name)
         sks->add(keysig);
     }
     score->setUpTempoMap();
-    return Score::FileError::FILE_NO_ERROR;
+    return engraving::Err::NoError;
 }
 
 //---------------------------------------------------------
@@ -791,7 +795,7 @@ void BBFile::convertTrack(Score* score, BBTrack* track, int staffIdx)
 
 void BBTrack::quantize(int startTick, int endTick, EventList* dst)
 {
-    int mintick = Constant::division * 64;
+    int mintick = Constants::division * 64;
     iEvent i = _events.begin();
     for (; i != _events.end(); ++i) {
         if (i->ontime() >= startTick) {
@@ -808,26 +812,26 @@ void BBTrack::quantize(int startTick, int endTick, EventList* dst)
             mintick = e.duration();
         }
     }
-    if (mintick <= Constant::division / 16) {        // minimum duration is 1/64
-        mintick = Constant::division / 16;
-    } else if (mintick <= Constant::division / 8) {
-        mintick = Constant::division / 8;
-    } else if (mintick <= Constant::division / 4) {
-        mintick = Constant::division / 4;
-    } else if (mintick <= Constant::division / 2) {
-        mintick = Constant::division / 2;
-    } else if (mintick <= Constant::division) {
-        mintick = Constant::division;
-    } else if (mintick <= Constant::division* 2) {
-        mintick = Constant::division * 2;
-    } else if (mintick <= Constant::division* 4) {
-        mintick = Constant::division * 4;
-    } else if (mintick <= Constant::division* 8) {
-        mintick = Constant::division * 8;
+    if (mintick <= Constants::division / 16) {        // minimum duration is 1/64
+        mintick = Constants::division / 16;
+    } else if (mintick <= Constants::division / 8) {
+        mintick = Constants::division / 8;
+    } else if (mintick <= Constants::division / 4) {
+        mintick = Constants::division / 4;
+    } else if (mintick <= Constants::division / 2) {
+        mintick = Constants::division / 2;
+    } else if (mintick <= Constants::division) {
+        mintick = Constants::division;
+    } else if (mintick <= Constants::division* 2) {
+        mintick = Constants::division * 2;
+    } else if (mintick <= Constants::division* 4) {
+        mintick = Constants::division * 4;
+    } else if (mintick <= Constants::division* 8) {
+        mintick = Constants::division * 8;
     }
     int raster;
-    if (mintick > Constant::division) {
-        raster = Constant::division;
+    if (mintick > Constants::division) {
+        raster = Constants::division;
     } else {
         raster = mintick;
     }

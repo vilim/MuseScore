@@ -34,19 +34,20 @@ class AppearanceSettingsModel : public AbstractInspectorModel
     INJECT(inspector, notation::INotationConfiguration, notationConfiguration)
 
     Q_PROPERTY(PropertyItem * leadingSpace READ leadingSpace CONSTANT)
-    Q_PROPERTY(PropertyItem * barWidth READ barWidth CONSTANT)
+    Q_PROPERTY(PropertyItem * measureWidth READ measureWidth CONSTANT)
     Q_PROPERTY(PropertyItem * minimumDistance READ minimumDistance CONSTANT)
     Q_PROPERTY(PropertyItem * color READ color CONSTANT)
     Q_PROPERTY(PropertyItem * arrangeOrder READ arrangeOrder CONSTANT)
-    Q_PROPERTY(PropertyItem * horizontalOffset READ horizontalOffset CONSTANT)
-    Q_PROPERTY(PropertyItem * verticalOffset READ verticalOffset CONSTANT)
+    Q_PROPERTY(PropertyItem * offset READ offset CONSTANT)
     Q_PROPERTY(bool isSnappedToGrid READ isSnappedToGrid WRITE setIsSnappedToGrid NOTIFY isSnappedToGridChanged)
 
 public:
     explicit AppearanceSettingsModel(QObject* parent, IElementRepositoryService* repository);
 
-    Q_INVOKABLE void pushBackInOrder();
-    Q_INVOKABLE void pushFrontInOrder();
+    Q_INVOKABLE void pushBackwardsInOrder();
+    Q_INVOKABLE void pushForwardsInOrder();
+    Q_INVOKABLE void pushToBackInOrder();
+    Q_INVOKABLE void pushToFrontInOrder();
 
     Q_INVOKABLE void configureGrid();
 
@@ -56,12 +57,11 @@ public:
     void resetProperties() override;
 
     PropertyItem* leadingSpace() const;
-    PropertyItem* barWidth() const;
+    PropertyItem* measureWidth() const;
     PropertyItem* minimumDistance() const;
     PropertyItem* color() const;
     PropertyItem* arrangeOrder() const;
-    PropertyItem* horizontalOffset() const;
-    PropertyItem* verticalOffset() const;
+    PropertyItem* offset() const;
 
     bool isSnappedToGrid() const;
 
@@ -72,17 +72,21 @@ signals:
     void isSnappedToGridChanged(bool isSnappedToGrid);
 
 private:
-    void updatePropertiesOnNotationChanged() override;
+    void onNotationChanged(const mu::engraving::PropertyIdSet& changedPropertyIdSet,
+                           const mu::engraving::StyleIdSet& changedStyleIdSet) override;
 
-    void loadOffsets();
+    void loadProperties(const mu::engraving::PropertyIdSet& allowedPropertyIdSet);
+
+    mu::engraving::Page* page() const;
+    std::vector<mu::engraving::EngravingItem*> allElementsInPage() const;
+    std::vector<mu::engraving::EngravingItem*> allOverlappingElements() const;
 
     PropertyItem* m_leadingSpace = nullptr;
-    PropertyItem* m_barWidth = nullptr;
+    PropertyItem* m_measureWidth = nullptr;
     PropertyItem* m_minimumDistance = nullptr;
     PropertyItem* m_color = nullptr;
     PropertyItem* m_arrangeOrder = nullptr;
-    PropertyItem* m_horizontalOffset = nullptr;
-    PropertyItem* m_verticalOffset = nullptr;
+    PointFPropertyItem* m_offset = nullptr;
 };
 }
 

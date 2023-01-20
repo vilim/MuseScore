@@ -19,7 +19,12 @@ mkdir -p $BUILD_TOOLS
 function download_github_release()
 {
   local -r repo_slug="$1" release_tag="$2" file="$3"
-  wget -q --show-progress "https://github.com/${repo_slug}/releases/download/${release_tag}/${file}"
+  if [[ "${release_tag}" == "latest" ]]; then
+    local -r url="https://github.com/${repo_slug}/releases/latest/download/${file}"
+  else
+    local -r url="https://github.com/${repo_slug}/releases/download/${release_tag}/${file}"
+  fi
+  wget -q --show-progress "${url}"
   chmod +x "${file}"
 }
 
@@ -45,8 +50,7 @@ function download_appimage_release()
 if [[ ! -d $BUILD_TOOLS/appimagetool ]]; then
   mkdir $BUILD_TOOLS/appimagetool
   cd $BUILD_TOOLS/appimagetool
-  # `12` and not `continuous` because see https://github.com/AppImage/AppImageKit/issues/1060
-  download_appimage_release AppImage/AppImageKit appimagetool 12
+  download_appimage_release AppImage/AppImageKit appimagetool continuous
   cd $ORIGIN_DIR
 fi
 export PATH="$BUILD_TOOLS/appimagetool:$PATH"
@@ -103,6 +107,26 @@ export QML_SOURCES_PATHS=./
 
 linuxdeploy --appdir "${appdir}" # adds all shared library dependencies
 linuxdeploy-plugin-qt --appdir "${appdir}" # adds all Qt dependencies
+
+# Approximately on June 1, the QtQuick/Controls.2 stopped being deploying 
+# (at that time the linux deploy was updated). 
+# This is a hack, for the deployment of QtQuick/Controls.2 
+if [ ! -f ${appdir}/usr/lib/libQt5QuickControls2.so.5 ]; then
+    cp -r $BUILD_TOOLS/Qt/5152/qml/QtQuick/Controls.2 ${appdir}/usr/qml/QtQuick/Controls.2
+    cp -r $BUILD_TOOLS/Qt/5152/qml/QtQuick/Templates.2 ${appdir}/usr/qml/QtQuick/Templates.2
+    cp $BUILD_TOOLS/Qt/5152/lib/libQt5QuickControls2.so.5 ${appdir}/usr/lib/libQt5QuickControls2.so.5 
+    cp $BUILD_TOOLS/Qt/5152/lib/libQt5QuickTemplates2.so.5 ${appdir}/usr/lib/libQt5QuickTemplates2.so.5 
+fi
+
+# At an unknown point in time, the libqgtk3 plugin stopped being deployed
+if [ ! -f ${appdir}/plugins/platformthemes/libqgtk3.so ]; then
+  cp $BUILD_TOOLS/Qt/5152/plugins/platformthemes/libqgtk3.so ${appdir}/plugins/platformthemes/libqgtk3.so 
+fi
+
+# The system must be used
+if [ -f ${appdir}/lib/libglib-2.0.so.0 ]; then
+  rm -f ${appdir}/lib/libglib-2.0.so.0 
+fi
 
 unset QML_SOURCES_PATHS
 
@@ -208,7 +232,13 @@ for name in "${extracted_appimages[@]}"; do
   extracted_appdir_path="$(dirname "${apprun}")"
   extracted_appdir_name="$(basename "${extracted_appdir_path}")"
   cp -r "${extracted_appdir_path}" "${appdir}/"
-  ln -s "../${extracted_appdir_name}/AppRun" "${appdir}/bin/${name}"
+  cat >"${appdir}/bin/${name}" <<EOF
+#!/bin/sh
+unset APPDIR APPIMAGE # clear outer values before running inner AppImage
+HERE="\$(dirname "\$(readlink -f "\$0")")"
+exec "\${HERE}/../${extracted_appdir_name}/AppRun" "\$@"
+EOF
+  chmod +x "${appdir}/bin/${name}"
 done
 
 # METHOD OF LAST RESORT

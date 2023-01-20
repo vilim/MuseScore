@@ -95,10 +95,10 @@ FocusScope {
     Rectangle {
         anchors.bottom: parent.bottom
 
-        height: 114
+        height: 100
         width: parent.width
 
-        color: ui.theme.popupBackgroundColor
+        color: ui.theme.backgroundSecondaryColor
 
         Row {
             anchors.verticalCenter: parent.verticalCenter
@@ -109,7 +109,7 @@ FocusScope {
 
             FlatButton {
                 id: accountInfoButton
-                width: prv.buttonWidth
+                minWidth: prv.buttonWidth
                 text: qsTrc("cloud", "Account info")
 
                 accentButton: true
@@ -131,7 +131,7 @@ FocusScope {
             }
 
             FlatButton {
-                width: prv.buttonWidth
+                minWidth: prv.buttonWidth
                 text: qsTrc("cloud", "Sign out")
 
                 navigation.name: "SignOut"

@@ -25,8 +25,13 @@ if (OS_IS_WIN)
     set(DRIVER_SRC
         #${CMAKE_CURRENT_LIST_DIR}/internal/platform/win/winmmdriver.cpp
         #${CMAKE_CURRENT_LIST_DIR}/internal/platform/win/winmmdriver.h
-        ${CMAKE_CURRENT_LIST_DIR}/internal/platform/win/wincoreaudiodriver.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/internal/platform/win/wincoreaudiodriver.h
+        #${CMAKE_CURRENT_LIST_DIR}/internal/platform/win/wincoreaudiodriver.cpp
+        #${CMAKE_CURRENT_LIST_DIR}/internal/platform/win/wincoreaudiodriver.h
+        ${CMAKE_CURRENT_LIST_DIR}/internal/platform/win/wasapiaudioclient.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/internal/platform/win/wasapiaudioclient.h
+        ${CMAKE_CURRENT_LIST_DIR}/internal/platform/win/wasapitypes.h
+        ${CMAKE_CURRENT_LIST_DIR}/internal/platform/win/wasapiaudiodriver.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/internal/platform/win/wasapiaudiodriver.h
     )
 elseif(OS_IS_LIN)
     set(DRIVER_SRC
@@ -35,13 +40,16 @@ elseif(OS_IS_LIN)
     )
 elseif(OS_IS_MAC)
     set(DRIVER_SRC
-        ${CMAKE_CURRENT_LIST_DIR}/internal/platform/osx/osxaudiodriver.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/internal/platform/osx/osxaudiodriver.mm
         ${CMAKE_CURRENT_LIST_DIR}/internal/platform/osx/osxaudiodriver.h
     )
 
-    # Conflicted with AudioBuffer
-    set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/internal/platform/osx/osxaudiodriver.cpp
-                                PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+    set_source_files_properties(
+        ${CMAKE_CURRENT_LIST_DIR}/internal/platform/osx/osxaudiodriver.mm
+        PROPERTIES
+        SKIP_UNITY_BUILD_INCLUSION ON
+        SKIP_PRECOMPILE_HEADERS ON
+    )
 elseif(OS_IS_WASM)
     set(DRIVER_SRC
         ${CMAKE_CURRENT_LIST_DIR}/internal/platform/web/webaudiodriver.cpp
@@ -62,6 +70,7 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/iaudiostream.h
     ${CMAKE_CURRENT_LIST_DIR}/abstractsynthesizer.cpp
     ${CMAKE_CURRENT_LIST_DIR}/abstractsynthesizer.h
+    ${CMAKE_CURRENT_LIST_DIR}/abstracteventsequencer.h
     ${CMAKE_CURRENT_LIST_DIR}/ifxprocessor.h
     ${CMAKE_CURRENT_LIST_DIR}/iaudiodriver.h
     ${CMAKE_CURRENT_LIST_DIR}/iaudiosource.h
@@ -73,9 +82,9 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/isynthresolver.h
     ${CMAKE_CURRENT_LIST_DIR}/ifxresolver.h
     ${CMAKE_CURRENT_LIST_DIR}/iplayback.h
+    ${CMAKE_CURRENT_LIST_DIR}/isoundfontrepository.h
 
     # Common internal
-    ${CMAKE_CURRENT_LIST_DIR}/internal/iaudiobuffer.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/audioconfiguration.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/audioconfiguration.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/audiothreadsecurer.cpp
@@ -86,6 +95,12 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/internal/audiothread.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/audiosanitizer.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/audiosanitizer.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/soundfontrepository.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/soundfontrepository.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/audiooutputdevicecontroller.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/audiooutputdevicecontroller.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/audiodeviceslistener.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/audiodeviceslistener.h
 
     # Driver
     ${DRIVER_SRC}
@@ -152,16 +167,12 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizers/fluidsynth/sfcachedloader.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizers/fluidsynth/fluidsynth.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizers/fluidsynth/fluidsynth.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizers/fluidsynth/fluidsequencer.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizers/fluidsynth/fluidsequencer.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizers/fluidsynth/fluidresolver.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizers/fluidsynth/fluidresolver.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizers/synthresolver.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizers/synthresolver.h
-    ${CMAKE_CURRENT_LIST_DIR}/view/synthssettingsmodel.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/view/synthssettingsmodel.h
-
-    # DevTools
-    ${CMAKE_CURRENT_LIST_DIR}/devtools/waveformmodel.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/devtools/waveformmodel.h
     )
 
 set(FLUIDSYNTH_DIR ${PROJECT_SOURCE_DIR}/thirdparty/fluidsynth/fluidsynth-2.1.4)
@@ -193,6 +204,12 @@ if (ENABLE_AUDIO_EXPORT)
         # Encoders
         ${CMAKE_CURRENT_LIST_DIR}/internal/encoders/mp3encoder.cpp
         ${CMAKE_CURRENT_LIST_DIR}/internal/encoders/mp3encoder.h
+        ${CMAKE_CURRENT_LIST_DIR}/internal/encoders/oggencoder.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/internal/encoders/oggencoder.h
+        ${CMAKE_CURRENT_LIST_DIR}/internal/encoders/flacencoder.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/internal/encoders/flacencoder.h
+        ${CMAKE_CURRENT_LIST_DIR}/internal/encoders/wavencoder.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/internal/encoders/wavencoder.h
         ${CMAKE_CURRENT_LIST_DIR}/internal/encoders/abstractaudioencoder.h
 
         # SoundTracks
@@ -201,17 +218,17 @@ if (ENABLE_AUDIO_EXPORT)
         )
 
     add_subdirectory(${PROJECT_SOURCE_DIR}/thirdparty/lame lame)
-    add_subdirectory(${PROJECT_SOURCE_DIR}/thirdparty/opus opus)
+    add_subdirectory(${PROJECT_SOURCE_DIR}/thirdparty/opusenc opusenc)
     add_subdirectory(${PROJECT_SOURCE_DIR}/thirdparty/flac flac)
 
-    set(MODULE_LINK ${MODULE_LINK} lame opus flac)
+    set(MODULE_LINK ${MODULE_LINK} lame opusenc flac)
 endif()
 
 if (OS_IS_MAC)
     find_library(AudioToolbox NAMES AudioToolbox)
     set(MODULE_LINK ${MODULE_LINK} ${AudioToolbox})
 elseif (OS_IS_WIN)
-    set(MODULE_LINK ${MODULE_LINK} winmm )
+    set(MODULE_LINK ${MODULE_LINK} winmm mmdevapi mfplat)
 elseif (OS_IS_LIN)
     find_package(ALSA REQUIRED)
     set(MODULE_INCLUDE ${MODULE_INCLUDE} ${ALSA_INCLUDE_DIRS} )

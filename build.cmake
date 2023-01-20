@@ -143,7 +143,7 @@ endif()
 
 fn__get_option(GENERATOR -G ${CONFIGURE_ARGS})
 if(WIN32)
-    fn__set_default(GENERATOR "Visual Studio 16 2019")
+    fn__set_default(GENERATOR "Visual Studio 17 2022")
 else()
     fn__set_default(GENERATOR "Unix Makefiles")
 endif()
@@ -196,7 +196,7 @@ endif()
 # Clean - delete an existing build directory.
 #
 # We usually avoid this because performing a clean build takes much longer
-# than an incremental build, but it is occassionally necessary. If you
+# than an incremental build, but it is occasionally necessary. If you
 # encounter errors during a build then you should try doing a clean build.
 
 if(ARG_CLEAN)
@@ -272,7 +272,7 @@ endif()
 # The working directory is unchanged. Use build_override.cmake to set the
 # CMake variable RUN_ARGS to contain a list of arguments to pass to MuseScore
 # on the command line. In addition, script arguments after "run" will be
-# appened to this list, but note that certain arguments cannot be passed this
+# appended to this list, but note that certain arguments cannot be passed this
 # way (e.g. --help, --version) because they cancel CMake script processing.
 
 if(ARG_RUN)

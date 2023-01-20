@@ -22,27 +22,23 @@
 #ifndef MU_FRAMEWORK_PROGRESS_H
 #define MU_FRAMEWORK_PROGRESS_H
 
-#include <string>
-
 #include "async/channel.h"
+#include "async/notification.h"
+
+#include "types/retval.h"
+#include "types/val.h"
 
 namespace mu::framework {
+using ProgressResult = RetVal<Val>;
+
 struct Progress
 {
-    int64_t current = 0;
-    int64_t total = 0;
-    std::string status;
-
-    Progress(int64_t current, int64_t total)
-        : current(current), total(total) {}
-
-    Progress(int64_t current, int64_t total, std::string status)
-        : current(current), total(total), status(std::move(status)) {}
-
-    Progress() = default;
+    async::Notification started;
+    async::Channel<int64_t /*current*/, int64_t /*total*/, std::string /*title*/> progressChanged;
+    async::Channel<ProgressResult> finished;
 };
 
-using ProgressChannel = async::Channel<Progress>;
+using ProgressPtr = std::shared_ptr<Progress>;
 }
 
 #endif // MU_FRAMEWORK_PROGRESS_H

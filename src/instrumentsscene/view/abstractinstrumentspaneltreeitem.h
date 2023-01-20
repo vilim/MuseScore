@@ -63,7 +63,7 @@ public:
     virtual bool isSelectable() const;
     bool isSelected() const;
 
-    Q_INVOKABLE virtual bool canAcceptDrop(int type) const;
+    Q_INVOKABLE virtual bool canAcceptDrop(const QVariant& item) const;
     Q_INVOKABLE virtual void appendNewItem();
 
     virtual void moveChildren(int sourceRow, int count, AbstractInstrumentsPanelTreeItem* destinationParent, int destinationRow);
@@ -74,6 +74,7 @@ public:
 
     AbstractInstrumentsPanelTreeItem* childAtId(const ID& id) const;
     AbstractInstrumentsPanelTreeItem* childAtRow(int row) const;
+    const QList<AbstractInstrumentsPanelTreeItem*>& childItems() const;
 
     void appendChild(AbstractInstrumentsPanelTreeItem* child);
     void insertChild(AbstractInstrumentsPanelTreeItem* child, int beforeRow);

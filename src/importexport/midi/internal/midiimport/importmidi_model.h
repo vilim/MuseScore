@@ -26,7 +26,9 @@
 
 #include <memory>
 
-namespace Ms {
+#include <QAbstractTableModel>
+
+namespace mu::iex::midi {
 class TracksModel : public QAbstractTableModel
 {
 public:
@@ -73,6 +75,6 @@ private:
     std::vector<std::unique_ptr<Column> > _columns;
     bool _isAllApplied;
 };
-} // namespace Ms
+} // namespace mu::iex::midi
 
 #endif // IMPORTMIDI_MODEL_H

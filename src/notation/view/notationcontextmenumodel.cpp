@@ -21,7 +21,7 @@
  */
 #include "notationcontextmenumodel.h"
 
-#include "translation.h"
+#include "types/translatablestring.h"
 
 #include "ui/view/iconcodes.h"
 
@@ -44,6 +44,7 @@ MenuItemList NotationContextMenuModel::makeItemsByElementType(ElementType elemen
     case ElementType::STAFF_TEXT:
         return makeStaffTextItems();
     case ElementType::SYSTEM_TEXT:
+    case ElementType::TRIPLET_FEEL:
         return makeSystemTextItems();
     case ElementType::TIMESIG:
         return makeTimeSignatureItems();
@@ -51,6 +52,12 @@ MenuItemList NotationContextMenuModel::makeItemsByElementType(ElementType elemen
         return makeInstrumentNameItems();
     case ElementType::HARMONY:
         return makeHarmonyItems();
+    case ElementType::INSTRUMENT_CHANGE:
+        return makeChangeInstrumentItems();
+    case ElementType::VBOX:
+        return makeVerticalBoxItems();
+    case ElementType::HBOX:
+        return makeHorizontalBoxItems();
     default:
         break;
     }
@@ -94,9 +101,9 @@ MenuItemList NotationContextMenuModel::makeMeasureItems()
     items << makeSeparator();
 
     MenuItem* clearItem = makeMenuItem("notation-delete");
-    clearItem->setTitle(qtrc("notation", "Clear measures"));
+    clearItem->setTitle(TranslatableString("notation", "Clear measures"));
     MenuItem* deleteItem = makeMenuItem("time-delete");
-    deleteItem->setTitle(qtrc("notation", "Delete measures"));
+    deleteItem->setTitle(TranslatableString("notation", "Delete measures"));
     items << clearItem;
     items << deleteItem;
 
@@ -108,7 +115,7 @@ MenuItemList NotationContextMenuModel::makeMeasureItems()
 
     items << makeMenuItem("staff-properties");
     items << makeSeparator();
-    items << makeMenu(qtrc("notation", "Insert measures"), makeInsertMeasuresItems());
+    items << makeMenu(TranslatableString("notation", "Insert measures"), makeInsertMeasuresItems());
     items << makeMenuItem("measure-properties");
 
     return items;
@@ -168,85 +175,132 @@ MenuItemList NotationContextMenuModel::makeSelectItems()
     } else if (canSelectSimilar()) {
         return MenuItemList{ makeMenuItem("select-dialog") };
     }
+
     return MenuItemList();
 }
 
 MenuItemList NotationContextMenuModel::makeElementItems()
 {
     MenuItemList items = makeDefaultCopyPasteItems();
-    MenuItemList selectItems = makeSelectItems();
-    if (!selectItems.isEmpty()) {
-        items << makeMenu(qtrc("notation", "Select"), selectItems);
+
+    if (interaction()->isTextEditingStarted()) {
+        return items;
     }
+
+    MenuItemList selectItems = makeSelectItems();
+
+    if (!selectItems.isEmpty()) {
+        items << makeMenu(TranslatableString("notation", "Select"), selectItems);
+    }
+
+    const EngravingItem* hitElement = hitElementContext().element;
+
+    if (hitElement && hitElement->isEditable()) {
+        items << makeSeparator();
+        items << makeMenuItem("edit-element");
+    }
+
     return items;
 }
 
 MenuItemList NotationContextMenuModel::makeInsertMeasuresItems()
 {
     MenuItemList items {
-        makeMenuItem("insert-measures-after-selection", qtrc("notation", "After selection…")),
-        makeMenuItem("insert-measures", qtrc("notation", "Before selection…")),
+        makeMenuItem("insert-measures-after-selection", TranslatableString("notation", "After selection…")),
+        makeMenuItem("insert-measures", TranslatableString("notation", "Before selection…")),
         makeSeparator(),
-        makeMenuItem("insert-measures-at-start-of-score", qtrc("notation", "At start of score…")),
-        makeMenuItem("append-measures", qtrc("notation", "At end of score…"))
+        makeMenuItem("insert-measures-at-start-of-score", TranslatableString("notation", "At start of score…")),
+        makeMenuItem("append-measures", TranslatableString("notation", "At end of score…"))
     };
+
+    return items;
+}
+
+MenuItemList NotationContextMenuModel::makeChangeInstrumentItems()
+{
+    MenuItemList items = makeElementItems();
+    items << makeSeparator();
+    items << makeMenuItem("change-instrument");
+
+    return items;
+}
+
+MenuItemList NotationContextMenuModel::makeVerticalBoxItems()
+{
+    MenuItemList addMenuItems;
+    addMenuItems << makeMenuItem("frame-text");
+    addMenuItems << makeMenuItem("title-text");
+    addMenuItems << makeMenuItem("subtitle-text");
+    addMenuItems << makeMenuItem("composer-text");
+    addMenuItems << makeMenuItem("poet-text");
+    addMenuItems << makeMenuItem("part-text");
+    addMenuItems << makeMenuItem("add-image");
+
+    MenuItemList items = makeElementItems();
+    items << makeSeparator();
+    items << makeMenu(TranslatableString("notation", "Add"), addMenuItems);
+
+    return items;
+}
+
+MenuItemList NotationContextMenuModel::makeHorizontalBoxItems()
+{
+    MenuItemList addMenuItems;
+    addMenuItems << makeMenuItem("frame-text");
+    addMenuItems << makeMenuItem("add-image");
+
+    MenuItemList items = makeElementItems();
+    items << makeSeparator();
+    items << makeMenu(TranslatableString("notation", "Add"), addMenuItems);
 
     return items;
 }
 
 bool NotationContextMenuModel::isSingleSelection() const
 {
-    auto notation = globalContext()->currentNotation();
-    if (!notation) {
-        return false;
-    }
-
-    auto interaction = notation->interaction();
-    if (!interaction) {
-        return false;
-    }
-
-    auto selection = interaction->selection();
+    INotationSelectionPtr selection = this->selection();
     return selection ? selection->element() != nullptr : false;
 }
 
 bool NotationContextMenuModel::canSelectSimilar() const
 {
-    auto notation = globalContext()->currentNotation();
-    if (!notation) {
-        return false;
-    }
-
-    auto interaction = notation->interaction();
-    if (!interaction) {
-        return false;
-    }
-
-    return interaction->hitElementContext().element != nullptr;
+    return hitElementContext().element != nullptr;
 }
 
 bool NotationContextMenuModel::canSelectSimilarInRange() const
 {
-    return canSelectSimilar() && globalContext()->currentNotation()->interaction()->selection()->isRange();
+    return canSelectSimilar() && selection()->isRange();
 }
 
 bool NotationContextMenuModel::isDrumsetStaff() const
 {
-    auto notation = globalContext()->currentNotation();
-    if (!notation) {
+    const INotationInteraction::HitElementContext& ctx = hitElementContext();
+    if (!ctx.staff) {
         return false;
     }
 
-    auto interaction = notation->interaction();
-    if (!interaction) {
-        return false;
+    Fraction tick = ctx.element ? ctx.element->tick() : Fraction { -1, 1 };
+    return ctx.staff->part()->instrument(tick)->drumset() != nullptr;
+}
+
+INotationInteractionPtr NotationContextMenuModel::interaction() const
+{
+    INotationPtr notation = globalContext()->currentNotation();
+    return notation ? notation->interaction() : nullptr;
+}
+
+INotationSelectionPtr NotationContextMenuModel::selection() const
+{
+    INotationInteractionPtr interaction = this->interaction();
+    return interaction ? interaction->selection() : nullptr;
+}
+
+const INotationInteraction::HitElementContext& NotationContextMenuModel::hitElementContext() const
+{
+    if (INotationInteractionPtr interaction = this->interaction()) {
+        return interaction->hitElementContext();
     }
 
-    auto hitElementContext = interaction->hitElementContext();
-    if (!hitElementContext.staff) {
-        return false;
-    }
-
-    auto tick = hitElementContext.element ? hitElementContext.element->tick() : Fraction { -1, 1 };
-    return hitElementContext.staff->part()->instrument(tick)->drumset() != nullptr;
+    static INotationInteraction::HitElementContext dummy;
+    return dummy;
 }

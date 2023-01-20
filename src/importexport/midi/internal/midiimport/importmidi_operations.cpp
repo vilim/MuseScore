@@ -21,11 +21,12 @@
  */
 #include "importmidi_operations.h"
 
+#include <QFile>
 #include <QXmlStreamReader>
 
 #include "log.h"
 
-namespace Ms {
+namespace mu::iex::midi {
 MidiOperations::Data midiImportOperations;
 
 namespace MidiOperations {
@@ -324,4 +325,4 @@ void Data::setOperationsFile(const QString& fileName)
     }
 }
 } // namespace MidiOperations
-} // namespace Ms
+} // namespace mu::iex::midi

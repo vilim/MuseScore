@@ -23,48 +23,51 @@
 //
 //    Capella 2000 import filter
 //
-#include <assert.h>
-#include <cmath>
-#include <QMessageBox>
-#include <QtMath>
-
-#include "libmscore/mscore.h"
 #include "capella.h"
 
-#include "translation.h"
-#include "interactive/messagebox.h"
+#include <assert.h>
+#include <cmath>
 
-#include "libmscore/factory.h"
-#include "libmscore/masterscore.h"
-#include "libmscore/part.h"
-#include "libmscore/staff.h"
-#include "libmscore/rest.h"
-#include "libmscore/chord.h"
-#include "libmscore/note.h"
-#include "libmscore/utils.h"
-#include "libmscore/lyrics.h"
-#include "libmscore/timesig.h"
-#include "libmscore/clef.h"
-#include "libmscore/pitchspelling.h"
-#include "libmscore/keysig.h"
-#include "libmscore/slur.h"
-#include "libmscore/tie.h"
-#include "libmscore/box.h"
-#include "libmscore/measure.h"
-#include "libmscore/sig.h"
-#include "libmscore/tuplet.h"
-#include "libmscore/segment.h"
-#include "libmscore/layoutbreak.h"
-#include "libmscore/dynamic.h"
-#include "libmscore/barline.h"
-#include "libmscore/volta.h"
-#include "libmscore/stafftext.h"
-#include "libmscore/trill.h"
+#include <QFile>
+#include <QtMath>
+
+#include "translation.h"
+#include "infrastructure/messagebox.h"
+
+#include "engraving/engravingerrors.h"
+
 #include "libmscore/arpeggio.h"
-#include "libmscore/breath.h"
-#include "libmscore/hairpin.h"
 #include "libmscore/articulation.h"
+#include "libmscore/box.h"
+#include "libmscore/breath.h"
+#include "libmscore/chord.h"
+#include "libmscore/clef.h"
+#include "libmscore/dynamic.h"
+#include "libmscore/factory.h"
+#include "libmscore/hairpin.h"
 #include "libmscore/harmony.h"
+#include "libmscore/keysig.h"
+#include "libmscore/layoutbreak.h"
+#include "libmscore/lyrics.h"
+#include "libmscore/masterscore.h"
+#include "libmscore/measure.h"
+#include "libmscore/mscore.h"
+#include "libmscore/note.h"
+#include "libmscore/part.h"
+#include "libmscore/pitchspelling.h"
+#include "libmscore/rest.h"
+#include "libmscore/segment.h"
+#include "libmscore/sig.h"
+#include "libmscore/slur.h"
+#include "libmscore/staff.h"
+#include "libmscore/stafftext.h"
+#include "libmscore/text.h"
+#include "libmscore/tie.h"
+#include "libmscore/timesig.h"
+#include "libmscore/trill.h"
+#include "libmscore/tuplet.h"
+#include "libmscore/utils.h"
+#include "libmscore/volta.h"
 
 #include "log.h"
 
@@ -72,7 +75,7 @@ extern QString rtf2html(const QString&);
 
 using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::iex::capella {
 //---------------------------------------------------------
 //   errmsg
 //---------------------------------------------------------
@@ -93,7 +96,7 @@ const char* Capella::errmsg[] = {
 static void addDynamic(Score*, Segment* s, int track, const char* name)
 {
     Dynamic* d = Factory::createDynamic(s);
-    d->setDynamicType(name);
+    d->setDynamicType(String::fromUtf8(name));
     d->setTrack(track);
     s->add(d);
 }
@@ -248,9 +251,9 @@ static void processBasicDrawObj(QList<BasicDrawObj*> objects, Segment* s, int tr
                         case 172:                           // arpeggio (short)
                         case 173:                           // arpeggio (long)
                         {
-                            Arpeggio* a = Factory::createArpeggio(Ms::toChord(cr));
+                            Arpeggio* a = Factory::createArpeggio(toChord(cr));
                             a->setArpeggioType(ArpeggioType::NORMAL);
-                            if (Ms::toChord(cr)->arpeggio()) {                           // there can be only one
+                            if (mu::engraving::toChord(cr)->arpeggio()) {                           // there can be only one
                                 delete a;
                                 a = 0;
                             } else {
@@ -260,7 +263,7 @@ static void processBasicDrawObj(QList<BasicDrawObj*> objects, Segment* s, int tr
                         break;
                         case 187:                           // arpeggio (wiggle line, arrow up)
                         {
-                            Arpeggio* a = Factory::createArpeggio(Ms::toChord(cr));
+                            Arpeggio* a = Factory::createArpeggio(toChord(cr));
                             a->setArpeggioType(ArpeggioType::UP);
                             if ((static_cast<Chord*>(cr))->arpeggio()) {                           // there can be only one
                                 delete a;
@@ -272,7 +275,7 @@ static void processBasicDrawObj(QList<BasicDrawObj*> objects, Segment* s, int tr
                         break;
                         case 188:                           // arpeggio (wiggle line, arrow down)
                         {
-                            Arpeggio* a = Factory::createArpeggio(Ms::toChord(cr));
+                            Arpeggio* a = Factory::createArpeggio(toChord(cr));
                             a->setArpeggioType(ArpeggioType::DOWN);
                             if ((static_cast<Chord*>(cr))->arpeggio()) {                           // there can be only one
                                 delete a;
@@ -782,7 +785,7 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
                 }
                 pitch += n.alteration;
                 pitch += score->staff(staffIdx)->part()->instrument()->transpose().chromatic;               // assume not in concert pitch
-                pitch = limit(pitch, 0, 127);
+                pitch = std::clamp(pitch, 0, 127);
 
                 chord->add(note);
                 note->setPitch(pitch);
@@ -1066,7 +1069,7 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
                         trill->setTick(cr1->tick());
                         trill->setTick2(cr2->tick());
                         if (!(tro->trillSign)) {
-                            trill->setTrillType("prallprall");
+                            trill->setTrillType(TrillType::PRALLPRALL_LINE);
                         }
                         score->addElement(trill);
                     }
@@ -1208,7 +1211,7 @@ void convertCapella(Score* score, Capella* cap, bool capxMode)
     Part* part = 0;
     for (int staffIdx = 0; staffIdx < staves; ++staffIdx) {
         CapStaffLayout* cl = cap->staffLayout(staffIdx);
-        // LOGD("Midi staff %d program %d", staffIdx, cl->sound);
+        // LOGD("MIDI staff %d program %d", staffIdx, cl->sound);
 
         // create a new part if necessary
         if (needPart(midiPatch, cl->sound, staffIdx, cap->brackets)) {
@@ -2303,7 +2306,7 @@ void Capella::readStaveLayout(CapStaffLayout* sl, int idx)
     sl->abbrev             = readQString();
     sl->intermediateName   = readQString();
     sl->intermediateAbbrev = readQString();
-    LOGD("   descr <%s> name <%s>  abbrev <%s> iname <%s> iabrev <%s>",
+    LOGD("   descr <%s> name <%s>  abbrev <%s> iname <%s> iabbrev <%s>",
          qPrintable(sl->descr), qPrintable(sl->name), qPrintable(sl->abbrev),
          qPrintable(sl->intermediateName), qPrintable(sl->intermediateAbbrev));
 }
@@ -2740,7 +2743,7 @@ void Capella::read(QFile* fp)
     bAllowCompression = b & 2;
     bPrintLandscape   = b & 16;
 
-    // LOGD("  nRel %d  nAbs %d useRealSize %d compresseion %d", nRel, nAbs, bUseRealSize, bAllowCompression);
+    // LOGD("  nRel %d  nAbs %d useRealSize %d compression %d", nRel, nAbs, bUseRealSize, bAllowCompression);
 
     readLayout();
 
@@ -2793,14 +2796,14 @@ void Capella::read(QFile* fp)
 //   importCapella
 //---------------------------------------------------------
 
-Score::FileError importCapella(MasterScore* score, const QString& name)
+Err importCapella(MasterScore* score, const QString& name)
 {
     QFile fp(name);
     if (!fp.exists()) {
-        return Score::FileError::FILE_NOT_FOUND;
+        return Err::FileNotFound;
     }
     if (!fp.open(QIODevice::ReadOnly)) {
-        return Score::FileError::FILE_OPEN_ERROR;
+        return Err::FileOpenError;
     }
 
     Capella cf;
@@ -2815,10 +2818,10 @@ Score::FileError importCapella(MasterScore* score, const QString& name)
         }
         fp.close();
         // avoid another error message box
-        return Score::FileError::FILE_NO_ERROR;
+        return Err::NoError;
     }
     fp.close();
     convertCapella(score, &cf, false);
-    return Score::FileError::FILE_NO_ERROR;
+    return Err::NoError;
 }
 }

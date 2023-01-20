@@ -105,6 +105,10 @@ private:
 
     void dispatch(const actions::ActionCode& code, const actions::ActionData& args = actions::ActionData());
 
+    void onCurrentNotationChanged();
+
+    notation::ZoomType currentZoomType() const;
+
     void listenChangesInAccessibility();
 
     QList<int> possibleZoomPercentageList() const;
@@ -113,8 +117,6 @@ private:
     QVariantList availableZoomList_property();
 
     QVariantList menuItemListToVariantList(const uicomponents::MenuItemList& list) const;
-
-    notation::ZoomType m_currentZoomType = notation::ZoomType::Percentage;
 };
 }
 

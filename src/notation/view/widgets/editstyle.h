@@ -29,6 +29,9 @@
 #include "inotationconfiguration.h"
 #include "iinteractive.h"
 #include "ui/iuiengine.h"
+#include "engraving/iengravingfontsprovider.h"
+
+#include "engraving/style/textstyle.h"
 
 namespace mu::notation {
 class EditStyle : public QDialog, private Ui::EditStyleBase
@@ -39,6 +42,7 @@ class EditStyle : public QDialog, private Ui::EditStyleBase
     INJECT(notation, mu::notation::INotationConfiguration, configuration)
     INJECT(notation, mu::framework::IInteractive, interactive)
     INJECT(notation, mu::ui::IUiEngine, uiEngine)
+    INJECT(notation, mu::engraving::IEngravingFontsProvider, engravingFonts)
 
     Q_PROPERTY(QString currentPageCode READ currentPageCode WRITE setCurrentPageCode NOTIFY currentPageChanged)
     Q_PROPERTY(QString currentSubPageCode READ currentSubPageCode WRITE setCurrentSubPageCode NOTIFY currentSubPageChanged)
@@ -86,7 +90,9 @@ private:
     QVector<StyleWidget> styleWidgets;
     const StyleWidget& styleWidget(StyleId id) const;
 
-    std::vector<QComboBox*> lineStyleComboBoxes;
+    class LineStyleSelect;
+    std::vector<LineStyleSelect*> m_lineStyleSelects;
+
     std::vector<QComboBox*> verticalPlacementComboBoxes;
     std::vector<QComboBox*> horizontalPlacementComboBoxes;
 
@@ -120,11 +126,12 @@ private slots:
     void resetStyleValue(int);
     void valueChanged(int);
     void textStyleChanged(int);
-    void resetTextStyle(Ms::Pid);
-    void textStyleValueChanged(Ms::Pid, QVariant);
+    void resetTextStyle(engraving::TextStylePropertyType type);
+    void textStyleValueChanged(engraving::TextStylePropertyType type, QVariant);
     void on_comboFBFont_currentIndexChanged(int index);
     void on_buttonTogglePagelist_clicked();
     void on_resetStylesButton_clicked();
+    void on_resetTabStylesButton_clicked();
     void editUserStyleName();
     void endEditUserStyleName();
     void resetUserStyleName();

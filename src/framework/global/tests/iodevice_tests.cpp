@@ -25,14 +25,15 @@
 
 #include "io/buffer.h"
 
+using namespace mu;
 using namespace mu::io;
 
-class IO_IODeviceTests : public ::testing::Test
+class Global_IO_IODeviceTests : public ::testing::Test
 {
 public:
 };
 
-TEST_F(IO_IODeviceTests, Open_ReadOnly)
+TEST_F(Global_IO_IODeviceTests, Open_ReadOnly)
 {
     //! GIVEN Some buffer
     std::string ref = "Hello";
@@ -56,10 +57,10 @@ TEST_F(IO_IODeviceTests, Open_ReadOnly)
     EXPECT_DEATH({
         size_t size = buf.write(wrba);
         EXPECT_EQ(size, 0);
-    }, ".*isOpenModeWriteable().*");
+    }, ".*isOpenModeWriteable\\(\\).*");
 }
 
-TEST_F(IO_IODeviceTests, Open_WriteOnly)
+TEST_F(Global_IO_IODeviceTests, Open_WriteOnly)
 {
     //! GIVEN Some buffer
     std::string ref = "Hello";
@@ -81,21 +82,21 @@ TEST_F(IO_IODeviceTests, Open_WriteOnly)
     EXPECT_DEATH({
         ByteArray rba = buf.readAll();
         EXPECT_TRUE(rba.empty());
-    }, ".*isOpenModeReadable().*");
+    }, ".*isOpenModeReadable\\(\\).*");
 
     EXPECT_DEATH({
         ByteArray rba = buf.read(4);
         EXPECT_TRUE(rba.empty());
-    }, ".*isOpenModeReadable().*");
+    }, ".*isOpenModeReadable\\(\\).*");
 
     EXPECT_DEATH({
         uint8_t d = 0;
         size_t s = buf.read(&d, 1);
         EXPECT_EQ(s, 0);
-    }, ".*isOpenModeReadable().*");
+    }, ".*isOpenModeReadable\\(\\).*");
 }
 
-TEST_F(IO_IODeviceTests, Open_ReadWrite)
+TEST_F(Global_IO_IODeviceTests, Open_ReadWrite)
 {
     //! GIVEN Some buffer
     std::string ref = "Hello";
@@ -121,7 +122,7 @@ TEST_F(IO_IODeviceTests, Open_ReadWrite)
     EXPECT_EQ(rba, wrba);
 }
 
-TEST_F(IO_IODeviceTests, Open_Append)
+TEST_F(Global_IO_IODeviceTests, Open_Append)
 {
     //! GIVEN Some buffer
     std::string ref = "Hello";

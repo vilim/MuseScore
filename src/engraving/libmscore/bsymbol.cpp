@@ -20,31 +20,32 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "bsymbol.h"
+
 #include <cmath>
 
 #include "containers.h"
 #include "rw/xml.h"
 
-#include "score.h"
-#include "image.h"
-#include "staff.h"
-#include "segment.h"
-#include "page.h"
-#include "system.h"
-#include "measure.h"
 #include "factory.h"
+#include "measure.h"
+#include "page.h"
+#include "score.h"
+#include "segment.h"
+#include "staff.h"
+#include "system.h"
 
 #include "log.h"
 
 using namespace mu;
 using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   BSymbol
 //---------------------------------------------------------
 
-BSymbol::BSymbol(const Ms::ElementType& type, Ms::EngravingItem* parent, ElementFlags f)
+BSymbol::BSymbol(const ElementType& type, EngravingItem* parent, ElementFlags f)
     : EngravingItem(type, parent, f)
 {
     _align = { AlignH::LEFT, AlignV::BASELINE };
@@ -79,7 +80,7 @@ void BSymbol::writeProperties(XmlWriter& xml) const
 
 bool BSymbol::readProperties(XmlReader& e)
 {
-    const QStringRef& tag = e.name();
+    const AsciiStringView tag = e.name();
 
     if (EngravingItem::readProperties(e)) {
         return true;
@@ -127,7 +128,7 @@ void BSymbol::add(EngravingItem* e)
 void BSymbol::scanElements(void* data, void (* func)(void*, EngravingItem*), bool all)
 {
     func(data, this);
-    foreach (EngravingItem* e, _leafs) {
+    for (EngravingItem* e : _leafs) {
         e->scanElements(data, func, all);
     }
 }
@@ -206,17 +207,17 @@ mu::RectF BSymbol::drag(EditData& ed)
         r.unite(e->canvasBoundingRect());
     }
 
-    qreal x = ed.delta.x();
-    qreal y = ed.delta.y();
+    double x = ed.delta.x();
+    double y = ed.delta.y();
 
-    qreal _spatium = spatium();
+    double _spatium = spatium();
     if (ed.hRaster) {
-        qreal hRaster = _spatium / MScore::hRaster();
+        double hRaster = _spatium / MScore::hRaster();
         int n = lrint(x / hRaster);
         x = hRaster * n;
     }
     if (ed.vRaster) {
-        qreal vRaster = _spatium / MScore::vRaster();
+        double vRaster = _spatium / MScore::vRaster();
         int n = lrint(y / vRaster);
         y = vRaster * n;
     }

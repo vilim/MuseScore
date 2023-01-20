@@ -25,34 +25,9 @@
 using namespace mu::engraving;
 using namespace mu::mpe;
 
-bool WindsSetupDataResolver::supportsInstrument(const Ms::Instrument* instrument)
+PlaybackSetupData WindsSetupDataResolver::doResolve(const Instrument* instrument)
 {
-    static const std::unordered_set<std::string> WINDS_FAMILY_SET = {
-        "winds", "flutes", "dizis", "shakuhachis",
-        "fifes", "whistles", "flageolets", "recorders",
-        "ocarinas", "gemshorns", "pan-flutes", "quenas",
-        "oboes", "shawms", "cromornes", "crumhorns",
-        "cornamuses", "kelhorns", "rauschpfeifes", "duduks",
-        "shenais", "clarinets", "chalumeaus", "xaphoons",
-        "tarogatos", "octavins", "saxophones", "bassoons",
-        "reed-contrabasses", "dulcians", "racketts", "sarrusophones",
-        "bagpipes", "accordions", "harmonicas", "melodicas",
-        "shengs", "brass", "horns", "wagner-tubas",
-        "cornets", "saxhorns", "alto-horns", "baritone-horns",
-        "posthorns", "trumpets", "baroque-trumpets", "bugles",
-        "flugelhorns", "ophicleides", "cornetts", "serpents",
-        "trombones", "sackbuts", "euphoniums", "tubas",
-        "sousaphones", "conches", "alphorns", "rag-dungs",
-        "didgeridoos", "shofars", "vuvuzelas", "klaxon-horns",
-        "kazoos"
-    };
-
-    return WINDS_FAMILY_SET.find(instrument->family().toStdString()) != WINDS_FAMILY_SET.cend();
-}
-
-const PlaybackSetupData& WindsSetupDataResolver::doResolve(const Ms::Instrument* instrument)
-{
-    static std::unordered_map<std::string, mpe::PlaybackSetupData> SETUP_DATA_MAP = {
+    static const std::unordered_map<std::string, mpe::PlaybackSetupData> SETUP_DATA_MAP = {
         { "winds", { SoundId::WindsGroup, SoundCategory::Winds, {}, {} } },
         { "eb-piccolo", { SoundId::Piccolo, SoundCategory::Winds, {}, {} } },
         { "db-piccolo", { SoundId::Piccolo, SoundCategory::Winds, {}, {} } },
@@ -96,6 +71,7 @@ const PlaybackSetupData& WindsSetupDataResolver::doResolve(const Ms::Instrument*
         { "recorder", { SoundId::Recorder, SoundCategory::Winds, {}, {} } },
         { "alto-recorder", { SoundId::Recorder, SoundCategory::Winds, { SoundSubCategory::Alto }, {} } },
         { "bass-recorder", { SoundId::Recorder, SoundCategory::Winds, { SoundSubCategory::Bass }, {} } },
+        { "tenor-recorder", { SoundId::Recorder, SoundCategory::Winds, { SoundSubCategory::Tenor }, {} } },
         { "greatbass-recorder", { SoundId::Recorder, SoundCategory::Winds, { SoundSubCategory::Great_Bass }, {} } },
         { "contrabass-recorder", { SoundId::Recorder, SoundCategory::Winds, { SoundSubCategory::Contra_Bass }, {} } },
 
@@ -115,6 +91,8 @@ const PlaybackSetupData& WindsSetupDataResolver::doResolve(const Ms::Instrument*
         { "alto-gemshorn", { SoundId::Gemshorn, SoundCategory::Winds, { SoundSubCategory::Alto }, {} } },
         { "tenor-gemshorn", { SoundId::Gemshorn, SoundCategory::Winds, { SoundSubCategory::Tenor }, {} } },
         { "bass-gemshorn", { SoundId::Gemshorn, SoundCategory::Winds, { SoundSubCategory::Bass }, {} } },
+
+        { "theremin", { SoundId::Theremin, SoundCategory::Winds, { SoundSubCategory::Electric }, {} } },
 
         { "pan-flute", { SoundId::PanFlute, SoundCategory::Winds, {}, {} } },
 
@@ -185,18 +163,24 @@ const PlaybackSetupData& WindsSetupDataResolver::doResolve(const Ms::Instrument*
 
         { "piccolo-clarinet", { SoundId::Clarinet, SoundCategory::Winds, {}, {} } },
         { "soprano-clarinet", { SoundId::Clarinet, SoundCategory::Winds, { SoundSubCategory::Sopranino }, {} } },
-        { "eb-clarinet", { SoundId::Clarinet, SoundCategory::Winds, { SoundSubCategory::Sopranino }, {} } },
+        { "eb-clarinet", { SoundId::Clarinet, SoundCategory::Winds, { SoundSubCategory::Sopranino,
+                                                                      SoundSubCategory::In_E_flat }, {} } },
         { "d-clarinet", { SoundId::Clarinet, SoundCategory::Winds, { SoundSubCategory::Sopranino }, {} } },
         { "c-clarinet", { SoundId::Clarinet, SoundCategory::Winds, { SoundSubCategory::Sopranino }, {} } },
-        { "bb-clarinet", { SoundId::Clarinet, SoundCategory::Winds, { SoundSubCategory::Sopranino }, {} } },
+        { "bb-clarinet", { SoundId::Clarinet, SoundCategory::Winds, { SoundSubCategory::Soprano,
+                                                                      SoundSubCategory::In_B_flat }, {} } },
         { "clarinet", { SoundId::Clarinet, SoundCategory::Winds, { SoundSubCategory::Soprano }, {} } },
         { "a-clarinet", { SoundId::Clarinet, SoundCategory::Winds, { SoundSubCategory::Soprano }, {} } },
         { "g-clarinet", { SoundId::Clarinet, SoundCategory::Winds, { SoundSubCategory::Soprano }, {} } },
         { "basset-clarinet", { SoundId::Clarinet, SoundCategory::Winds, { SoundSubCategory::Soprano }, {} } },
+        { "basset-horn", { SoundId::Clarinet, SoundCategory::Winds, { SoundSubCategory::Soprano }, {} } },
         { "alto-clarinet", { SoundId::Clarinet, SoundCategory::Winds, { SoundSubCategory::Alto }, {} } },
-        { "bass-clarinet", { SoundId::Clarinet, SoundCategory::Winds, { SoundSubCategory::Bass }, {} } },
-        { "bb-bass-clarinet", { SoundId::Clarinet, SoundCategory::Winds, { SoundSubCategory::Bass }, {} } },
-        { "bb-bass-clarinet-bass-clef", { SoundId::Clarinet, SoundCategory::Winds, { SoundSubCategory::Bass }, {} } },
+        { "bass-clarinet", { SoundId::Clarinet, SoundCategory::Winds, { SoundSubCategory::Bass,
+                                                                        SoundSubCategory::In_B_flat }, {} } },
+        { "bb-bass-clarinet", { SoundId::Clarinet, SoundCategory::Winds, { SoundSubCategory::Bass,
+                                                                           SoundSubCategory::In_B_flat }, {} } },
+        { "bb-bass-clarinet-bass-clef", { SoundId::Clarinet, SoundCategory::Winds, { SoundSubCategory::Bass,
+                                                                                     SoundSubCategory::In_B_flat }, {} } },
         { "a-bass-clarinet", { SoundId::Clarinet, SoundCategory::Winds, { SoundSubCategory::Bass }, {} } },
         { "a-bass-clarinet-bass-clef", { SoundId::Clarinet, SoundCategory::Winds, { SoundSubCategory::Bass }, {} } },
         { "contra-alto-clarinet", { SoundId::Clarinet, SoundCategory::Winds, { SoundSubCategory::Contra_Alto }, {} } },
@@ -285,18 +269,23 @@ const PlaybackSetupData& WindsSetupDataResolver::doResolve(const Ms::Instrument*
 
         { "brass", { SoundId::BrassGroup, SoundCategory::Winds, {}, {} } },
 
-        { "c-horn-alto", { SoundId::Horn, SoundCategory::Winds, { SoundSubCategory::Alto }, {} } },
-        { "bb-horn-alto", { SoundId::Horn, SoundCategory::Winds, { SoundSubCategory::Alto }, {} } },
-        { "a-horn", { SoundId::Horn, SoundCategory::Winds, {}, {} } },
-        { "ab-horn", { SoundId::Horn, SoundCategory::Winds, {}, {} } },
-        { "g-horn", { SoundId::Horn, SoundCategory::Winds, {}, {} } },
-        { "e-horn", { SoundId::Horn, SoundCategory::Winds, {}, {} } },
-        { "eb-horn", { SoundId::Horn, SoundCategory::Winds, {}, {} } },
-        { "d-horn", { SoundId::Horn, SoundCategory::Winds, {}, {} } },
-        { "horn", { SoundId::Horn, SoundCategory::Winds, {}, {} } },
-        { "c-horn", { SoundId::Horn, SoundCategory::Winds, {}, {} } },
-        { "c-horn-bass", { SoundId::Horn, SoundCategory::Winds, { SoundSubCategory::Bass }, {} } },
-        { "bb-horn-basso", { SoundId::Horn, SoundCategory::Winds, { SoundSubCategory::Bass }, {} } },
+        { "c-horn-alto", { SoundId::Horn, SoundCategory::Winds, { SoundSubCategory::Alto,
+                                                                  SoundSubCategory::In_C }, {} } },
+        { "bb-horn-alto", { SoundId::Horn, SoundCategory::Winds, { SoundSubCategory::Alto,
+                                                                   SoundSubCategory::In_B_flat }, {} } },
+        { "a-horn", { SoundId::Horn, SoundCategory::Winds, { SoundSubCategory::In_A }, {} } },
+        { "ab-horn", { SoundId::Horn, SoundCategory::Winds, { SoundSubCategory::In_A_flat }, {} } },
+        { "g-horn", { SoundId::Horn, SoundCategory::Winds, { SoundSubCategory::In_G }, {} } },
+        { "e-horn", { SoundId::Horn, SoundCategory::Winds, { SoundSubCategory::In_E }, {} } },
+        { "eb-horn", { SoundId::Horn, SoundCategory::Winds, { SoundSubCategory::In_E_flat }, {} } },
+        { "d-horn", { SoundId::Horn, SoundCategory::Winds, { SoundSubCategory::In_D }, {} } },
+        { "horn", { SoundId::Horn, SoundCategory::Winds, { SoundSubCategory::French,
+                                                           SoundSubCategory::In_F }, {} } },
+        { "c-horn", { SoundId::Horn, SoundCategory::Winds, { SoundSubCategory::In_C }, {} } },
+        { "c-horn-bass", { SoundId::Horn, SoundCategory::Winds, { SoundSubCategory::Bass,
+                                                                  SoundSubCategory::In_C }, {} } },
+        { "bb-horn-basso", { SoundId::Horn, SoundCategory::Winds, { SoundSubCategory::Bass,
+                                                                    SoundSubCategory::In_B_flat }, {} } },
         { "vienna-horn", { SoundId::Horn, SoundCategory::Winds, { SoundSubCategory::Vienna }, {} } },
 
         { "bb-wagner-tuba", { SoundId::Tuba, SoundCategory::Winds, { SoundSubCategory::Wagner }, {} } },
@@ -411,7 +400,7 @@ const PlaybackSetupData& WindsSetupDataResolver::doResolve(const Ms::Instrument*
         { "horagai", { SoundId::Horagai, SoundCategory::Winds, { SoundSubCategory::Japanese }, {} } },
 
         { "alphorn", { SoundId::Alphorn, SoundCategory::Winds, { SoundSubCategory::Alpine }, {} } },
-        { "rag-dung", { SoundId::RagDung, SoundCategory::Winds, { SoundSubCategory::Tibetian }, {} } },
+        { "rag-dung", { SoundId::RagDung, SoundCategory::Winds, { SoundSubCategory::Tibetan }, {} } },
         { "didgeridoo", { SoundId::Didgeridoo, SoundCategory::Winds, { SoundSubCategory::Australian }, {} } },
         { "shofar", { SoundId::Shofar, SoundCategory::Winds, {}, {} } },
         { "vuvuzela", { SoundId::Vuvuzela, SoundCategory::Winds, {}, {} } },
@@ -423,6 +412,17 @@ const PlaybackSetupData& WindsSetupDataResolver::doResolve(const Ms::Instrument*
     if (search == SETUP_DATA_MAP.cend()) {
         static PlaybackSetupData empty;
         return empty;
+    }
+
+    static const std::unordered_set<SoundId> supportPrimaryAndSecondaryCategories {
+        SoundId::Flute,
+    };
+
+    if (mu::contains(supportPrimaryAndSecondaryCategories, search->second.id)) {
+        SoundSubCategory category = instrument->isPrimary() ? SoundSubCategory::Primary : SoundSubCategory::Secondary;
+        PlaybackSetupData setupData = search->second;
+        setupData.subCategorySet.insert(category);
+        return setupData;
     }
 
     return search->second;

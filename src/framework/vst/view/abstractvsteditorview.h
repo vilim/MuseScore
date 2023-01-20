@@ -37,6 +37,8 @@ class AbstractVstEditorView : public uicomponents::TopLevelDialog, public Steinb
 {
     Q_OBJECT
 
+    DECLARE_FUNKNOWN_METHODS
+
     Q_PROPERTY(int trackId READ trackId WRITE setTrackId NOTIFY trackIdChanged)
     Q_PROPERTY(QString resourceId READ resourceId WRITE setResourceId NOTIFY resourceIdChanged)
 
@@ -71,7 +73,11 @@ private:
     void setupWindowGeometry();
     void moveViewToMainWindowCenter();
 
-    void showEvent(QShowEvent* event) override;
+    void showEvent(QShowEvent* ev) override;
+    void closeEvent(QCloseEvent* ev) override;
+    bool event(QEvent* ev) override;
+
+    void deinit();
 
     FIDString currentPlatformUiType() const;
 

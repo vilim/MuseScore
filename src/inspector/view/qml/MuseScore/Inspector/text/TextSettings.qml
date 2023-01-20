@@ -50,8 +50,8 @@ Column {
         CheckBoxPropertyView {
             id: matchStaffSize
             anchors.left: parent.left
-            anchors.right: parent.horizontalCenter
-            anchors.rightMargin: 2
+            anchors.right: subscriptOptionsButtonList.left
+            anchors.rightMargin: 8
             anchors.verticalCenter: subscriptOptionsButtonList.verticalCenter
 
             navigation.name: "Match staff size"
@@ -88,7 +88,7 @@ Column {
                 iconCode: modelData["iconRole"]
                 checked: root.model && !root.model.textScriptAlignment.isUndefined ? root.model.textScriptAlignment.value === modelData["typeRole"]
                                                                                    : false
-                onToggled: {
+                onClicked: {
                     if (root.model.textScriptAlignment.value === modelData["typeRole"]) {
                         root.model.textScriptAlignment.value = TextTypes.TEXT_SUBSCRIPT_NORMAL
                     } else {
@@ -110,7 +110,7 @@ Column {
 
         model: [
             { text: qsTrc("inspector", "None"), value: TextTypes.FRAME_TYPE_NONE, titleRole: qsTrc("inspector", "None") },
-            { iconCode: IconCode.FRAME_SQUARE, value: TextTypes.FRAME_TYPE_SQUARE, titleRole: qsTrc("inspector", "Square") },
+            { iconCode: IconCode.FRAME_SQUARE, value: TextTypes.FRAME_TYPE_SQUARE, titleRole: qsTrc("inspector", "Rectangle") },
             { iconCode: IconCode.FRAME_CIRCLE, value: TextTypes.FRAME_TYPE_CIRCLE, titleRole: qsTrc("inspector", "Circle") }
         ]
     }
@@ -146,11 +146,11 @@ Column {
             navigationPanel: root.navigationPanel
             navigationRowStart: borderColorSection.navigationRowEnd + 1
 
-            visible: root.model ? root.model.frameHighlightColor.isEnabled : false
+            visible: root.model ? root.model.frameFillColor.isEnabled : false
             height: visible ? implicitHeight : 0
 
-            titleText: qsTrc("inspector", "Highlight")
-            propertyItem: root.model ? root.model.frameHighlightColor : null
+            titleText: qsTrc("inspector", "Fill color")
+            propertyItem: root.model ? root.model.frameFillColor : null
         }
     }
 
@@ -175,7 +175,7 @@ Column {
             propertyItem: root.model ? root.model.frameThickness : null
 
             step: 0.1
-            minValue: 0.1
+            minValue: 0
             maxValue: 5
         }
 
@@ -217,9 +217,10 @@ Column {
         titleText: qsTrc("inspector", "Corner radius")
         propertyItem: root.model ? root.model.frameCornerRadius : null
 
-        step: 0.1
+        step: 1
+        decimals: 2
         minValue: 0
-        maxValue: 5
+        maxValue: 100
     }
 
     SeparatorLine { anchors.margins: -12 }
@@ -233,35 +234,7 @@ Column {
         navigationPanel: root.navigationPanel
         navigationRowStart: cornerRadiusSection.navigationRowEnd + 1
 
-        model: [
-            { text: qsTrc("inspector", "Title"), value: TextTypes.TEXT_TYPE_TITLE },
-            { text: qsTrc("inspector", "Subtitle"), value: TextTypes.TEXT_TYPE_SUBTITLE},
-            { text: qsTrc("inspector", "Composer"), value: TextTypes.TEXT_TYPE_COMPOSER },
-            { text: qsTrc("inspector", "Lyricist"), value: TextTypes.TEXT_TYPE_LYRICS_ODD },
-            { text: qsTrc("inspector", "Translator"), value: TextTypes.TEXT_TYPE_TRANSLATOR },
-            { text: qsTrc("inspector", "Frame"), value: TextTypes.TEXT_TYPE_FRAME },
-            { text: qsTrc("inspector", "Header"), value: TextTypes.TEXT_TYPE_HEADER },
-            { text: qsTrc("inspector", "Footer"), value: TextTypes.TEXT_TYPE_FOOTER },
-            { text: qsTrc("inspector", "Measure number"), value: TextTypes.TEXT_TYPE_MEASURE_NUMBER },
-            { text: qsTrc("inspector", "Instrument name (Part)"), value: TextTypes.TEXT_TYPE_INSTRUMENT_EXCERPT },
-            { text: qsTrc("inspector", "Instrument change"), value: TextTypes.TEXT_TYPE_INSTRUMENT_CHANGE },
-            { text: qsTrc("inspector", "Staff"), value: TextTypes.TEXT_TYPE_STAFF },
-            { text: qsTrc("inspector", "System"), value: TextTypes.TEXT_TYPE_SYSTEM },
-            { text: qsTrc("inspector", "Expression"), value: TextTypes.TEXT_TYPE_EXPRESSION },
-            { text: qsTrc("inspector", "Dynamics"), value: TextTypes.TEXT_TYPE_DYNAMICS },
-            { text: qsTrc("inspector", "Hairpin"), value: TextTypes.TEXT_TYPE_HAIRPIN },
-            { text: qsTrc("inspector", "Tempo"), value: TextTypes.TEXT_TYPE_TEMPO },
-            { text: qsTrc("inspector", "Rehearshal mark"), value: TextTypes.TEXT_TYPE_REHEARSAL_MARK },
-            { text: qsTrc("inspector", "Repeat text left"), value: TextTypes.TEXT_TYPE_REPEAT_LEFT },
-            { text: qsTrc("inspector", "Repeat text right"), value: TextTypes.TEXT_TYPE_REPEAT_RIGHT },
-            { text: qsTrc("inspector", "Lyrics odd lines"), value: TextTypes.TEXT_TYPE_LYRICS_ODD },
-            { text: qsTrc("inspector", "Lyrics even lines"), value: TextTypes.TEXT_TYPE_LYRICS_EVEN },
-            { text: qsTrc("inspector", "Chord symbol"), value: TextTypes.TEXT_TYPE_HARMONY_A },
-            { text: qsTrc("inspector", "Chord symbol (Alternate)"), value: TextTypes.TEXT_TYPE_HARMONY_B },
-            { text: qsTrc("inspector", "Roman numeral analysis"), value: TextTypes.TEXT_TYPE_HARMONY_ROMAN },
-            { text: qsTrc("inspector", "Nashville number"), value: TextTypes.TEXT_TYPE_HARMONY_NASHVILLE },
-            { text: qsTrc("inspector", "Sticking"), value: TextTypes.TEXT_TYPE_STICKING }
-        ]
+        model: root.model ? root.model.textStyles : []
     }
 
     PlacementSection {

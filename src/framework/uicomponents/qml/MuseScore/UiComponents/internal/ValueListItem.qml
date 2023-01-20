@@ -34,6 +34,8 @@ ListItemBlank {
     property string valueRoleName: "value"
     property string valueTypeRole: "valueType"
     property string valueEnabledRoleName: "enabled"
+    property string minValueRoleName: "min"
+    property string maxValueRoleName: "max"
     property string iconRoleName: "icon"
 
     property bool readOnly: false
@@ -112,12 +114,12 @@ ListItemBlank {
                 loader.item.val = loader.val
 
                 if (privateProperties.isNumberComponent() && !root.readOnly) {
-                    if (Boolean(root.item.min)) {
-                        loader.item.minValue = root.item.min
+                    if (Boolean(root.item[minValueRoleName])) {
+                        loader.item.minValue = root.item[minValueRoleName]
                     }
 
-                    if (Boolean(root.item.max)) {
-                        loader.item.maxValue = root.item.max
+                    if (Boolean(root.item[maxValueRoleName])) {
+                        loader.item.maxValue = root.item[maxValueRoleName]
                     }
                 }
             }
@@ -139,6 +141,7 @@ ListItemBlank {
 
     Component {
         id: textComp
+
         TextInputField {
             id: textControl
 
@@ -153,7 +156,7 @@ ListItemBlank {
 
             currentText: val
 
-            onCurrentTextEdited: function(newTextValue) {
+            onTextChanged: function(newTextValue) {
                 textControl.changed(newTextValue)
             }
         }
@@ -161,6 +164,7 @@ ListItemBlank {
 
     Component {
         id: colorComp
+
         ColorPicker {
             id: colorControl
 
@@ -183,6 +187,7 @@ ListItemBlank {
 
     Component {
         id: intComp
+
         IncrementalPropertyControl {
             id: intControl
 
@@ -208,6 +213,7 @@ ListItemBlank {
 
     Component {
         id: doubleComp
+
         IncrementalPropertyControl {
             id: doubleControl
 
@@ -231,17 +237,18 @@ ListItemBlank {
 
     Component {
         id: boolComp
+
         CheckBox {
             id: boolControl
 
             property bool val
             signal changed(bool newVal)
 
+            property string accessibleName: checked ? qsTrc("ui", "checked", "checkstate") : qsTrc("ui", "unchecked", "checkstate")
+
             navigation.panel: root.navigation.panel
             navigation.row: root.navigation.row
             navigation.column: 1
-
-            property string accessibleName: checked ? qsTrc("uicomponents", "checked") : qsTrc("uicomponents", "unchecked")
 
             checked: val ? true : false
             onClicked: {

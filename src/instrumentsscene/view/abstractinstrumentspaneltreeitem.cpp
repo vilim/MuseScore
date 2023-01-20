@@ -92,9 +92,14 @@ bool AbstractInstrumentsPanelTreeItem::isRemovable() const
     return m_isRemovable;
 }
 
-bool AbstractInstrumentsPanelTreeItem::canAcceptDrop(int type) const
+bool AbstractInstrumentsPanelTreeItem::canAcceptDrop(const QVariant& obj) const
 {
-    return static_cast<InstrumentsTreeItemType::ItemType>(type) == m_type;
+    auto item = dynamic_cast<const AbstractInstrumentsPanelTreeItem*>(obj.value<QObject*>());
+    if (!item) {
+        return false;
+    }
+
+    return item->m_parent == m_parent && item->m_type == m_type;
 }
 
 void AbstractInstrumentsPanelTreeItem::appendNewItem()
@@ -161,11 +166,16 @@ AbstractInstrumentsPanelTreeItem* AbstractInstrumentsPanelTreeItem::childAtId(co
 
 AbstractInstrumentsPanelTreeItem* AbstractInstrumentsPanelTreeItem::childAtRow(int row) const
 {
-    if (row < 0 || row >= childCount()) {
+    if (row < 0 || row >= m_children.size()) {
         return nullptr;
     }
 
     return m_children.at(row);
+}
+
+const QList<AbstractInstrumentsPanelTreeItem*>& AbstractInstrumentsPanelTreeItem::childItems() const
+{
+    return m_children;
 }
 
 int AbstractInstrumentsPanelTreeItem::indexOf(const AbstractInstrumentsPanelTreeItem* item) const

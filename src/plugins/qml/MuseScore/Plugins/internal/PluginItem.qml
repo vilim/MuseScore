@@ -29,7 +29,7 @@ Item {
     id: root
 
     property alias name: nameLabel.text
-    property alias thumbnailUrl: thumbnail.source
+    property alias thumbnailUrl: thumbnailImage.source
     property bool selected: false
 
     signal clicked()
@@ -48,29 +48,19 @@ Item {
         onTriggered: root.clicked()
     }
 
-    Rectangle {
-        id: thumbnailRect
+    Item {
+        id: thumbnail
 
         anchors.top: parent.top
         width: parent.width
         height: 144
 
-        color: "transparent"
-        radius: 10
-
-        border.color: ui.theme.fontPrimaryColor
-        border.width: root.selected ? 2 : 0
-
-        NavigationFocusBorder {
-            navigationCtrl: root.navigation
-            drawOutsideParent: false
-        }
+        property real radius: 10
 
         Image {
-            id: thumbnail
+            id: thumbnailImage
 
             anchors.fill: parent
-            anchors.margins: 4 //! NOTE: it is necessary to simplify understanding of which element the user is on when navigating
 
             fillMode: Image.PreserveAspectCrop
 
@@ -79,16 +69,39 @@ Item {
                 maskSource: Rectangle {
                     width: thumbnail.width
                     height: thumbnail.height
-                    radius: 10
+                    radius: thumbnail.radius
                 }
             }
+        }
+
+        Rectangle {
+            id: selectionBorder
+
+            readonly property real padding: 2 // add some padding between image and border, to make border better distinguishable
+
+            anchors.fill: parent
+            anchors.margins: -border.width - padding
+
+            visible: root.selected
+
+            color: "transparent"
+
+            border.color: ui.theme.fontPrimaryColor
+            border.width: 2
+            radius: thumbnail.radius - anchors.margins
+        }
+
+        NavigationFocusBorder {
+            navigationCtrl: root.navigation
+
+            padding: 2
         }
     }
 
     StyledTextLabel {
         id: nameLabel
 
-        anchors.top: thumbnailRect.bottom
+        anchors.top: thumbnail.bottom
         anchors.topMargin: 16
         anchors.horizontalCenter: parent.horizontalCenter
     }

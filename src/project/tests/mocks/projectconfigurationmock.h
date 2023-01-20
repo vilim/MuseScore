@@ -30,45 +30,48 @@ namespace mu::project {
 class ProjectConfigurationMock : public project::IProjectConfiguration
 {
 public:
-    MOCK_METHOD(io::paths, recentProjectPaths, (), (const, override));
-    MOCK_METHOD(void, setRecentProjectPaths, (const io::paths&), (override));
-    MOCK_METHOD(async::Channel<io::paths>, recentProjectPathsChanged, (), (const, override));
+    MOCK_METHOD(io::paths_t, recentProjectPaths, (), (const, override));
+    MOCK_METHOD(void, setRecentProjectPaths, (const io::paths_t&), (override));
+    MOCK_METHOD(async::Channel<io::paths_t>, recentProjectPathsChanged, (), (const, override));
 
-    MOCK_METHOD(io::path, myFirstProjectPath, (), (const, override));
+    MOCK_METHOD(io::path_t, myFirstProjectPath, (), (const, override));
 
-    MOCK_METHOD(io::paths, availableTemplateDirs, (), (const, override));
-    MOCK_METHOD(io::path, templateCategoriesJsonPath, (const io::path&), (const, override));
+    MOCK_METHOD(io::paths_t, availableTemplateDirs, (), (const, override));
+    MOCK_METHOD(io::path_t, templateCategoriesJsonPath, (const io::path_t&), (const, override));
 
-    MOCK_METHOD(io::path, userTemplatesPath, (), (const, override));
-    MOCK_METHOD(void, setUserTemplatesPath, (const io::path&), (override));
-    MOCK_METHOD(async::Channel<io::path>, userTemplatesPathChanged, (), (const, override));
+    MOCK_METHOD(io::path_t, userTemplatesPath, (), (const, override));
+    MOCK_METHOD(void, setUserTemplatesPath, (const io::path_t&), (override));
+    MOCK_METHOD(async::Channel<io::path_t>, userTemplatesPathChanged, (), (const, override));
 
-    MOCK_METHOD(io::path, defaultProjectsPath, (), (const, override));
-    MOCK_METHOD(void, setDefaultProjectsPath, (const io::path&), (override));
+    MOCK_METHOD(io::path_t, defaultProjectsPath, (), (const, override));
+    MOCK_METHOD(void, setDefaultProjectsPath, (const io::path_t&), (override));
 
-    MOCK_METHOD(io::path, lastOpenedProjectsPath, (), (const, override));
-    MOCK_METHOD(void, setLastOpenedProjectsPath, (const io::path&), (override));
+    MOCK_METHOD(io::path_t, lastOpenedProjectsPath, (), (const, override));
+    MOCK_METHOD(void, setLastOpenedProjectsPath, (const io::path_t&), (override));
 
-    MOCK_METHOD(io::path, lastSavedProjectsPath, (), (const, override));
-    MOCK_METHOD(void, setLastSavedProjectsPath, (const io::path&), (override));
+    MOCK_METHOD(io::path_t, lastSavedProjectsPath, (), (const, override));
+    MOCK_METHOD(void, setLastSavedProjectsPath, (const io::path_t&), (override));
 
-    MOCK_METHOD(io::path, userProjectsPath, (), (const, override));
-    MOCK_METHOD(void, setUserProjectsPath, (const io::path&), (override));
-    MOCK_METHOD(async::Channel<io::path>, userProjectsPathChanged, (), (const, override));
-
-    MOCK_METHOD(io::path, cloudProjectsPath, (), (const, override));
-    MOCK_METHOD(bool, isCloudProject, (const io::path&), (const, override));
-
-    MOCK_METHOD(io::path, defaultSavingFilePath, (INotationProjectPtr, const QString&, const QString&), (const, override));
+    MOCK_METHOD(io::path_t, userProjectsPath, (), (const, override));
+    MOCK_METHOD(void, setUserProjectsPath, (const io::path_t&), (override));
+    MOCK_METHOD(async::Channel<io::path_t>, userProjectsPathChanged, (), (const, override));
 
     MOCK_METHOD(bool, shouldAskSaveLocationType, (), (const, override));
     MOCK_METHOD(void, setShouldAskSaveLocationType, (bool), (override));
 
+    MOCK_METHOD(bool, isCloudProject, (const io::path_t&), (const, override));
+
+    MOCK_METHOD(io::path_t, cloudProjectSavingFilePath, (const io::path_t&), (const, override));
+    MOCK_METHOD(io::path_t, defaultSavingFilePath, (INotationProjectPtr, const std::string&, const std::string&), (const, override));
+
     MOCK_METHOD(SaveLocationType, lastUsedSaveLocationType, (), (const, override));
     MOCK_METHOD(void, setLastUsedSaveLocationType, (SaveLocationType), (override));
 
-    MOCK_METHOD(bool, shouldWarnBeforePublishing, (), (const, override));
-    MOCK_METHOD(void, setShouldWarnBeforePublishing, (bool), (override));
+    MOCK_METHOD(bool, shouldWarnBeforePublish, (), (const, override));
+    MOCK_METHOD(void, setShouldWarnBeforePublish, (bool), (override));
+
+    MOCK_METHOD(bool, shouldWarnBeforeSavingPubliclyToCloud, (), (const, override));
+    MOCK_METHOD(void, setShouldWarnBeforeSavingPubliclyToCloud, (bool), (override));
 
     MOCK_METHOD(QColor, templatePreviewBackgroundColor, (), (const, override));
     MOCK_METHOD(async::Notification, templatePreviewBackgroundChanged, (), (const, override));
@@ -87,12 +90,34 @@ public:
     MOCK_METHOD(void, setAutoSaveInterval, (int), (override));
     MOCK_METHOD(async::Channel<int>, autoSaveIntervalChanged, (), (const, override));
 
-    MOCK_METHOD(io::path, newProjectTemporaryPath, (), (const, override));
+    MOCK_METHOD(io::path_t, newProjectTemporaryPath, (), (const, override));
 
     MOCK_METHOD(bool, isAccessibleEnabled, (), (const, override));
 
     MOCK_METHOD(bool, shouldDestinationFolderBeOpenedOnExport, (), (const, override));
     MOCK_METHOD(void, setShouldDestinationFolderBeOpenedOnExport, (bool), (override));
+
+    MOCK_METHOD(QUrl, scoreManagerUrl, (), (const, override));
+    MOCK_METHOD(QUrl, supportForumUrl, (), (const, override));
+
+    MOCK_METHOD(bool, openDetailedProjectUploadedDialog, (), (const, override));
+    MOCK_METHOD(void, setOpenDetailedProjectUploadedDialog, (bool), (override));
+
+    MOCK_METHOD(bool, hasAskedAudioGenerationSettings, (), (const, override));
+    MOCK_METHOD(void, setHasAskedAudioGenerationSettings, (bool), (override));
+
+    MOCK_METHOD(GenerateAudioTimePeriodType, generateAudioTimePeriodType, (), (const, override));
+    MOCK_METHOD(void, setGenerateAudioTimePeriodType, (GenerateAudioTimePeriodType), (override));
+
+    MOCK_METHOD(int, numberOfSavesToGenerateAudio, (), (const, override));
+    MOCK_METHOD(void, setNumberOfSavesToGenerateAudio, (int), (override));
+
+    MOCK_METHOD(io::path_t, temporaryMp3FilePathTemplate, (), (const, override));
+
+    MOCK_METHOD(io::path_t, projectBackupPath, (const io::path_t&), (const, override));
+
+    MOCK_METHOD(bool, showCloudIsNotAvailableWarning, (), (const, override));
+    MOCK_METHOD(void, setShowCloudIsNotAvailableWarning, (bool), (override));
 };
 }
 

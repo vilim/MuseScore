@@ -27,7 +27,7 @@
 
 using namespace mu::io;
 
-File::File(const path& filePath)
+File::File(const path_t& filePath)
     : m_filePath(filePath)
 {
 }
@@ -37,7 +37,7 @@ File::~File()
     close();
 }
 
-path File::filePath() const
+path_t File::filePath() const
 {
     return m_filePath;
 }
@@ -45,6 +45,37 @@ path File::filePath() const
 bool File::exists() const
 {
     return fileSystem()->exists(m_filePath);
+}
+
+bool File::exists(const path_t& filePath)
+{
+    return fileSystem()->exists(filePath);
+}
+
+bool File::remove(const path_t& filePath)
+{
+    return fileSystem()->remove(filePath);
+}
+
+mu::Ret File::readFile(const io::path_t& filePath, ByteArray& out)
+{
+    bool ok = fileSystem()->readFile(filePath, out);
+    return make_ret(ok ? Err::NoError : Err::FSReadError);
+}
+
+mu::Ret File::writeFile(const io::path_t& filePath, const ByteArray& data)
+{
+    return fileSystem()->writeFile(filePath, data);
+}
+
+bool File::setPermissionsAllowedForAll(const path_t& filePath)
+{
+    return fileSystem()->setPermissionsAllowedForAll(filePath);
+}
+
+bool File::remove()
+{
+    return fileSystem()->remove(m_filePath);
 }
 
 bool File::doOpen(OpenMode m)
@@ -55,15 +86,21 @@ bool File::doOpen(OpenMode m)
     }
 
     if (!exists()) {
-        return true;
+        if (m == OpenMode::ReadOnly) {
+            m_error = Error::ReadError;
+            return false;
+        } else {
+            return true;
+        }
     }
 
-    RetVal<QByteArray> data = fileSystem()->readFile(m_filePath);
-    if (!data.ret) {
+    m_data = ByteArray();
+    bool ok = fileSystem()->readFile(m_filePath, m_data);
+    if (!ok) {
+        m_error = Error::ReadError;
         return false;
     }
 
-    m_data = ByteArray(reinterpret_cast<const uint8_t*>(data.val.constData()), data.val.size());
     return true;
 }
 
@@ -86,9 +123,25 @@ bool File::resizeData(size_t size)
 size_t File::writeData(const uint8_t* data, size_t len)
 {
     std::memcpy(m_data.data() + pos(), data, len);
-    Ret ret = fileSystem()->writeToFile(m_filePath, QByteArray(reinterpret_cast<const char*>(m_data.data()), m_data.size()));
-    if (ret) {
-        return len;
+    bool ok = fileSystem()->writeFile(m_filePath, m_data);
+    if (!ok) {
+        m_error = Error::WriteError;
+        return 0;
     }
-    return 0;
+    return len;
+}
+
+File::Error File::error() const
+{
+    return m_error;
+}
+
+std::string File::errorString() const
+{
+    switch (m_error) {
+    case Error::NoError: return "";
+    case Error::ReadError: return "failed read";
+    case Error::WriteError: return "failed write";
+    }
+    return "";
 }

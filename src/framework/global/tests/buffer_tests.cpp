@@ -26,9 +26,10 @@
 
 #include "io/buffer.h"
 
+using namespace mu;
 using namespace mu::io;
 
-class IO_BufferTests : public ::testing::Test
+class Global_IO_BufferTests : public ::testing::Test
 {
 public:
 };
@@ -42,7 +43,7 @@ static void writeDevice(IODevice& dev, const std::string& data)
     dev.write(reinterpret_cast<const uint8_t*>(data.c_str()), data.size());
 }
 
-TEST_F(IO_BufferTests, Buffer_Write_Default)
+TEST_F(Global_IO_BufferTests, Buffer_Write_Default)
 {
     //! GIVEN Default Buffer
     Buffer buf;
@@ -63,7 +64,7 @@ TEST_F(IO_BufferTests, Buffer_Write_Default)
     EXPECT_EQ(d, ByteArray(reinterpret_cast<const uint8_t*>(ref.c_str()), ref.size()));
 }
 
-TEST_F(IO_BufferTests, Buffer_Write_PreAllocated)
+TEST_F(Global_IO_BufferTests, Buffer_Write_PreAllocated)
 {
     {
         //! GIVEN Buffer with pre allocated size > ref size)
@@ -106,7 +107,7 @@ TEST_F(IO_BufferTests, Buffer_Write_PreAllocated)
     }
 }
 
-TEST_F(IO_BufferTests, Buffer_Write_To_ByteArray)
+TEST_F(Global_IO_BufferTests, Buffer_Write_To_ByteArray)
 {
     //! GIVEN Buffer for given ByteArray
     ByteArray ba;
@@ -126,7 +127,7 @@ TEST_F(IO_BufferTests, Buffer_Write_To_ByteArray)
     EXPECT_EQ(ba, ByteArray(reinterpret_cast<const uint8_t*>(ref.c_str()), ref.size()));
 }
 
-TEST_F(IO_BufferTests, Buffer_Read_From_ByteArray)
+TEST_F(Global_IO_BufferTests, Buffer_Read_From_ByteArray)
 {
     //! GIVEN ByteArray with data
     std::string ref = "Hello";
@@ -146,7 +147,7 @@ TEST_F(IO_BufferTests, Buffer_Read_From_ByteArray)
     EXPECT_EQ(ba, data);
 }
 
-TEST_F(IO_BufferTests, Buffer_Read_Pos)
+TEST_F(Global_IO_BufferTests, Buffer_Read_Pos)
 {
     //! GIVEN Buffer with data
     std::string ref = "Hello";

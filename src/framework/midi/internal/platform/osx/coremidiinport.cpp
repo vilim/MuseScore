@@ -24,9 +24,13 @@
 #include <CoreAudio/HostTime.h>
 #include <CoreServices/CoreServices.h>
 #include <CoreMIDI/CoreMIDI.h>
+
 #include <algorithm>
-#include "log.h"
+
+#include "translation.h"
 #include "midierrors.h"
+#include "defer.h"
+#include "log.h"
 
 using namespace mu;
 using namespace mu::midi;
@@ -45,6 +49,15 @@ CoreMidiInPort::CoreMidiInPort()
 
 CoreMidiInPort::~CoreMidiInPort()
 {
+}
+
+void CoreMidiInPort::init()
+{
+    initCore();
+}
+
+void CoreMidiInPort::deinit()
+{
     if (isConnected()) {
         disconnect();
     }
@@ -58,23 +71,27 @@ CoreMidiInPort::~CoreMidiInPort()
     }
 }
 
-void CoreMidiInPort::init()
-{
-    initCore();
-}
-
-MidiDeviceList CoreMidiInPort::devices() const
+MidiDeviceList CoreMidiInPort::availableDevices() const
 {
     MidiDeviceList ret;
 
+    ret.push_back({ NONE_DEVICE_ID, trc("midi", "No device") });
+
     CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, false);
-    int sources = MIDIGetNumberOfSources();
-    for (int sourceIndex = 0; sourceIndex <= sources; sourceIndex++) {
+    ItemCount sources = MIDIGetNumberOfSources();
+    for (ItemCount sourceIndex = 0; sourceIndex <= sources; sourceIndex++) {
         MIDIEndpointRef sourceRef = MIDIGetSource(sourceIndex);
         if (sourceRef != 0) {
+            MidiDevice dev;
+
+            SInt32 id = 0;
+            if (MIDIObjectGetIntegerProperty(sourceRef, kMIDIPropertyUniqueID, &id) != noErr) {
+                LOGE() << "Can't get property kMIDIPropertyUniqueID";
+                continue;
+            }
+
             CFStringRef stringRef = 0;
             char name[256];
-
             if (MIDIObjectGetStringProperty(sourceRef, kMIDIPropertyDisplayName, &stringRef) != noErr) {
                 LOGE() << "Can't get property kMIDIPropertyDisplayName";
                 continue;
@@ -82,8 +99,7 @@ MidiDeviceList CoreMidiInPort::devices() const
             CFStringGetCString(stringRef, name, sizeof(name), kCFStringEncodingUTF8);
             CFRelease(stringRef);
 
-            MidiDevice dev;
-            dev.id = std::to_string(sourceIndex);
+            dev.id = std::to_string(id);
             dev.name = name;
 
             ret.push_back(std::move(dev));
@@ -93,9 +109,9 @@ MidiDeviceList CoreMidiInPort::devices() const
     return ret;
 }
 
-async::Notification CoreMidiInPort::devicesChanged() const
+async::Notification CoreMidiInPort::availableDevicesChanged() const
 {
-    return m_devicesChanged;
+    return m_availableDevicesChanged;
 }
 
 void CoreMidiInPort::initCore()
@@ -110,33 +126,51 @@ void CoreMidiInPort::initCore()
 
         switch (notification->messageID) {
         case kMIDIMsgObjectAdded:
-        case kMIDIMsgObjectRemoved:
-            if (notification->messageSize == sizeof(MIDIObjectAddRemoveNotification)) {
-                auto addRemoveNotification = (const MIDIObjectAddRemoveNotification*)notification;
-                MIDIObjectType objectType = addRemoveNotification->childType;
-
-                if (objectType == kMIDIObjectType_Source) {
-                    if (notification->messageID == kMIDIMsgObjectRemoved) {
-                        MIDIObjectRef removedObject = addRemoveNotification->child;
-
-                        if (self->isConnected() && removedObject == self->m_core->sourceId) {
-                            self->disconnect();
-                        }
-                    }
-
-                    self->devicesChanged().notify();
-                }
-            } else {
+        case kMIDIMsgObjectRemoved: {
+            if (notification->messageSize != sizeof(MIDIObjectAddRemoveNotification)) {
                 LOGW() << "Received corrupted MIDIObjectAddRemoveNotification";
+                break;
             }
-            break;
+
+            auto addRemoveNotification = (const MIDIObjectAddRemoveNotification*)notification;
+
+            if (addRemoveNotification->childType != kMIDIObjectType_Source) {
+                break;
+            }
+
+            if (notification->messageID == kMIDIMsgObjectRemoved) {
+                MIDIObjectRef removedObject = addRemoveNotification->child;
+
+                if (self->isConnected() && removedObject == self->m_core->sourceId) {
+                    self->disconnect();
+                }
+            }
+
+            self->availableDevicesChanged().notify();
+        } break;
+
+        case kMIDIMsgPropertyChanged: {
+            if (notification->messageSize != sizeof(MIDIObjectPropertyChangeNotification)) {
+                LOGW() << "Received corrupted MIDIObjectPropertyChangeNotification";
+                break;
+            }
+
+            auto propertyChangeNotification = (const MIDIObjectPropertyChangeNotification*)notification;
+
+            if (propertyChangeNotification->objectType != kMIDIObjectType_Device
+                && propertyChangeNotification->objectType != kMIDIObjectType_Source) {
+                break;
+            }
+
+            if (CFStringCompare(propertyChangeNotification->propertyName, kMIDIPropertyDisplayName, 0) == kCFCompareEqualTo
+                || CFStringCompare(propertyChangeNotification->propertyName, kMIDIPropertyName, 0) == kCFCompareEqualTo) {
+                self->availableDevicesChanged().notify();
+            }
+        } break;
 
         // General message that should be ignored because we handle specific ones
         case kMIDIMsgSetupChanged:
 
-        // Questionable whether we should send a notification for this ones
-        // Possibly we should send a notification when the changed property is the device name
-        case kMIDIMsgPropertyChanged:
         case kMIDIMsgThruConnectionsChanged:
         case kMIDIMsgSerialPortOwnerChanged:
 
@@ -161,7 +195,7 @@ void CoreMidiInPort::initCore()
                 if (packet->wordCount != 0 && packet->wordCount <= 4) {
                     Event e = Event::fromRawData(packet->words, packet->wordCount);
                     if (e) {
-                        m_eventReceived.send(packet->timeStamp, e);
+                        m_eventReceived.send((tick_t)packet->timeStamp, e);
                     }
                 } else if (packet->wordCount > 4) {
                     LOGW() << "unsupported midi message size " << packet->wordCount << " bytes";
@@ -184,7 +218,7 @@ void CoreMidiInPort::initCore()
 
                     auto e = Event::fromMIDI10Package(message).toMIDI20();
                     if (e) {
-                        m_eventReceived.send(packet->timeStamp, e);
+                        m_eventReceived.send((tick_t)packet->timeStamp, e);
                     }
                 } else if (packet->length > 4) {
                     LOGW() << "unsupported midi message size " << packet->length << " bytes";
@@ -204,26 +238,47 @@ void CoreMidiInPort::initCore()
 
 Ret CoreMidiInPort::connect(const MidiDeviceID& deviceID)
 {
+    DEFER {
+        m_deviceChanged.notify();
+    };
+
     if (isConnected()) {
         disconnect();
     }
 
-    if (!m_core->client) {
-        return make_ret(Err::MidiFailedConnect, "failed create client");
+    Ret ret = make_ok();
+
+    if (!deviceID.empty() && deviceID != NONE_DEVICE_ID) {
+        if (!m_core->client) {
+            return make_ret(Err::MidiFailedConnect, "failed create client");
+        }
+
+        if (!m_core->inputPort) {
+            return make_ret(Err::MidiFailedConnect, "failed create port");
+        }
+
+        MIDIObjectRef obj;
+        MIDIObjectType type;
+
+        OSStatus err = MIDIObjectFindByUniqueID(std::stoi(deviceID), &obj, &type);
+        if (err != noErr) {
+            return make_ret(Err::MidiFailedConnect, "failed get source");
+        }
+
+        m_core->deviceID = std::stoi(deviceID);
+        m_core->sourceId = (MIDIEndpointRef)obj;
+
+        m_deviceID = deviceID;
+        ret = run();
+    } else {
+        m_deviceID = deviceID;
     }
 
-    if (!m_core->inputPort) {
-        return make_ret(Err::MidiFailedConnect, "failed create port");
+    if (ret) {
+        LOGD() << "Connected to " << m_deviceID;
     }
 
-    m_core->deviceID = std::stoi(deviceID);
-    m_core->sourceId = MIDIGetSource(m_core->deviceID);
-    if (m_core->sourceId == 0) {
-        return make_ret(Err::MidiFailedConnect, "failed get source");
-    }
-
-    m_deviceID = deviceID;
-    return run();
+    return ret;
 }
 
 void CoreMidiInPort::disconnect()
@@ -233,6 +288,8 @@ void CoreMidiInPort::disconnect()
     }
 
     stop();
+
+    LOGD() << "Disconnected from " << m_deviceID;
 
     m_core->sourceId = 0;
     m_deviceID.clear();
@@ -246,6 +303,16 @@ bool CoreMidiInPort::isConnected() const
 MidiDeviceID CoreMidiInPort::deviceID() const
 {
     return m_deviceID;
+}
+
+async::Notification CoreMidiInPort::deviceChanged() const
+{
+    return m_deviceChanged;
+}
+
+async::Channel<tick_t, Event> CoreMidiInPort::eventReceived() const
+{
+    return m_eventReceived;
 }
 
 Ret CoreMidiInPort::run()
@@ -280,9 +347,4 @@ void CoreMidiInPort::stop()
         LOGE() << "can't disconnect midi port " << result;
     }
     m_running = false;
-}
-
-async::Channel<tick_t, Event> CoreMidiInPort::eventReceived() const
-{
-    return m_eventReceived;
 }

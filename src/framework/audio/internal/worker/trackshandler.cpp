@@ -74,7 +74,7 @@ Promise<TrackName> TracksHandler::trackName(const TrackSequenceId sequenceId, co
 }
 
 Promise<TrackId, AudioParams> TracksHandler::addTrack(const TrackSequenceId sequenceId, const std::string& trackName,
-                                                      io::Device* playbackData,
+                                                      io::IODevice* playbackData,
                                                       AudioParams&& params)
 {
     return Promise<TrackId, AudioParams>([this, sequenceId, trackName, playbackData, params](auto resolve, auto reject) {
@@ -212,6 +212,11 @@ Channel<TrackSequenceId, TrackId, AudioInputParams> TracksHandler::inputParamsCh
     ONLY_AUDIO_MAIN_OR_WORKER_THREAD;
 
     return m_inputParamsChanged;
+}
+
+void TracksHandler::clearSources()
+{
+    resolver()->clearSources();
 }
 
 ITrackSequencePtr TracksHandler::sequence(const TrackSequenceId id) const

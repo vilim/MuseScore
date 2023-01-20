@@ -20,30 +20,29 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "utils.h"
-#include "factory.h"
-#include "score.h"
-#include "pitchspelling.h"
-#include "key.h"
-#include "staff.h"
-#include "note.h"
-#include "harmony.h"
-#include "segment.h"
-#include "undo.h"
-#include "keysig.h"
-#include "stafftype.h"
 #include "chord.h"
-#include "measure.h"
-#include "fret.h"
-#include "part.h"
+#include "factory.h"
+#include "harmony.h"
+#include "key.h"
+#include "keysig.h"
 #include "linkedobjects.h"
+#include "measure.h"
+#include "note.h"
+#include "part.h"
+#include "pitchspelling.h"
+#include "score.h"
+#include "segment.h"
+#include "staff.h"
+#include "stafftype.h"
+#include "undo.h"
+#include "utils.h"
 
 #include "log.h"
 
 using namespace mu;
 using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   keydiff2Interval
 //    keysig -   -7(Cb) - +7(C#)
@@ -345,6 +344,9 @@ bool Score::transpose(TransposeMode mode, TransposeDirection direction, Key trKe
             if (!e->staff() || e->staff()->staffType(e->tick())->group() == StaffGroup::PERCUSSION) {
                 continue;
             }
+            if (e->staff()->primaryStaff() && e->staff()->primaryStaff()->staffType(Fraction(0, 1))->group() == StaffGroup::PERCUSSION) {
+                continue;
+            }
             if (e->isNote()) {
                 Note* note = toNote(e);
                 if (mode == TransposeMode::DIATONICALLY) {
@@ -398,6 +400,9 @@ bool Score::transpose(TransposeMode mode, TransposeDirection direction, Key trKe
     for (staff_idx_t staffIdx = _selection.staffStart(); staffIdx < _selection.staffEnd(); ++staffIdx) {
         Staff* s = staff(staffIdx);
         if (s->staffType(Fraction(0, 1))->group() == StaffGroup::PERCUSSION) {        // ignore percussion staff
+            continue;
+        }
+        if (s->primaryStaff() && s->primaryStaff()->staffType(Fraction(0, 1))->group() == StaffGroup::PERCUSSION) {
             continue;
         }
         if (mu::contains(sl, s)) {
@@ -717,10 +722,10 @@ void Note::transposeDiatonic(int interval, bool keepAlterations, bool useDoubleA
     if (concertPitch()) {
         v.flip();
         newTpc1 = newTpc;
-        newTpc2 = Ms::transposeTpc(newTpc, v, true);
+        newTpc2 = mu::engraving::transposeTpc(newTpc, v, true);
     } else {
         newPitch += v.chromatic;
-        newTpc1 = Ms::transposeTpc(newTpc, v, true);
+        newTpc1 = mu::engraving::transposeTpc(newTpc, v, true);
         newTpc2 = newTpc;
     }
 
@@ -854,5 +859,18 @@ void Score::transpositionChanged(Part* part, Interval oldV, Fraction tickStart, 
             }
         }
     }
+}
+
+void Score::transpositionChanged(Part* part, const Fraction& instrumentTick, Interval oldTransposition)
+{
+    Fraction tickStart = instrumentTick;
+    Fraction tickEnd = { -1, 1 };
+
+    auto mainInstrumentEndIt = part->instruments().upper_bound(tickStart.ticks());
+    if (mainInstrumentEndIt != part->instruments().cend()) {
+        tickEnd = Fraction::fromTicks(mainInstrumentEndIt->first);
+    }
+
+    transpositionChanged(part, oldTransposition, tickStart, tickEnd);
 }
 }

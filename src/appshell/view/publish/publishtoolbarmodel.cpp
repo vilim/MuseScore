@@ -22,8 +22,6 @@
 
 #include "publishtoolbarmodel.h"
 
-#include "log.h"
-
 using namespace mu::appshell;
 using namespace mu::uicomponents;
 

@@ -21,49 +21,48 @@
  */
 import QtQuick 2.15
 import QtQuick.Layouts 1.12
-import QtQuick.Dialogs 1.3
 
 import MuseScore.Ui 1.0
 import MuseScore.UiComponents 1.0
 import MuseScore.Shortcuts 1.0
 
-Dialog {
+StyledDialogView {
     id: root
-
-    signal mapToEventRequested(var event)
 
     title: qsTrc("shortcuts", "MIDI remote control")
 
-    height: 220
-    width: 538
+    contentWidth: 538
+    contentHeight: 164
 
-    standardButtons: Dialog.NoButton
+    margins: 20
+
+    signal mapToEventRequested(var event)
 
     function startEdit(action) {
         model.load(action.mappedType, action.mappedValue)
-        open()
-
         actionNameLabel.text = action.title
         actionIconLabel.iconCode = action.icon
+
+        open()
     }
 
-    EditMidiMappingModel {
-        id: model
-    }
 
     Rectangle {
         anchors.fill: parent
 
         color: ui.theme.backgroundPrimaryColor
 
+        EditMidiMappingModel {
+            id: model
+        }
+
         Column {
             anchors.fill: parent
-            anchors.margins: 8
 
             spacing: 24
 
             Row {
-                anchors.horizontalCenter: parent.horizontalCenter
+                width: parent.width
 
                 spacing: 8
 
@@ -79,9 +78,9 @@ Dialog {
             }
 
             StyledTextLabel {
-                anchors.horizontalCenter: parent.horizontalCenter
+                width: parent.width
 
-                text: qsTrc("shortcuts", "Press a key or adjust a control on your MIDI device to\nassign it to this function.")
+                text: qsTrc("shortcuts", "Press a key or adjust a control on your MIDI device to assign it to this action.")
             }
 
             RowLayout {
@@ -101,7 +100,9 @@ Dialog {
                     readOnly: true
 
                     currentText: model.mappingTitle
-                    hint: qsTrc("global", "Waiting…")
+
+                    //: The app is waiting for the user to trigger a valid MIDI remote event
+                    hint: qsTrc("shortcuts", "Waiting…")
                 }
             }
 
@@ -117,7 +118,7 @@ Dialog {
                     enabled: mappingField.hasText
 
                     onClicked: {
-                        root.mapToEventRequested(model.inputedEvent())
+                        root.mapToEventRequested(model.inputtedEvent())
                         root.close()
                     }
                 }

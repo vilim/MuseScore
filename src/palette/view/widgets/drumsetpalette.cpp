@@ -22,8 +22,6 @@
 
 #include "drumsetpalette.h"
 
-#include "translation.h"
-
 #include "engraving/libmscore/factory.h"
 #include "engraving/libmscore/chord.h"
 #include "engraving/libmscore/note.h"
@@ -35,12 +33,14 @@
 #include "engraving/libmscore/mscore.h"
 #include "engraving/libmscore/undo.h"
 
+#include "translation.h"
 #include "log.h"
+
+#include <QTimer>
 
 using namespace mu::notation;
 using namespace mu::engraving;
 using namespace mu::palette;
-using namespace Ms;
 
 DrumsetPalette::DrumsetPalette(QWidget* parent)
     : PaletteScrollArea(nullptr, parent)
@@ -58,7 +58,7 @@ DrumsetPalette::DrumsetPalette(QWidget* parent)
     setWidget(m_drumPalette);
     retranslate();
 
-    connect(m_drumPalette, &PaletteWidget::boxClicked, this, &DrumsetPalette::drumNoteSelected);
+    connect(m_drumPalette, &PaletteWidget::boxClicked, this, &DrumsetPalette::drumNoteClicked);
 }
 
 void DrumsetPalette::setNotation(INotationPtr notation)
@@ -144,7 +144,7 @@ void DrumsetPalette::updateDrumset()
         int shortcutCode = m_drumset->shortcut(pitch);
         QString shortcut = shortcutCode != 0 ? QChar(shortcutCode) : QString();
 
-        m_drumPalette->appendElement(chord, mu::qtrc("drumset", m_drumset->name(pitch).toUtf8().data()), 1.0, shortcut);
+        m_drumPalette->appendElement(chord, m_drumset->translatedName(pitch), 1.0, QPointF(0, 0), shortcut);
     }
 
     noteInput->setDrumNote(selectedDrumNote());
@@ -156,7 +156,7 @@ void DrumsetPalette::clear()
     m_drumPalette->clear();
 }
 
-void DrumsetPalette::drumNoteSelected(int val)
+void DrumsetPalette::drumNoteClicked(int val)
 {
     INotationNoteInputPtr noteInput = this->noteInput();
     if (!noteInput) {
@@ -168,21 +168,42 @@ void DrumsetPalette::drumNoteSelected(int val)
         return;
     }
 
-    TRACEFUNC;
+    const Chord* ch = mu::engraving::toChord(element.get());
+    bool newChordSelected = val != m_drumPalette->selectedIdx();
 
-    const Chord* ch = dynamic_cast<Chord*>(element.get());
-    const Note* note = ch->downNote();
-    int pitch = note->pitch();
-    int voice = static_cast<int>(element->voice());
+    if (newChordSelected) {
+        const Note* note = ch->downNote();
 
-    noteInput->setCurrentVoiceIndex(voice);
-    noteInput->setDrumNote(pitch);
+        track_idx_t track = (noteInput->state().currentTrack / mu::engraving::VOICES) * mu::engraving::VOICES + element->track();
 
-    QString voiceActionCode = QString("voice-%1").arg(voice + 1);
-    dispatcher()->dispatch(voiceActionCode.toStdString());
+        noteInput->setCurrentTrack(track);
+        noteInput->setDrumNote(note->pitch());
 
-    auto pitchCell = m_drumPalette->cellAt(val);
-    m_pitchNameChanged.send(pitchCell->name);
+        PaletteCellPtr pitchCell = m_drumPalette->cellAt(val);
+        m_pitchNameChanged.send(pitchCell->name);
+    }
+
+    previewSound(ch, newChordSelected, noteInput->state());
+}
+
+void DrumsetPalette::previewSound(const Chord* chord, bool newChordSelected, const notation::NoteInputState& inputState)
+{
+    //! NOTE: prevents "sound spam" after multiple clicks on a selected element
+    static QTimer soundPauseTimer;
+    if (soundPauseTimer.isActive() && !newChordSelected) {
+        return;
+    }
+
+    Chord* preview = chord->clone();
+    preview->setParent(inputState.segment);
+    preview->setStaffIdx(engraving::track2staff(inputState.currentTrack));
+
+    playback()->playElements({ preview });
+
+    delete preview;
+
+    soundPauseTimer.setSingleShot(true);
+    soundPauseTimer.start(200);
 }
 
 int DrumsetPalette::selectedDrumNote()
@@ -213,6 +234,11 @@ void DrumsetPalette::changeEvent(QEvent* event)
 }
 
 void DrumsetPalette::mousePressEvent(QMouseEvent* event)
+{
+    m_drumPalette->handleEvent(event);
+}
+
+void DrumsetPalette::mouseDoubleClickEvent(QMouseEvent* event)
 {
     m_drumPalette->handleEvent(event);
 }

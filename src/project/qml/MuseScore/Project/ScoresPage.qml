@@ -99,7 +99,7 @@ FocusScope {
             navigation.name: "Scores Search"
             navigation.panel: navSearchPanel
             navigation.order: 1
-            accessible.name: qsTrc("project", "Recent scores search")
+            accessible.name: qsTrc("project", "Search recent scores")
         }
     }
 
@@ -139,8 +139,12 @@ FocusScope {
 
         backgroundColor: background.color
 
+        isSearching: searchField.searchText.length != 0
+
         model: SortFilterProxyModel {
             sourceModel: recentScoresModel
+
+            excludeIndexes: [0, recentScoresModel.rowCount() - 1]           // New score and no result items
 
             filters: [
                 FilterValue {
@@ -161,14 +165,34 @@ FocusScope {
     }
 
     Rectangle {
+        anchors.bottom: buttonsPanel.top
+
+        width: parent.width
+        height: 8
+        z: 1
+
+        gradient: Gradient {
+            GradientStop {
+                position: 0.0
+                color: "transparent"
+            }
+
+            GradientStop {
+                position: 1.0
+                color: buttonsPanel.color
+            }
+        }
+    }
+
+    Rectangle {
         id: buttonsPanel
 
         anchors.bottom: parent.bottom
 
-        height: 114
+        height: 100
         width: parent.width
 
-        color: ui.theme.popupBackgroundColor
+        color: ui.theme.backgroundSecondaryColor
 
         NavigationPanel {
             id: navBottomPanel
@@ -176,7 +200,26 @@ FocusScope {
             section: navSec
             direction: NavigationPanel.Horizontal
             order: 3
-            accessible.name: qsTrc("project", "Recent scores bottom")
+
+            //: accessibility name for the panel at the bottom of the "Scores" page
+            accessible.name: qsTrc("project", "Scores actions")
+        }
+
+        FlatButton {
+            anchors.left: parent.left
+            anchors.leftMargin: prv.sideMargin
+            anchors.verticalCenter: parent.verticalCenter
+
+            navigation.name: "ScoreManager"
+            navigation.panel: navBottomPanel
+            navigation.column: 1
+
+            minWidth: 216
+            text: qsTrc("project", "Score manager (online)")
+
+            onClicked: {
+                recentScoresModel.openScoreManager()
+            }
         }
 
         Row {
@@ -190,9 +233,9 @@ FocusScope {
 
                 navigation.name: "NewScore"
                 navigation.panel: navBottomPanel
-                navigation.column: 1
+                navigation.column: 2
 
-                width: prv.buttonWidth
+                minWidth: prv.buttonWidth
                 text: qsTrc("project", "New")
 
                 onClicked: {
@@ -203,9 +246,9 @@ FocusScope {
             FlatButton {
                 navigation.name: "Open other Score"
                 navigation.panel: navBottomPanel
-                navigation.column: 2
+                navigation.column: 3
 
-                width: prv.buttonWidth
+                minWidth: prv.buttonWidth
                 text: qsTrc("project", "Open other…")
 
                 onClicked: {

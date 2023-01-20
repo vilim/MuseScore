@@ -19,19 +19,30 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+
+#include <QFileInfo>
+
 #include "musedatareader.h"
 
-#include "libmscore/masterscore.h"
-#include "notation/notationerrors.h"
+#include "musedata.h"
 
-namespace Ms {
-extern Score::FileError importMuseData(MasterScore*, const QString& name);
-}
+#include "libmscore/masterscore.h"
+#include "engraving/engravingerrors.h"
 
 using namespace mu::iex::musedata;
+using namespace mu::engraving;
 
-mu::Ret MuseDataReader::read(Ms::MasterScore* score, const io::path& path, const Options&)
+mu::Ret MuseDataReader::read(MasterScore* score, const io::path_t& path, const Options&)
 {
-    Ms::Score::FileError err = Ms::importMuseData(score, path.toQString());
-    return mu::notation::scoreFileErrorToRet(err, path);
+    if (!QFileInfo::exists(path.toQString())) {
+        return make_ret(Err::FileNotFound, path);
+    }
+
+    MuseData md(score);
+    if (!md.read(path.toQString())) {
+        return make_ret(Err::FileUnknownError, path);
+    }
+
+    md.convert();
+    return make_ok();
 }

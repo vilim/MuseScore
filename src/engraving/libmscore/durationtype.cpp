@@ -30,7 +30,7 @@
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   dots
 //---------------------------------------------------------
@@ -204,7 +204,7 @@ NoteHeadType TDuration::headType() const
 
 int TDuration::hooks() const
 {
-    static const int table[] = {
+    static constexpr int table[] = {
         // V_LONG, V_BREVE, V_WHOLE, V_HALF, V_QUARTER, V_EIGHTH, V_16TH,
         0,      0,       0,       0,      0,         1,        2,
         // V_32ND, V_64TH, V_128TH, V_256TH, V_512TH, V_1024TH,
@@ -406,12 +406,12 @@ Fraction TDuration::fraction() const
 TDuration::TDuration(const Fraction& l, bool truncate, int maxDots, DurationType maxType)
 {
 #ifdef NDEBUG
-    Q_UNUSED(truncate);
+    UNUSED(truncate);
 #endif
     setType(maxType);   // use maxType to avoid testing all types if you know that l is smaller than a certain DurationType
     setDots(maxDots);
     truncateToFraction(l, maxDots);
-    Q_ASSERT(truncate || (fraction() - l).numerator() == 0);   // check for exact fit
+    assert(truncate || (fraction() - l).numerator() == 0);   // check for exact fit
 }
 
 //---------------------------------------------------------
@@ -428,7 +428,7 @@ void TDuration::truncateToFraction(const Fraction& l, int maxDots)
     // that wasn't enough so now change type too
     for (shiftType(1); isValid(); shiftType(1)) {
         if (setDotsToFitFraction(l, maxDots)) {
-            return;       // duration fits fits in l
+            return;       // duration fits in l
         }
     }
 }
@@ -677,11 +677,11 @@ bool forceRhythmicSplit(bool isRest, BeatType startBeat, BeatType endBeat,
 {
     // Assumption: Notes were split at measure boundary before this function was
     // called. (Necessary because timeSig might be different in next measure.)
-    Q_ASSERT(strongestBeatCrossed != BeatType::DOWNBEAT);
+    assert(strongestBeatCrossed != BeatType::DOWNBEAT);
     // Assumption: compound notes have already been split where they enter a compound beat.
     // (Necessary because the split beat is not always the strongest beat in this case.)
-    Q_ASSERT(!nominal.isCompound() || strongestBeatCrossed >= BeatType::COMPOUND_SUBBEAT
-             || (startBeat <= BeatType::COMPOUND_UNSTRESSED && endBeat <= BeatType::COMPOUND_UNSTRESSED));
+    assert(!nominal.isCompound() || strongestBeatCrossed >= BeatType::COMPOUND_SUBBEAT
+           || (startBeat <= BeatType::COMPOUND_UNSTRESSED && endBeat <= BeatType::COMPOUND_UNSTRESSED));
 
     // SPECIAL CASES
 
@@ -718,12 +718,12 @@ bool forceRhythmicSplitCompound(bool isRest, BeatType startBeat, BeatType endBea
     switch (strongestBeatCrossed) {
     case BeatType::COMPOUND_STRESSED:
         // Assumption: compound notes have already been split where they enter a compound beat.
-        Q_ASSERT(startBeat <= BeatType::COMPOUND_UNSTRESSED && endBeat <= BeatType::COMPOUND_UNSTRESSED);
+        assert(startBeat <= BeatType::COMPOUND_UNSTRESSED && endBeat <= BeatType::COMPOUND_UNSTRESSED);
         // Notes are guaranteed to and start on a compound beat so we can pretend we have a simple measure.
         return forceRhythmicSplitSimple(isRest, startBeat, endBeat, dUnitsCrossed / 3, BeatType::SIMPLE_STRESSED);
     case BeatType::COMPOUND_UNSTRESSED:
         // Same assumption as before
-        Q_ASSERT(startBeat <= BeatType::COMPOUND_UNSTRESSED && endBeat <= BeatType::COMPOUND_UNSTRESSED);
+        assert(startBeat <= BeatType::COMPOUND_UNSTRESSED && endBeat <= BeatType::COMPOUND_UNSTRESSED);
         // No further conditions since note are guaranteed to start and end on a compound beat.
         return false;
     case BeatType::COMPOUND_SUBBEAT:

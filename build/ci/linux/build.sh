@@ -29,7 +29,7 @@ BUILD_TOOLS=$HOME/build_tools
 ARTIFACTS_DIR=build.artifacts
 CRASH_REPORT_URL=""
 BUILD_MODE=""
-SUFFIX="" # appended to `mscore` command name to avoid conflicts (e.g. `mscore-dev`)
+SUFFIX="" # appended to `mscore` command name to avoid conflicts (e.g. `mscoredev`)
 YOUTUBE_API_KEY=""
 
 while [[ "$#" -gt 0 ]]; do
@@ -50,9 +50,9 @@ if [ -z "$YOUTUBE_API_KEY" ]; then YOUTUBE_API_KEY=""; fi
 MUSESCORE_BUILD_CONFIG=dev
 BUILD_UNIT_TESTS=OFF
 case "${BUILD_MODE}" in
-"devel_build")   MUSESCORE_BUILD_CONFIG=dev; SUFFIX=-dev;;
-"nightly_build") MUSESCORE_BUILD_CONFIG=dev; SUFFIX=-nightly;;
-"testing_build") MUSESCORE_BUILD_CONFIG=testing; SUFFIX=-testing;;
+"devel_build")   MUSESCORE_BUILD_CONFIG=dev; SUFFIX=dev;;
+"nightly_build") MUSESCORE_BUILD_CONFIG=dev; SUFFIX=nightly;;
+"testing_build") MUSESCORE_BUILD_CONFIG=testing; SUFFIX=testing;;
 "stable_build")  MUSESCORE_BUILD_CONFIG=release; SUFFIX="";;
 "mtests")        MUSESCORE_BUILD_CONFIG=dev; BUILDTYPE=installdebug; OPTIONS="USE_SYSTEM_FREETYPE=ON UPDATE_CACHE=FALSE PREFIX=$ARTIFACTS_DIR/software";;
 esac
@@ -68,13 +68,15 @@ echo "=== ENVIRONMENT === "
 cat $BUILD_TOOLS/environment.sh
 source $BUILD_TOOLS/environment.sh
 
-echo "VST3_SDK_PATH: $VST3_SDK_PATH"
-if [ -z "$VST3_SDK_PATH" ]; then 
-    echo "warning: not set VST3_SDK_PATH, build VST module disabled"
-    BUILD_VST=OFF
-else
-    BUILD_VST=ON
-fi
+# TODO: https://github.com/musescore/MuseScore/issues/11689
+#echo "VST3_SDK_PATH: $VST3_SDK_PATH"
+#if [ -z "$VST3_SDK_PATH" ]; then
+#    echo "warning: not set VST3_SDK_PATH, build VST module disabled"
+#    BUILD_VST=OFF
+#else
+#    BUILD_VST=ON
+#fi
+BUILD_VST=OFF
 
 echo "=== BUILD ==="
 
@@ -96,6 +98,5 @@ bash ./build/ci/tools/make_release_channel_env.sh -c $MUSESCORE_BUILD_CONFIG
 bash ./build/ci/tools/make_version_env.sh $BUILD_NUMBER
 bash ./build/ci/tools/make_revision_env.sh $MUSESCORE_REVISION
 bash ./build/ci/tools/make_branch_env.sh
-bash ./build/ci/tools/make_datetime_env.sh
 
 df -h .

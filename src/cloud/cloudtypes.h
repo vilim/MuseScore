@@ -47,18 +47,42 @@ struct AccountInfo {
 
     bool isValid() const
     {
-        return !userName.isEmpty();
+        return id != 0 && !userName.isEmpty();
     }
+};
+
+struct ScoreOwnerInfo {
+    int id = 0;
+    QString userName;
+    QUrl profileUrl;
+
+    bool operator==(const ScoreOwnerInfo& info) const
+    {
+        bool equals = true;
+
+        equals &= (id == info.id);
+        equals &= (userName == info.userName);
+        equals &= (profileUrl == info.profileUrl);
+
+        return equals;
+    }
+};
+
+enum class Visibility {
+    Public = 0,
+    Unlisted = 1,
+    Private = 2
 };
 
 struct ScoreInfo {
     int id = 0;
     QString title;
     QString description;
-    bool isPrivate = false;
+    Visibility visibility = Visibility::Private;
     QString license;
     QStringList tags;
     QString url;
+    ScoreOwnerInfo owner;
 
     bool operator==(const ScoreInfo& another) const
     {
@@ -66,10 +90,11 @@ struct ScoreInfo {
 
         equals &= (id == another.id);
         equals &= (description == another.description);
-        equals &= (isPrivate == another.isPrivate);
+        equals &= (visibility == another.visibility);
         equals &= (license == another.license);
         equals &= (tags == another.tags);
         equals &= (url == another.url);
+        equals &= (owner == another.owner);
 
         return equals;
     }

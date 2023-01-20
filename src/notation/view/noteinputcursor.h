@@ -28,7 +28,7 @@
 #include "context/iglobalcontext.h"
 #include "notation/inotationconfiguration.h"
 
-#include "engraving/infrastructure/draw/geometry.h"
+#include "draw/types/geometry.h"
 
 namespace mu::notation {
 class NoteInputCursor
@@ -37,17 +37,10 @@ class NoteInputCursor
     INJECT(notation, INotationConfiguration, configuration)
 
 public:
-    NoteInputCursor() = default;
-
     void paint(draw::Painter* painter);
 
 private:
     INotationNoteInputPtr currentNoteInput() const;
-
-    bool isNoteInputMode() const;
-    RectF rect() const;
-    QColor cursorColor() const;
-    QColor fillColor() const;
 };
 }
 

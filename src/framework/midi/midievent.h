@@ -32,6 +32,7 @@
 
 namespace mu::midi {
 using channel_t = uint8_t;
+using tuning_t = float;
 
 /*!
  * MIDI Event stored in Universal MIDI Packet Format Message
@@ -145,6 +146,11 @@ struct Event {
     bool operator !=(const Event& other) const { return !operator==(other); }
     operator bool() const {
         return operator!=(NOOP()) && isValid();
+    }
+
+    bool operator <(const Event& other) const
+    {
+        return m_data < other.m_data;
     }
 
     bool isChannelVoice() const { return messageType() == MessageType::ChannelVoice10 || messageType() == MessageType::ChannelVoice20; }
@@ -285,23 +291,23 @@ struct Event {
     }
 
     //! return tuning in semitones from Pitch attribute (for NoteOn & NoteOff) events) if exists else return 0.f
-    float pitchTuning() const
+    tuning_t pitchTuning() const
     {
         assertOpcode({ Opcode::NoteOn, Opcode::NoteOff });
         if (attributeType() == AttributeType::Pitch) {
-            return static_cast<float>((attribute() & 0x1FF) / static_cast<float>(0x200));
+            return static_cast<tuning_t>((attribute() & 0x1FF) / static_cast<tuning_t>(0x200));
         }
         return 0.f;
     }
 
     //! return tuning in cents
-    float pitchTuningCents() const
+    tuning_t pitchTuningCents() const
     {
         return pitchTuning() * 100;
     }
 
     //! 4.2.14.3 @see pitchNote(), pitchTuning()
-    void setPitchNote(uint8_t note, float tuning)
+    void setPitchNote(uint8_t note, tuning_t tuning)
     {
         assertOpcode({ Opcode::NoteOn, Opcode::NoteOff });
         assertMessageType({ MessageType::ChannelVoice20 });
@@ -642,9 +648,9 @@ struct Event {
     }
 
     //!convert ChannelVoice from MIDI2.0 to MIDI1.0
-    std::list<Event> toMIDI10() const
+    std::vector<Event> toMIDI10() const
     {
-        std::list<Event> events;
+        std::vector<Event> events;
         switch (messageType()) {
         case MessageType::ChannelVoice10: events.push_back(*this);
             break;
@@ -680,7 +686,7 @@ struct Event {
             //D2.3
             case Opcode::AssignableController:
             case Opcode::RegisteredController: {
-                std::list<std::pair<uint8_t, uint8_t> > controlChanges = {
+                std::vector<std::pair<uint8_t, uint8_t> > controlChanges = {
                     { (opcode() == Opcode::RegisteredController ? 101 : 99), bank() },
                     { (opcode() == Opcode::RegisteredController ? 100 : 98), index() },
                     { 6,  (data() & 0x7FFFFFFF) >> 24 },
@@ -956,7 +962,7 @@ struct Event {
             dataToStr();
             break;
         case MessageType::SystemExclusiveData:
-            str += "MIDI System Exlusive";
+            str += "MIDI System Exclusive";
             dataToStr();
             break;
         case MessageType::Data:

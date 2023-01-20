@@ -29,14 +29,12 @@
 #include "chord.h"
 #include "note.h"
 #include "part.h"
-#include "score.h"
-#include "staff.h"
-#include "undo.h"
 #include "segment.h"
+#include "staff.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   StringData
 //---------------------------------------------------------
@@ -81,7 +79,7 @@ void StringData::read(XmlReader& e)
 {
     stringTable.clear();
     while (e.readNextStartElement()) {
-        const QStringRef& tag(e.name());
+        const AsciiStringView tag(e.name());
         if (tag == "frets") {
             _frets = e.readInt();
         } else if (tag == "string") {
@@ -104,16 +102,16 @@ void StringData::read(XmlReader& e)
 
 void StringData::write(XmlWriter& xml) const
 {
-    xml.startObject("StringData");
+    xml.startElement("StringData");
     xml.tag("frets", _frets);
-    foreach (instrString strg, stringTable) {
+    for (const instrString& strg : stringTable) {
         if (strg.open) {
             xml.tag("string open=\"1\"", strg.pitch);
         } else {
             xml.tag("string", strg.pitch);
         }
     }
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -219,7 +217,7 @@ void StringData::fretChords(Chord* chord) const
     maxFret = INT32_MIN;
     for (auto& p : sortedNotes) {
         Note* note = p.second;
-        if (note->string() != INVALID_STRING_INDEX && note->displayFret() != Note::DisplayFretOption::Hide) {
+        if (note->string() != INVALID_STRING_INDEX && note->displayFret() == Note::DisplayFretOption::NoHarmonic) {
             bUsed[note->string()]++;
         }
         if (note->fret() != INVALID_FRET_INDEX && note->fret() < minFret) {
@@ -239,7 +237,8 @@ void StringData::fretChords(Chord* chord) const
         // if no fretting (any invalid fretting has been erased by sortChordNotes() )
         if (nString == INVALID_STRING_INDEX /*|| nFret == INVALID_FRET_INDEX || getPitch(nString, nFret) != note->pitch()*/) {
             // get a new fretting
-            if (!convertPitch(note->pitch(), pitchOffset, &nNewString, &nNewFret)) {
+            if (!convertPitch(note->pitch(), pitchOffset, &nNewString, &nNewFret) && note->displayFret()
+                == Note::DisplayFretOption::NoHarmonic && !note->negativeFretUsed()) {
                 // no way to fit this note in this tab:
                 // mark as fretting conflict
                 note->setFretConflict(true);
@@ -273,7 +272,7 @@ void StringData::fretChords(Chord* chord) const
             }
         }
 
-        // TODO : try to optimize used fret range, avoiding eccessively open positions
+        // TODO : try to optimize used fret range, avoiding excessively open positions
 
         // if fretting did change, store as a fret change
         if (nFret != nNewFret) {
@@ -287,7 +286,7 @@ void StringData::fretChords(Chord* chord) const
     // check for any remaining fret conflict
     for (auto& p : sortedNotes) {
         Note* note = p.second;
-        if (note->string() == -1 || bUsed[note->string()] > 1) {
+        if (!note->negativeFretUsed() && (note->string() == -1 || bUsed[note->string()] > 1)) {
             note->setFretConflict(true);
         }
     }
@@ -468,8 +467,23 @@ void StringData::sortChordNotes(std::map<int, Note*>& sortedNotes, const Chord* 
     int capoFret = chord->staff()->part()->capoFret();
 
     for (Note* note : chord->notes()) {
+        if (note->displayFret() != Note::DisplayFretOption::NoHarmonic) {
+            continue;
+        }
+
         int string = note->string();
         int fret = note->fret();
+
+        // if note not fretted yet or current fretting no longer valid,
+        // use most convenient string as key
+        int pitch = getPitch(string, fret + capoFret, pitchOffset);
+        if (!note->negativeFretUsed() && (string <= INVALID_STRING_INDEX || fret <= INVALID_FRET_INDEX
+                                          || (pitchIsValid(pitch) && pitch != note->pitch()))) {
+            note->setString(INVALID_STRING_INDEX);
+            note->setFret(INVALID_FRET_INDEX);
+            convertPitch(note->pitch(), pitchOffset, &string, &fret);
+        }
+
         int key = string * 100000;
         key += -(note->pitch() + pitchOffset) * 100 + *count;       // disambiguate notes of equal pitch
         sortedNotes.insert({ key, note });

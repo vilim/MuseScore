@@ -25,15 +25,11 @@
 #include "modularity/ioc.h"
 #include "ilanguagesconfiguration.h"
 #include "iglobalconfiguration.h"
-#include "io/ifilesystem.h"
-#include "multiinstances/imultiinstancesprovider.h"
 
 namespace mu::languages {
 class LanguagesConfiguration : public ILanguagesConfiguration
 {
     INJECT(languages, framework::IGlobalConfiguration, globalConfiguration)
-    INJECT(languages, io::IFileSystem, fileSystem)
-    INJECT(languages, mi::IMultiInstancesProvider, multiInstancesProvider)
 
 public:
     void init();
@@ -44,24 +40,15 @@ public:
     QUrl languagesUpdateUrl() const override;
     QUrl languageFileServerUrl(const QString& languageCode) const override;
 
-    ValCh<LanguagesHash> languages() const override;
-    Ret setLanguages(const LanguagesHash& languages) override;
+    io::path_t languagesAppDataPath() const override;
+    io::path_t languagesUserAppDataPath() const override;
 
-    io::path languagesAppDataPath() const;
-    io::path languagesUserAppDataPath() const override;
-
-    io::paths languageFilePaths(const QString& languageCode) const override;
-    io::path languageArchivePath(const QString& languageCode) const override;
+    io::path_t builtinLanguagesJsonPath() const override;
+    io::path_t builtinLanguageFilePath(const QString& resourceName, const QString& languageCode) const override;
+    io::path_t userLanguageFilePath(const QString& resourceName, const QString& languageCode) const override;
 
 private:
-    LanguagesHash parseLanguagesConfig(const QByteArray& json) const;
-    io::path languageFileName(const QString& languageCode) const;
-
-    RetVal<QByteArray> readLanguagesState() const;
-    Ret writeLanguagesState(const QByteArray& data);
-
     async::Channel<QString> m_currentLanguageCodeChanged;
-    async::Channel<LanguagesHash> m_languagesHashChanged;
 };
 }
 

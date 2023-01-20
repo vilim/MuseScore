@@ -22,6 +22,8 @@
 #ifndef MU_NOTATION_NOTATIONVIEWINPUTCONTROLLER_H
 #define MU_NOTATION_NOTATIONVIEWINPUTCONTROLLER_H
 
+#include <QtEvents>
+
 #include "modularity/ioc.h"
 
 #include "actions/iactionsdispatcher.h"
@@ -36,7 +38,7 @@
 
 #include "playback/iplaybackcontroller.h"
 
-class QMouseEvent;
+class QQuickItem;
 
 namespace mu::notation {
 class IControlledView
@@ -56,7 +58,7 @@ public:
 
     virtual RectF notationContentRect() const = 0;
     virtual qreal currentScaling() const = 0;
-    virtual void setScaling(qreal scaling, const PointF& pos) = 0;
+    virtual void setScaling(qreal scaling, const PointF& pos, bool overrideZoomType = true) = 0;
 
     virtual PointF toLogical(const PointF& p) const = 0;
     virtual PointF toLogical(const QPointF& p) const = 0;
@@ -71,6 +73,8 @@ public:
 
     virtual INotationInteractionPtr notationInteraction() const = 0;
     virtual INotationPlaybackPtr notationPlayback() const = 0;
+
+    virtual QQuickItem* asItem() = 0;
 };
 
 class NotationViewInputController : public actions::Actionable, public async::Asyncable
@@ -85,8 +89,8 @@ public:
 
     void init();
 
-    bool isZoomInited();
     void initZoom();
+    void updateZoomAfterSizeChange();
     void zoomIn();
     void zoomOut();
     void nextScreen();
@@ -128,15 +132,18 @@ private:
     const INotationInteraction::HitElementContext& hitElementContext() const;
 
     void zoomToPageWidth();
+    void doZoomToPageWidth();
     void zoomToWholePage();
+    void doZoomToWholePage();
     void zoomToTwoPages();
+    void doZoomToTwoPages();
     void moveScreen(int direction);
     void movePage(int direction);
 
     int currentZoomIndex() const;
     int currentZoomPercentage() const;
     PointF findZoomFocusPoint() const;
-    void setScaling(qreal scaling, const PointF& pos = PointF());
+    void setScaling(qreal scaling, const PointF& pos = PointF(), bool overrideZoomType = true);
     void setZoom(int zoomPercentage, const PointF& pos = PointF());
 
     qreal scalingFromZoomPercentage(int zoomPercentage) const;
@@ -151,7 +158,7 @@ private:
     struct ClickContext {
         PointF logicClickPos;
         const QMouseEvent* event = nullptr;
-        Ms::EngravingItem* hitElement = nullptr;
+        mu::engraving::EngravingItem* hitElement = nullptr;
         bool isHitGrip = false;
     };
 
@@ -169,11 +176,11 @@ private:
 
     bool m_readonly = false;
     bool m_isCanvasDragged = false;
+    bool m_tripleClickPending = false;
 
-    bool m_isZoomInited = false;
     PointF m_beginPoint;
 
-    Ms::EngravingItem* m_prevHitElement = nullptr;
+    mu::engraving::EngravingItem* m_prevHitElement = nullptr;
 };
 }
 

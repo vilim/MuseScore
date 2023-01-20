@@ -72,7 +72,7 @@ FocusScope {
         anchors.topMargin: privateProperties.sideMargin
         anchors.leftMargin: privateProperties.sideMargin
 
-        text: qsTrc("scores", "Account")
+        text: qsTrc("cloud", "Account")
 
         font: ui.theme.titleBoldFont
     }
@@ -91,10 +91,10 @@ FocusScope {
     Rectangle {
         anchors.bottom: parent.bottom
 
-        height: 114
+        height: 100
         width: parent.width
 
-        color: ui.theme.popupBackgroundColor
+        color: ui.theme.backgroundSecondaryColor
 
         RowLayout {
             anchors.verticalCenter: parent.verticalCenter
@@ -108,7 +108,7 @@ FocusScope {
             FlatButton {
                 Layout.alignment: Qt.AlignLeft
 
-                width: privateProperties.buttonWidth
+                minWidth: privateProperties.buttonWidth
                 text: qsTrc("cloud", "Learn more")
 
                 navigation.name: "LearnMore"
@@ -116,7 +116,7 @@ FocusScope {
                 navigation.column: 2
 
                 onClicked: {
-                    // TODO: implement me
+                    Qt.openUrlExternally("https://youtu.be/6LP4U_BF23w")
                 }
             }
 
@@ -126,7 +126,7 @@ FocusScope {
                 spacing: 22
 
                 FlatButton {
-                    width: privateProperties.buttonWidth
+                    minWidth: privateProperties.buttonWidth
                     text: qsTrc("cloud", "Sign in")
 
                     navigation.name: "SignIn"
@@ -140,7 +140,7 @@ FocusScope {
 
                 FlatButton {
                     id: createNewAccount
-                    width: privateProperties.buttonWidth
+                    minWidth: privateProperties.buttonWidth
                     text: qsTrc("cloud", "Create new account")
 
                     accentButton: true

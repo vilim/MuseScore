@@ -76,9 +76,9 @@ void MidiInputController::connectCurrentOutputDevice()
     }
 }
 
-void MidiInputController::onMidiEventReceived(midi::tick_t tick, const midi::Event& event)
+void MidiInputController::onMidiEventReceived(const midi::tick_t tick, const midi::Event& event)
 {
-    UNUSED(tick);
+    UNUSED(tick)
 
     Ret ret = midiRemote()->process(event);
     if (check_ret(ret, Ret::Code::Undefined)) {

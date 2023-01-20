@@ -19,6 +19,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+
+#include <utility>
+
 #include "playback.h"
 
 #include "log.h"
@@ -47,6 +50,19 @@ void Playback::init()
     m_audioOutputPtr = std::make_shared<AudioOutputHandler>(this);
 }
 
+void Playback::deinit()
+{
+    ONLY_AUDIO_WORKER_THREAD;
+
+    m_sequences.clear();
+
+    m_playerHandlersPtr = nullptr;
+    m_trackHandlersPtr = nullptr;
+    m_audioOutputPtr = nullptr;
+
+    disconnectAll();
+}
+
 Promise<TrackSequenceId> Playback::addSequence()
 {
     return Promise<TrackSequenceId>([this](auto resolve, auto /*reject*/) {
@@ -66,7 +82,7 @@ Promise<TrackSequenceIdList> Playback::sequenceIdList() const
     return Promise<TrackSequenceIdList>([this](auto resolve, auto /*reject*/) {
         ONLY_AUDIO_WORKER_THREAD;
 
-        TrackSequenceIdList result(m_sequences.size());
+        TrackSequenceIdList result;
 
         for (const auto& pair : m_sequences) {
             result.push_back(pair.first);

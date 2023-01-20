@@ -21,8 +21,8 @@
  */
 #include "midiremote.h"
 
-#include "global/xmlreader.h"
-#include "global/xmlwriter.h"
+#include "global/deprecated/xmlreader.h"
+#include "global/deprecated/xmlwriter.h"
 
 #include "multiinstances/resourcelockguard.h"
 
@@ -83,7 +83,7 @@ void MidiRemote::resetMidiMappings()
     m_midiMappingsChanged.notify();
 }
 
-mu::async::Notification MidiRemote::midiMappinsChanged() const
+mu::async::Notification MidiRemote::midiMappingsChanged() const
 {
     return m_midiMappingsChanged;
 }
@@ -107,7 +107,7 @@ void MidiRemote::setCurrentActionEvent(const Event& ev)
 mu::Ret MidiRemote::process(const Event& ev)
 {
     if (needIgnoreEvent(ev)) {
-        return make_ret(Ret::Code::Ok);
+        return Ret(Ret::Code::Undefined);
     }
 
     RemoteEvent event = remoteEventFromMidiEvent(ev);
@@ -126,7 +126,7 @@ void MidiRemote::readMidiMappings()
 {
     mi::ReadResourceLockGuard resource_guard(multiInstancesProvider(), MIDI_MAPPING_RESOURCE_NAME);
 
-    io::path midiMappingsPath = configuration()->midiMappingUserAppDataPath();
+    io::path_t midiMappingsPath = configuration()->midiMappingUserAppDataPath();
     XmlReader reader(midiMappingsPath);
 
     reader.readNextStartElement();
@@ -178,7 +178,7 @@ bool MidiRemote::writeMidiMappings(const MidiMappingList& midiMappings) const
 
     mi::WriteResourceLockGuard resource_guard(multiInstancesProvider(), MIDI_MAPPING_RESOURCE_NAME);
 
-    io::path midiMappingsPath = configuration()->midiMappingUserAppDataPath();
+    io::path_t midiMappingsPath = configuration()->midiMappingUserAppDataPath();
     XmlWriter writer(midiMappingsPath);
 
     writer.writeStartDocument();
@@ -209,6 +209,11 @@ bool MidiRemote::needIgnoreEvent(const Event& event) const
         return true;
     }
 
+    if (event.opcode() != Event::Opcode::NoteOn && event.opcode() != Event::Opcode::NoteOff
+        && event.opcode() != Event::Opcode::ControlChange) {
+        return true;
+    }
+
     static const QList<Event::Opcode> releaseOps {
         Event::Opcode::NoteOff
     };
@@ -216,10 +221,13 @@ bool MidiRemote::needIgnoreEvent(const Event& event) const
     bool release = releaseOps.contains(event.opcode());
     if (release) {
         bool advanceToNextNoteOnKeyRelease = configuration()->advanceToNextNoteOnKeyRelease();
+        if (!advanceToNextNoteOnKeyRelease) {
+            return true;
+        }
+
         RemoteEvent remoteEvent = remoteEventFromMidiEvent(event);
         RemoteEvent realtimeEvent = this->remoteEvent(REALTIME_ADVANCE_ACTION_NAME);
-        if (!advanceToNextNoteOnKeyRelease
-            || (realtimeEvent.isValid() && remoteEvent != realtimeEvent)) {
+        if (!realtimeEvent.isValid() || remoteEvent != realtimeEvent) {
             return true;
         }
     }

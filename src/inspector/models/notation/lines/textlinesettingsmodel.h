@@ -46,18 +46,18 @@ class TextLineSettingsModel : public AbstractInspectorModel
 
     Q_PROPERTY(PropertyItem * placement READ placement CONSTANT)
 
-    Q_PROPERTY(PropertyItem * beginingText READ beginingText CONSTANT)
-    Q_PROPERTY(PropertyItem * beginingTextVerticalOffset READ beginingTextVerticalOffset CONSTANT)
+    Q_PROPERTY(PropertyItem * beginningText READ beginningText CONSTANT)
+    Q_PROPERTY(PropertyItem * beginningTextOffset READ beginningTextOffset CONSTANT)
 
-    Q_PROPERTY(PropertyItem * continiousText READ continiousText CONSTANT)
-    Q_PROPERTY(PropertyItem * continiousTextVerticalOffset READ continiousTextVerticalOffset CONSTANT)
+    Q_PROPERTY(PropertyItem * continuousText READ continuousText CONSTANT)
+    Q_PROPERTY(PropertyItem * continuousTextOffset READ continuousTextOffset CONSTANT)
 
     Q_PROPERTY(PropertyItem * endText READ endText CONSTANT)
-    Q_PROPERTY(PropertyItem * endTextVerticalOffset READ endTextVerticalOffset CONSTANT)
+    Q_PROPERTY(PropertyItem * endTextOffset READ endTextOffset CONSTANT)
 
 public:
     explicit TextLineSettingsModel(QObject* parent, IElementRepositoryService* repository,
-                                   Ms::ElementType elementType = Ms::ElementType::TEXTLINE);
+                                   mu::engraving::ElementType elementType = mu::engraving::ElementType::TEXTLINE);
 
     PropertyItem* isLineVisible() const;
     PropertyItem* allowDiagonal() const;
@@ -74,22 +74,22 @@ public:
 
     PropertyItem* placement() const;
 
-    PropertyItem* beginingText() const;
-    PropertyItem* beginingTextVerticalOffset() const;
+    PropertyItem* beginningText() const;
+    PropertyItem* beginningTextOffset() const;
 
-    PropertyItem* continiousText() const;
-    PropertyItem* continiousTextVerticalOffset() const;
+    PropertyItem* continuousText() const;
+    PropertyItem* continuousTextOffset() const;
 
     PropertyItem* endText() const;
-    PropertyItem* endTextVerticalOffset() const;
+    PropertyItem* endTextOffset() const;
 
     Q_INVOKABLE QVariantList possibleStartHookTypes() const;
     Q_INVOKABLE QVariantList possibleEndHookTypes() const;
 
 protected:
     enum TextType {
-        BeginingText,
-        ContiniousText,
+        BeginningText,
+        ContinuousText,
         EndText
     };
 
@@ -98,7 +98,7 @@ protected:
         ui::IconCode::Code icon = ui::IconCode::Code::NONE;
         QString title;
 
-        HookTypeInfo(Ms::HookType type, ui::IconCode::Code icon, const QString& title)
+        HookTypeInfo(mu::engraving::HookType type, ui::IconCode::Code icon, const QString& title)
             : type(static_cast<int>(type)), icon(icon), title(title)
         {
         }
@@ -112,6 +112,8 @@ protected:
     void createProperties() override;
     void loadProperties() override;
     void resetProperties() override;
+    void onNotationChanged(const mu::engraving::PropertyIdSet& changedPropertyIdSet,
+                           const mu::engraving::StyleIdSet& changedStyleIdSet) override;
 
     virtual void onUpdateLinePropertiesAvailability();
     virtual bool isTextVisible(TextType type) const;
@@ -121,6 +123,8 @@ protected:
 
 private:
     QVariantList hookTypesToObjList(const QList<HookTypeInfo>& types) const;
+
+    void loadProperties(const mu::engraving::PropertyIdSet& propertyIdSet);
 
     PropertyItem* m_lineStyle = nullptr;
     PropertyItem* m_placement = nullptr;
@@ -136,14 +140,14 @@ private:
     PropertyItem* m_endHookType = nullptr;
     PropertyItem* m_hookHeight = nullptr;
 
-    PropertyItem* m_beginingText = nullptr;
-    PropertyItem* m_beginingTextVerticalOffset = nullptr;
+    PropertyItem* m_beginningText = nullptr;
+    PointFPropertyItem* m_beginningTextOffset = nullptr;
 
-    PropertyItem* m_continiousText = nullptr;
-    PropertyItem* m_continiousTextVerticalOffset = nullptr;
+    PropertyItem* m_continuousText = nullptr;
+    PointFPropertyItem* m_continuousTextOffset = nullptr;
 
     PropertyItem* m_endText = nullptr;
-    PropertyItem* m_endTextVerticalOffset = nullptr;
+    PointFPropertyItem* m_endTextOffset = nullptr;
 
     QVariantList m_possibleStartHookTypes;
     QVariantList m_possibleEndHookTypes;

@@ -23,6 +23,8 @@
 #define MU_NOTATION_NOTATIONNAVIGATOR_H
 
 #include <QObject>
+#include <QMouseEvent>
+#include <QPainter>
 #include <QQuickPaintedItem>
 
 #include "modularity/ioc.h"
@@ -31,10 +33,10 @@
 #include "context/iglobalcontext.h"
 #include "ui/iuiconfiguration.h"
 #include "engraving/iengravingconfiguration.h"
-#include "notationpaintview.h"
+#include "abstractnotationpaintview.h"
 
 namespace mu::notation {
-class NotationNavigator : public NotationPaintView
+class NotationNavigator : public AbstractNotationPaintView
 {
     Q_OBJECT
 

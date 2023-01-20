@@ -28,38 +28,54 @@
 #include "mapping/percussionssetupdataresolver.h"
 #include "mapping/voicessetupdataresolver.h"
 
+#include "log.h"
+
 using namespace mu::engraving;
 using namespace mu::mpe;
 
-void PlaybackSetupDataResolver::resolveSetupData(const Ms::Instrument* instrument, mpe::PlaybackSetupData& result) const
+void PlaybackSetupDataResolver::resolveSetupData(const Instrument* instrument, mpe::PlaybackSetupData& result) const
 {
-    if (KeyboardsSetupDataResolver::isAbleToResolve(instrument)) {
-        KeyboardsSetupDataResolver::resolve(instrument, result);
+    if (KeyboardsSetupDataResolver::resolve(instrument, result)) {
         return;
     }
 
-    if (StringsSetupDataResolver::isAbleToResolve(instrument)) {
-        StringsSetupDataResolver::resolve(instrument, result);
+    if (StringsSetupDataResolver::resolve(instrument, result)) {
         return;
     }
 
-    if (WindsSetupDataResolver::isAbleToResolve(instrument)) {
-        WindsSetupDataResolver::resolve(instrument, result);
+    if (WindsSetupDataResolver::resolve(instrument, result)) {
         return;
     }
 
-    if (PercussionsSetupDataResolver::isAbleToResolve(instrument)) {
-        PercussionsSetupDataResolver::resolve(instrument, result);
+    if (PercussionsSetupDataResolver::resolve(instrument, result)) {
         return;
     }
 
-    if (VoicesSetupDataResolver::isAbleToResolve(instrument)) {
-        VoicesSetupDataResolver::resolve(instrument, result);
+    if (VoicesSetupDataResolver::resolve(instrument, result)) {
         return;
     }
 
     LOGE() << "Unable to resolve setup data for instrument, id: " << instrument->id()
            << ", family: " << instrument->family();
+}
+
+void PlaybackSetupDataResolver::resolveChordSymbolsSetupData(const Instrument* instrument, mpe::PlaybackSetupData& result) const
+{
+    if (instrument->hasStrings()) {
+        static const mpe::PlaybackSetupData CHORD_SYMBOLS_SETUP_DATA = {
+            SoundId::Guitar, SoundCategory::Strings, { SoundSubCategory::Acoustic,
+                                                       SoundSubCategory::Nylon,
+                                                       SoundSubCategory::Plucked }, {}
+        };
+
+        result = CHORD_SYMBOLS_SETUP_DATA;
+    } else {
+        static const mpe::PlaybackSetupData CHORD_SYMBOLS_SETUP_DATA = {
+            SoundId::Piano, SoundCategory::Keyboards, {}, {}
+        };
+
+        result = CHORD_SYMBOLS_SETUP_DATA;
+    }
 }
 
 void PlaybackSetupDataResolver::resolveMetronomeSetupData(mpe::PlaybackSetupData& result) const

@@ -87,9 +87,19 @@ void CommandLineController::parse(const QStringList& args)
 //    m_parser.addOption(QCommandLineOption("piano-position", "Show Piano top or bottom. Default bottom", "bottom"));
     m_parser.addOption(QCommandLineOption("resolution", "Resolution [2160p, 1440p, 1080p, 720p, 480p, 360p]", "1080p"));
     m_parser.addOption(QCommandLineOption("fps", "Frame per second [60, 30, 24]", "24"));
+    m_parser.addOption(QCommandLineOption("ls", "Pause before playback in seconds (3.0)", "3.0"));
+    m_parser.addOption(QCommandLineOption("ts", "Pause before end of video in seconds (3.0)", "3.0"));
+
+    m_parser.addOption(QCommandLineOption("gp-linked", "create tabulature linked staves for guitar pro"));
+    m_parser.addOption(QCommandLineOption("gp-experimental", "experimental features for guitar pro import"));
 
     //! NOTE Currently only implemented `full` mode
     m_parser.addOption(QCommandLineOption("migration", "Whether to do migration with given mode, `full` - full migration", "mode"));
+
+    // Diagnostic
+    m_parser.addOption(QCommandLineOption("diagnostic-output", "Diagnostic output", "output"));
+    m_parser.addOption(QCommandLineOption("diagnostic-gen-drawdata", "Generate engraving draw data", "scores-dir"));
+    m_parser.addOption(QCommandLineOption("diagnostic-drawdata-to-png", "Convert draw data to png", "file"));
 
     m_parser.process(args);
 }
@@ -165,7 +175,7 @@ void CommandLineController::apply()
         }
     }
 
-    notationConfiguration()->setTemplateModeEnalbed(m_parser.isSet("template-mode"));
+    notationConfiguration()->setTemplateModeEnabled(m_parser.isSet("template-mode"));
     notationConfiguration()->setTestModeEnabled(m_parser.isSet("t"));
 
     QString modeType;
@@ -313,6 +323,14 @@ void CommandLineController::apply()
         if (m_parser.isSet("fps")) {
             videoExportConfiguration()->setFps(intValue("fps"));
         }
+
+        if (m_parser.isSet("ls")) {
+            videoExportConfiguration()->setLeadingSec(doubleValue("ls"));
+        }
+
+        if (m_parser.isSet("ts")) {
+            videoExportConfiguration()->setTrailingSec(doubleValue("ts"));
+        }
     }
 #endif
 
@@ -321,16 +339,24 @@ void CommandLineController::apply()
     }
 
     if (m_parser.isSet("f")) {
-        m_converterTask.params[CommandLineController::ParamKey::ForceMode] = m_parser.value("f");
+        m_converterTask.params[CommandLineController::ParamKey::ForceMode] = true;
     }
 
     if (m_parser.isSet("S")) {
         m_converterTask.params[CommandLineController::ParamKey::StylePath] = m_parser.value("S");
     }
 
+    if (m_parser.isSet("gp-linked")) {
+        guitarProConfiguration()->setLinkedTabStaffCreated(true);
+    }
+
+    if (m_parser.isSet("gp-experimental")) {
+        guitarProConfiguration()->setExperimental(true);
+    }
+
     if (application()->runMode() == IApplication::RunMode::Converter) {
         project::MigrationOptions migration;
-        migration.appVersion = Ms::MSCVERSION;
+        migration.appVersion = mu::engraving::MSCVERSION;
 
         //! NOTE Don't ask about migration in convert mode
         migration.isAskAgain = false;
@@ -349,6 +375,24 @@ void CommandLineController::apply()
         }
     }
 
+    // Diagnostic
+    if (m_parser.isSet("diagnostic-output")) {
+        m_diagnostic.output = m_parser.value("diagnostic-output");
+    }
+
+    if (m_parser.isSet("diagnostic-gen-drawdata")) {
+        application()->setRunMode(IApplication::RunMode::Converter);
+        m_diagnostic.type = DiagnosticType::GenDrawData;
+        m_diagnostic.input = m_parser.value("diagnostic-gen-drawdata");
+    }
+
+    if (m_parser.isSet("diagnostic-drawdata-to-png")) {
+        application()->setRunMode(IApplication::RunMode::Converter);
+        m_diagnostic.type = DiagnosticType::DrawDataToPng;
+        m_diagnostic.input = m_parser.value("diagnostic-drawdata-to-png");
+    }
+
+    // Startup
     if (application()->runMode() == IApplication::RunMode::Editor) {
         startupScenario()->setModeType(modeType);
 
@@ -361,6 +405,11 @@ void CommandLineController::apply()
 CommandLineController::ConverterTask CommandLineController::converterTask() const
 {
     return m_converterTask;
+}
+
+CommandLineController::Diagnostic CommandLineController::diagnostic() const
+{
+    return m_diagnostic;
 }
 
 void CommandLineController::printLongVersion() const

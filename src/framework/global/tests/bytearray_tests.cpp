@@ -23,16 +23,16 @@
 
 #include <cstring>
 
-#include "io/bytearray.h"
+#include "types/bytearray.h"
 
-using namespace mu::io;
+using namespace mu;
 
-class IO_ByteArrayTests : public ::testing::Test
+class Global_Types_ByteArrayTests : public ::testing::Test
 {
 public:
 };
 
-TEST_F(IO_ByteArrayTests, ByteArray_Construct)
+TEST_F(Global_Types_ByteArrayTests, Construct)
 {
     std::vector<uint8_t> ref = { 1, 2, 3, 4, 5, 6 };
 
@@ -62,7 +62,7 @@ TEST_F(IO_ByteArrayTests, ByteArray_Construct)
     EXPECT_EQ(ref[2], 3);
 }
 
-TEST_F(IO_ByteArrayTests, ByteArray_Compare)
+TEST_F(Global_Types_ByteArrayTests, Compare)
 {
     std::vector<uint8_t> ref = { 1, 2, 3, 4, 5, 6 };
     //! GIVEN Two ByteArrays with same the data
@@ -77,7 +77,7 @@ TEST_F(IO_ByteArrayTests, ByteArray_Compare)
     EXPECT_TRUE(ba1 != ba2);
 }
 
-TEST_F(IO_ByteArrayTests, ByteArray_Modification)
+TEST_F(Global_Types_ByteArrayTests, Modification)
 {
     std::vector<uint8_t> ref = { 1, 2, 3, 4, 5, 6 };
     //! GIVEN ByteArray with the data
@@ -176,7 +176,24 @@ TEST_F(IO_ByteArrayTests, ByteArray_Modification)
 
     //! CHECK
     EXPECT_EQ(ba10.size(), 8);
-    //! CHECK (data more pos 4 is trash)
+    //! CHECK (data beyond the first 4 positions is garbage)
     const uint8_t* d11 = ba10.constData();
     EXPECT_EQ(std::memcmp(d11, &ref11[0], 4), 0);
+
+    //! DO reserve
+    size_t sizeBeforeReserving = ba10.size();
+    ba10.reserve(10);
+
+    //! CHECK (reserving should only affect capacity, not size)
+    EXPECT_EQ(ba10.size(), sizeBeforeReserving);
+    //! CHECK (data beyond the first 4 positions is garbage)
+    const uint8_t* d12 = ba10.constData();
+    EXPECT_EQ(std::memcmp(d12, &ref11[0], 4), 0);
+
+    //! DO clear
+    ba10.clear();
+
+    //! CHECK (should be empty now)
+    EXPECT_EQ(ba10.size(), 0);
+    EXPECT_TRUE(ba10.empty());
 }

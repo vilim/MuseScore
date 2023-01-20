@@ -27,22 +27,20 @@
 
 #include "score.h"
 
-#include "libmscore/masterscore.h"
 #include "libmscore/measurebase.h"
 #include "libmscore/page.h"
+#include "libmscore/score.h"
 #include "libmscore/system.h"
-#include "libmscore/staff.h"
 
 using namespace mu;
 
-namespace Ms {
-namespace PluginAPI {
+namespace mu::plugins::api {
 //---------------------------------------------------------
 //   ScoreView
 //---------------------------------------------------------
 
 ScoreView::ScoreView(QQuickItem* parent)
-    : QQuickPaintedItem(parent)
+    : uicomponents::QuickPaintedView(parent)
 {
     setAcceptedMouseButtons(Qt::LeftButton);
     score = 0;
@@ -141,13 +139,13 @@ int FileIO::modifiedTime()
 //   setScore
 //---------------------------------------------------------
 
-void ScoreView::setScore(Ms::PluginAPI::Score* s)
+void ScoreView::setScore(mu::plugins::api::Score* s)
 {
-    Ms::Score* newScore = s ? s->score() : nullptr;
+    mu::engraving::Score* newScore = s ? s->score() : nullptr;
     setScore(newScore);
 }
 
-void ScoreView::setScore(Ms::Score* s)
+void ScoreView::setScore(mu::engraving::Score* s)
 {
     MuseScoreView::setScore(s);
     _currentPage = 0;
@@ -156,7 +154,7 @@ void ScoreView::setScore(Ms::Score* s)
     if (score) {
         score->doLayout();
 
-        Ms::Page* page = score->pages()[_currentPage];
+        mu::engraving::Page* page = score->pages()[_currentPage];
         RectF pr(page->abbox());
         qreal m1 = width() / pr.width();
         qreal m2 = height() / pr.height();
@@ -184,16 +182,16 @@ void ScoreView::paint(QPainter* qp)
     }
     p.scale(mag, mag);
 
-    Ms::Page* page = score->pages()[_currentPage];
-    QList<const Ms::EngravingItem*> el;
-    for (System* s : page->systems()) {
-        for (MeasureBase* m : s->measures()) {
-            m->scanElements(&el, Ms::collectElements, false);
+    mu::engraving::Page* page = score->pages()[_currentPage];
+    QList<const mu::engraving::EngravingItem*> el;
+    for (engraving::System* s : page->systems()) {
+        for (engraving::MeasureBase* m : s->measures()) {
+            m->scanElements(&el, mu::engraving::collectElements, false);
         }
     }
-    page->scanElements(&el, Ms::collectElements, false);
+    page->scanElements(&el, mu::engraving::collectElements, false);
 
-    foreach (const Ms::EngravingItem* e, el) {
+    foreach (const mu::engraving::EngravingItem* e, el) {
         PointF pos(e->pagePos());
         p.translate(pos);
         e->draw(&p);
@@ -241,5 +239,4 @@ void ScoreView::prevPage()
 {
     setCurrentPage(_currentPage - 1);
 }
-}
-}
+} // namespace mu::plugins::api

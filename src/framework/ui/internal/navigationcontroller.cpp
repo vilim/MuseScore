@@ -247,7 +247,7 @@ template<class T>
 static T* findByName(const std::set<T*>& set, const QString& name)
 {
     auto it = std::find_if(set.cbegin(), set.cend(), [name](const T* s) {
-        return s->name() == name && s->enabled();
+        return s->name() == name;
     });
 
     if (it != set.cend()) {
@@ -920,8 +920,19 @@ void NavigationController::onEscape()
     }
 
     INavigationControl* activeCtrl = findActive(activePanel->controls());
-    if (activeCtrl) {
-        activeCtrl->onEvent(e);
+    if (!activeCtrl) {
+        return;
+    }
+
+    activeCtrl->onEvent(e);
+    if (e->accepted) {
+        return;
+    }
+
+    activeCtrl->setActive(false);
+
+    if (m_defaultNavigationControl) {
+        doActivateControl(m_defaultNavigationControl);
     }
 }
 

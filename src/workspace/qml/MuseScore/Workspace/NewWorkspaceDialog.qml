@@ -46,7 +46,7 @@ StyledDialogView {
         workspaceModel.load(root.workspaceNames)
     }
 
-    onOpened: {
+    onNavigationActivateRequested: {
         workspaceNameField.navigation.requestActive()
     }
 
@@ -86,7 +86,9 @@ StyledDialogView {
             navigation.row: 1
             navigation.accessible.name: workspaceNameTitle.text + " " + currentText
 
-            onCurrentTextEdited: function(newTextValue) {
+            maximumLength: 40
+
+            onTextChanged: function(newTextValue) {
                 workspaceModel.workspaceName = newTextValue
             }
 
@@ -126,7 +128,7 @@ StyledDialogView {
             CheckBox {
                 checked: workspaceModel.useUiPreferences
 
-                text: qsTrc("workspace", "UI preferences (colours, canvas style, etc.)")
+                text: qsTrc("workspace", "UI preferences (colors, canvas style, etc.)")
 
                 navigation.name: "UIPreferencesCheckBox"
                 navigation.panel: content.navigationPanel

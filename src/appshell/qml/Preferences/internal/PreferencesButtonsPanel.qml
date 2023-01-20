@@ -57,12 +57,12 @@ Rectangle {
         FlatButton {
             anchors.left: parent.left
 
-            width: 160
+            minWidth: 160
 
             navigation.panel: root.navigation
             navigation.order: 2
 
-            text: qsTrc("appshell", "Reset preferences")
+            text: qsTrc("appshell/preferences", "Reset preferences")
 
             onClicked: {
                 root.revertFactorySettingsRequested()
@@ -76,7 +76,6 @@ Rectangle {
             navigation.panel: root.navigation
             navigation.order: 3
 
-            width: 132
             text: qsTrc("global", "Cancel")
 
             onClicked: {
@@ -92,7 +91,6 @@ Rectangle {
             navigation.panel: root.navigation
             navigation.order: 1
 
-            width: 132
             accentButton: true
 
             text: qsTrc("global", "OK")

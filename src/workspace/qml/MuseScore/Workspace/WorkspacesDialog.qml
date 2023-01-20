@@ -43,12 +43,11 @@ StyledDialogView {
         workspacesModel.load()
     }
 
-    onOpened: {
-        activateNavigation()
+    onNavigationActivateRequested: {
+        view.focusOnSelected()
     }
 
-    function activateNavigation() {
-        view.focusOnSelected()
+    onAccessibilityActivateRequested: {
         topPanel.readInfo()
     }
 

@@ -24,8 +24,8 @@
 #include <QScreen>
 
 #include "engraving/libmscore/score.h"
-#include "engraving/paint/paint.h"
-#include "engraving/paint/debugpaint.h"
+#include "engraving/infrastructure/paint.h"
+#include "engraving/infrastructure/debugpaint.h"
 
 #include "notation.h"
 #include "notationinteraction.h"
@@ -42,7 +42,7 @@ NotationPainting::NotationPainting(Notation* notation)
 {
 }
 
-Ms::Score* NotationPainting::score() const
+mu::engraving::Score* NotationPainting::score() const
 {
     return m_notation->score();
 }
@@ -78,7 +78,7 @@ int NotationPainting::pageCount() const
         return 0;
     }
 
-    return score()->npages();
+    return static_cast<int>(score()->npages());
 }
 
 SizeF NotationPainting::pageSizeInch() const
@@ -90,11 +90,11 @@ SizeF NotationPainting::pageSizeInch() const
     //! NOTE If now it is not PAGE view mode,
     //! then the page sizes will differ from the standard sizes (in PAGE view mode)
     if (score()->npages() > 0) {
-        const Ms::Page* page = score()->pages().front();
-        return SizeF(page->bbox().width() / Ms::DPI, page->bbox().height() / Ms::DPI);
+        const mu::engraving::Page* page = score()->pages().front();
+        return SizeF(page->bbox().width() / mu::engraving::DPI, page->bbox().height() / mu::engraving::DPI);
     }
 
-    return SizeF(score()->styleD(Ms::Sid::pageWidth), score()->styleD(Ms::Sid::pageHeight));
+    return SizeF(score()->styleD(mu::engraving::Sid::pageWidth), score()->styleD(mu::engraving::Sid::pageHeight));
 }
 
 bool NotationPainting::isPaintPageBorder() const
@@ -119,123 +119,30 @@ void NotationPainting::doPaint(draw::Painter* painter, const Options& opt)
         return;
     }
 
-    const std::vector<Ms::Page*>& pages = score()->pages();
-    if (pages.empty()) {
-        return;
-    }
+    Options myopt = opt;
+    bool printPageBackground = myopt.printPageBackground;
+    myopt.onPaintPageSheet
+        = [this, printPageBackground](draw::Painter* painter, const RectF& pageRect, const RectF& pageContentRect, bool isOdd) {
+        paintPageSheet(painter, pageRect, pageContentRect, isOdd, printPageBackground);
+    };
 
-    //! NOTE This is DPI of paint device,  ex screen, image, printer and etc.
-    //! Should be set, but if not set, we will use our default DPI.
-    const int DEVICE_DPI = opt.deviceDpi > 0 ? opt.deviceDpi : Ms::DPI;
+    engraving::Paint::paintScore(painter, score(), myopt);
 
-    //! NOTE Depending on the view mode,
-    //! if the view mode is PAGE, then this is one page size (ex A4),
-    //! if someone a continuous mode, then this is the size of the entire score.
-    SizeF pageSize = pageSizeInch();
-
-    // Setup Painter
-    painter->setAntialiasing(true);
-
-    //! NOTE To draw on the screen, no need to adjust the viewport,
-    //! to draw on others (pdf, png, printer), we need to set the viewport
-    if (opt.isSetViewport) {
-        painter->setViewport(RectF(0.0, 0.0, pageSize.width() * DEVICE_DPI, pageSize.height() * DEVICE_DPI));
-        painter->setWindow(RectF(0.0, 0.0, pageSize.width() * Ms::DPI, pageSize.height() * Ms::DPI));
-    }
-
-    // Setup score draw system
-    Ms::MScore::pixelRatio = Ms::DPI / DEVICE_DPI;
-    score()->setPrinting(opt.isPrinting);
-    Ms::MScore::pdfPrinting = opt.isPrinting;
-
-    // Setup page counts
-    int fromPage = opt.fromPage >= 0 ? opt.fromPage : 0;
-    int toPage = (opt.toPage >= 0 && opt.toPage < int(pages.size())) ? opt.toPage : (int(pages.size()) - 1);
-
-    for (int copy = 0; copy < opt.copyCount; ++copy) {
-        bool firstPage = true;
-        for (int pi = fromPage; pi <= toPage; ++pi) {
-            Ms::Page* page = pages.at(pi);
-
-            PointF pagePos = page->pos();
-            RectF pageRect = page->bbox();
-            RectF pageContentRect = pageRect.adjusted(page->lm(), page->tm(), -page->rm(), -page->bm());
-
-            //! NOTE Trim page margins, if need
-            if (opt.trimMarginPixelSize >= 0) {
-                qreal trimSize = static_cast<qreal>(opt.trimMarginPixelSize);
-                pageRect = pageContentRect.adjusted(-trimSize, -trimSize, trimSize, trimSize);
-            }
-
-            //! NOTE Check draw rect, usually for optimisation drawing on screen (draw only what we see)
-            RectF drawRect;
-            RectF pageAbsRect = pageRect.translated(pagePos);
-            if (opt.frameRect.isValid()) {
-                if (pageAbsRect.right() < opt.frameRect.left()) {
-                    continue;
-                }
-
-                if (pageAbsRect.left() > opt.frameRect.right()) {
-                    break;
-                }
-
-                drawRect = opt.frameRect;
-            } else {
-                drawRect = pageAbsRect;
-            }
-
-            //! NOTE Notify about new page (usually for paged paint device, ex pdf, printer)
-            if (!firstPage) {
-                if (opt.onNewPage) {
-                    opt.onNewPage();
-                }
-            }
-            firstPage = false;
-
-            if (opt.isMultiPage) {
-                painter->translate(pagePos);
-            }
-
-            // Draw page sheet
-            paintPageSheet(painter, pageRect, pageContentRect, page->isOdd());
-
-            // Draw page elements
-            painter->setClipping(true);
-            painter->setClipRect(pageRect);
-            std::vector<EngravingItem*> elements = page->items(drawRect.translated(-pagePos));
-            engraving::Paint::paintElements(*painter, elements, opt.isPrinting);
-            painter->setClipping(false);
-
-#ifdef ENGRAVING_PAINT_DEBUGGER_ENABLED
-            if (!opt.isPrinting) {
-                engraving::DebugPaint::paintPageDebug(*painter, page);
-            }
-#endif
-
-            if (opt.isMultiPage) {
-                painter->translate(-pagePos);
-            }
-
-            if ((copy + 1) < opt.copyCount) {
-                //! NOTE Notify about new page (usually for paged paint device, ex pdf, printer)
-                //! for next copy
-                if (opt.onNewPage) {
-                    opt.onNewPage();
-                }
-            }
-        }
-
-        if (!opt.isPrinting) {
-            static_cast<NotationInteraction*>(m_notation->interaction().get())->paint(painter);
-        }
+    if (!myopt.isPrinting) {
+        static_cast<NotationInteraction*>(m_notation->interaction().get())->paint(painter);
     }
 }
 
-void NotationPainting::paintPageSheet(Painter* painter, const RectF& pageRect, const RectF& pageContentRect, bool isOdd) const
+void NotationPainting::paintPageSheet(Painter* painter, const RectF& pageRect, const RectF& pageContentRect, bool isOdd,
+                                      bool printPageBackground) const
 {
     TRACEFUNC;
     if (score()->printing()) {
-        painter->fillRect(pageRect, Color::white);
+        if (!printPageBackground) {
+            return;
+        }
+
+        painter->fillRect(pageRect, Color::WHITE);
         return;
     }
 
@@ -248,7 +155,7 @@ void NotationPainting::paintPageSheet(Painter* painter, const RectF& pageRect, c
         } else {
             //! NOTE We can use the color from the configuration,
             //! but in this case I believe it is better to use the "unassigned" color
-            painter->fillRect(pageRect, Color::white);
+            painter->fillRect(pageRect, Color::WHITE);
         }
     }
 

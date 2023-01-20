@@ -30,6 +30,11 @@ using namespace mu::accessibility;
 class AccessibilityActivationObserver : public QAccessible::ActivationObserver
 {
 public:
+    AccessibilityActivationObserver()
+    {
+        m_isAccessibilityActive = QAccessible::isActive();
+    }
+
     bool isAccessibilityActive() const
     {
         return m_isAccessibilityActive;
@@ -65,17 +70,12 @@ bool AccessibilityConfiguration::enabled() const
         return false;
     }
 
-#ifdef BUILD_DIAGNOSTICS
-    return true;
-#else
-
     if (!active()) {
         return false;
     }
 
     //! NOTE Accessibility available if navigation is used
     return navigationController()->activeSection() != nullptr;
-#endif
 }
 
 bool AccessibilityConfiguration::active() const

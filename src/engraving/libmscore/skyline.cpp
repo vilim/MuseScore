@@ -21,18 +21,24 @@
  */
 
 #include "skyline.h"
-#include "segment.h"
 
-#include "infrastructure/draw/painter.h"
+#include "arpeggio.h"
+#include "beam.h"
+#include "chord.h"
+#include "stem.h"
+
+#include "draw/painter.h"
+
+#include "shape.h"
 
 #include "realfn.h"
 
 using namespace mu;
 using namespace mu::draw;
 
-namespace Ms {
-static const qreal MAXIMUM_Y = 1000000.0;
-static const qreal MINIMUM_Y = -1000000.0;
+namespace mu::engraving {
+static const double MAXIMUM_Y = 1000000.0;
+static const double MINIMUM_Y = -1000000.0;
 
 // #define SKL_DEBUG
 
@@ -42,54 +48,79 @@ static const qreal MINIMUM_Y = -1000000.0;
 #define DP(...)
 #endif
 
+//--------------------------------------------------------
+// findSpan
+// used for correct handling of cross-staff skyline items
+//--------------------------------------------------------
+
+int findSpan(const ShapeElement& r)
+{
+    if (!r.toItem) {
+        return 0;
+    }
+    int span = 0;
+    if (r.toItem->isArpeggio()) {
+        // cross-staff arpeggios
+        span = toArpeggio(r.toItem)->span() - 1; // for some reason, Arpeggio::_span is 1-indexed
+    } else if (r.toItem->isStem()) {
+        // cross-staff stems
+        Chord* chord = toStem(r.toItem)->chord();
+        if (chord && chord->beam() && chord->beam()->cross()) {
+            span = chord->up() ? -1 : 1;
+        }
+    }
+    return span;
+}
+
 //---------------------------------------------------------
 //   add
 //---------------------------------------------------------
 
-void Skyline::add(const RectF& r)
+void Skyline::add(const ShapeElement& r)
 {
-    _north.add(r.x(), r.top(), r.width());
-    _south.add(r.x(), r.bottom(), r.width());
+    int span = findSpan(r);
+    _north.add(r.x(), r.top(), r.width(), span);
+    _south.add(r.x(), r.bottom(), r.width(), span);
 }
 
 //---------------------------------------------------------
 //   insert
 //---------------------------------------------------------
 
-SkylineLine::SegIter SkylineLine::insert(SegIter i, qreal x, qreal y, qreal w)
+SkylineLine::SegIter SkylineLine::insert(SegIter i, double x, double y, double w, int span)
 {
-    const qreal xr = x + w;
+    const double xr = x + w;
     // Only x coordinate change is handled here as width change gets handled
     // in SkylineLine::add().
     if (i != seg.end() && xr > i->x) {
         i->x = xr;
     }
-    return seg.emplace(i, x, y, w);
+    return seg.emplace(i, x, y, w, span);
 }
 
 //---------------------------------------------------------
 //   append
 //---------------------------------------------------------
 
-void SkylineLine::append(qreal x, qreal y, qreal w)
+void SkylineLine::append(double x, double y, double w, int span)
 {
-    seg.emplace_back(x, y, w);
+    seg.emplace_back(x, y, w, span);
 }
 
 //---------------------------------------------------------
 //   getApproxPosition
 //---------------------------------------------------------
 
-SkylineLine::SegIter SkylineLine::find(qreal x)
+SkylineLine::SegIter SkylineLine::find(double x)
 {
-    auto it = std::upper_bound(seg.begin(), seg.end(), x, [](qreal x, const SkylineSegment& s) { return x < s.x; });
+    auto it = std::upper_bound(seg.begin(), seg.end(), x, [](double x, const SkylineSegment& s) { return x < s.x; });
     if (it == seg.begin()) {
         return it;
     }
     return --it;
 }
 
-SkylineLine::SegConstIter SkylineLine::find(qreal x) const
+SkylineLine::SegConstIter SkylineLine::find(double x) const
 {
     return const_cast<SkylineLine*>(this)->find(x);
 }
@@ -105,12 +136,13 @@ void SkylineLine::add(const Shape& s)
     }
 }
 
-void SkylineLine::add(const RectF& r)
+void SkylineLine::add(const ShapeElement& r)
 {
+    int span = findSpan(r);
     if (north) {
-        add(r.x(), r.top(), r.width());
+        add(r.x(), r.top(), r.width(), span);
     } else {
-        add(r.x(), r.bottom(), r.width());
+        add(r.x(), r.bottom(), r.width(), span);
     }
 }
 
@@ -121,9 +153,9 @@ void Skyline::add(const Shape& s)
     }
 }
 
-void SkylineLine::add(qreal x, qreal y, qreal w)
+void SkylineLine::add(double x, double y, double w, int span)
 {
-//      Q_ASSERT(w >= 0.0);
+//      assert(w >= 0.0);
     if (x < 0.0) {
         w -= -x;
         x = 0.0;
@@ -135,9 +167,9 @@ void SkylineLine::add(qreal x, qreal y, qreal w)
     DP("===add  %f %f %f\n", x, y, w);
 
     SegIter i = find(x);
-    qreal cx = seg.empty() ? 0.0 : i->x;
+    double cx = seg.empty() ? 0.0 : i->x;
     for (; i != seg.end(); ++i) {
-        qreal cy = i->y;
+        double cy = i->y;
         if ((x + w) <= cx) {                                            // A
             return;       // break;
         }
@@ -151,13 +183,13 @@ void SkylineLine::add(qreal x, qreal y, qreal w)
         }
         if ((x >= cx) && ((x + w) < (cx + i->w))) {                     // (E) insert segment
             DP("    insert at %f %f   x:%f w:%f\n", cx, i->w, x, w);
-            qreal w1 = x - cx;
-            qreal w2 = w;
-            qreal w3 = i->w - (w1 + w2);
+            double w1 = x - cx;
+            double w2 = w;
+            double w3 = i->w - (w1 + w2);
             if (w1 > 0.0000001) {
                 i->w = w1;
                 ++i;
-                i = insert(i, x, y, w2);
+                i = insert(i, x, y, w2, span);
                 DP("       A w1 %f w2 %f\n", w1, w2);
             } else {
                 i->w = w2;
@@ -167,41 +199,41 @@ void SkylineLine::add(qreal x, qreal y, qreal w)
             if (w3 > 0.0000001) {
                 ++i;
                 DP("       C w3 %f\n", w3);
-                insert(i, x + w2, cy, w3);
+                insert(i, x + w2, cy, w3, span);
             }
             return;
         } else if ((x <= cx) && ((x + w) >= (cx + i->w))) {                 // F
             DP("    change(F) cx %f y %f\n", cx, y);
             i->y = y;
         } else if (x < cx) {                                            // C
-            qreal w1 = x + w - cx;
+            double w1 = x + w - cx;
             i->w    -= w1;
             DP("    add(C) cx %f y %f w %f w1 %f\n", cx, y, w1, i->w);
-            insert(i, cx, y, w1);
+            insert(i, cx, y, w1, span);
             return;
         } else {                                                        // D
-            qreal w1 = x - cx;
-            qreal w2 = i->w - w1;
+            double w1 = x - cx;
+            double w2 = i->w - w1;
             if (w2 > 0.0000001) {
                 i->w = w1;
                 cx  += w1;
                 DP("    add(D) %f %f\n", y, w2);
                 ++i;
-                i = insert(i, cx, y, w2);
+                i = insert(i, cx, y, w2, span);
             }
         }
         cx += i->w;
     }
     if (x >= cx) {
         if (x > cx) {
-            qreal cy = north ? MAXIMUM_Y : MINIMUM_Y;
+            double cy = north ? MAXIMUM_Y : MINIMUM_Y;
             DP("    append1 %f %f\n", cy, x - cx);
-            append(cx, cy, x - cx);
+            append(cx, cy, x - cx, span);
         }
         DP("    append2 %f %f\n", y, w);
-        append(x, y, w);
+        append(x, y, w, span);
     } else if (x + w > cx) {
-        append(cx, y, x + w - cx);
+        append(cx, y, x + w - cx, span);
     }
 }
 
@@ -221,19 +253,22 @@ void Skyline::clear()
 //    Calculates the minimum distance between two skylines
 //-------------------------------------------------------------------
 
-qreal Skyline::minDistance(const Skyline& s) const
+double Skyline::minDistance(const Skyline& s) const
 {
     return south().minDistance(s.north());
 }
 
-qreal SkylineLine::minDistance(const SkylineLine& sl) const
+double SkylineLine::minDistance(const SkylineLine& sl) const
 {
-    qreal dist = MINIMUM_Y;
+    double dist = MINIMUM_Y;
 
-    qreal x1 = 0.0;
-    qreal x2 = 0.0;
+    double x1 = 0.0;
+    double x2 = 0.0;
     auto k   = sl.begin();
     for (auto i = begin(); i != end(); ++i) {
+        if (i->staffSpan > 0) {
+            continue; // don't add this to the distance because it crosses to the next staff
+        }
         while (k != sl.end() && (x2 + k->w) < x1) {
             x2 += k->w;
             ++k;
@@ -242,8 +277,9 @@ qreal SkylineLine::minDistance(const SkylineLine& sl) const
             break;
         }
         for (;;) {
-            if ((x1 + i->w > x2) && (x1 < x2 + k->w)) {
-                dist = qMax(dist, i->y - k->y);
+            if ((x1 + i->w > x2) && (x1 < x2 + k->w) && k->staffSpan >= 0) {
+                // (staffSpan: don't add lower north skyline object if it crosses into our staff)
+                dist = std::max(dist, i->y - k->y);
             }
             if (x2 + k->w < x1 + i->w) {
                 x2 += k->w;
@@ -263,7 +299,7 @@ qreal SkylineLine::minDistance(const SkylineLine& sl) const
     return dist;
 }
 
-void Skyline::paint(Painter& painter, qreal lineWidth) const
+void Skyline::paint(Painter& painter, double lineWidth) const
 {
     painter.save();
 
@@ -278,9 +314,9 @@ void Skyline::paint(Painter& painter, qreal lineWidth) const
 
 void SkylineLine::paint(Painter& painter) const
 {
-    qreal x1 = 0.0;
-    qreal x2;
-    qreal y = 0.0;
+    double x1 = 0.0;
+    double x2;
+    double y = 0.0;
 
     bool pvalid = false;
     for (const SkylineSegment& s : *this) {
@@ -327,7 +363,7 @@ void Skyline::dump(const char* p, bool n) const
 
 void SkylineLine::dump() const
 {
-    qreal x = 0.0;
+    double x = 0.0;
     for (const SkylineSegment& s : *this) {
         printf("   x %f y %f w %f\n", x, s.y, s.w);
         x += s.w;
@@ -338,20 +374,20 @@ void SkylineLine::dump() const
 //   max
 //---------------------------------------------------------
 
-qreal SkylineLine::max() const
+double SkylineLine::max() const
 {
-    qreal val;
+    double val;
     if (north) {
         val = MAXIMUM_Y;
         for (const SkylineSegment& s : *this) {
-            val = qMin(val, s.y);
+            val = std::min(val, s.y);
         }
     } else {
         val = MINIMUM_Y;
         for (const SkylineSegment& s : *this) {
-            val = qMax(val, s.y);
+            val = std::max(val, s.y);
         }
     }
     return val;
 }
-} // namespace Ms
+} // namespace mu::engraving

@@ -28,22 +28,22 @@ import MuseScore.UiComponents 1.0
 import MuseScore.AppShell 1.0
 
 Page {
-    title: qsTrc("appshell", "Playback")
-    explanation: qsTrc("appshell", "Enjoy premium sounds for free with our Muse Symphony Orchestra library")
+    title: qsTrc("appshell/gettingstarted", "Playback")
+    explanation: qsTrc("appshell/gettingstarted", "Enjoy realistic playback for free by downloading our new Muse Sounds library")
 
     titleContentSpacing: 12
 
-    extraButtonTitle: qsTrc("appshell", "Download")
+    extraButtonTitle: qsTrc("appshell/gettingstarted", "Watch video")
 
     onExtraButtonClicked: {
-        console.log("NOT_IMPLEMENTED!")
+        Qt.openUrlExternally("https://youtu.be/n7UgN69e2Y8")
     }
 
     Image {
         id: image
         anchors.fill: parent
         fillMode: Image.PreserveAspectCrop
-        source: "resources/placeholder.png"
+        source: "resources/MuseSounds.png"
         sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
 
         layer.enabled: true

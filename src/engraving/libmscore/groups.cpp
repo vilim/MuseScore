@@ -21,9 +21,11 @@
  */
 
 #include "groups.h"
+
 #include "rw/xml.h"
-#include "durationtype.h"
+
 #include "chordrest.h"
+#include "durationtype.h"
 #include "staff.h"
 #include "tuplet.h"
 
@@ -31,7 +33,16 @@
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
+//---------------------------------------------------------
+//   NoteGroup
+//---------------------------------------------------------
+
+struct NoteGroup {
+    Fraction timeSig;
+    Groups endings;
+};
+
 //---------------------------------------------------------
 //   noteGroups
 //---------------------------------------------------------
@@ -90,28 +101,46 @@ static std::vector<NoteGroup> noteGroups {
 //   endBeam
 //---------------------------------------------------------
 
-BeamMode Groups::endBeam(ChordRest* cr, ChordRest* prev)
+BeamMode Groups::endBeam(const ChordRest* cr, const ChordRest* prev)
 {
     if (cr->isGrace() || cr->beamMode() != BeamMode::AUTO) {
         return cr->beamMode();
     }
-    Q_ASSERT(cr->staff());
+    assert(cr->staff());
 
-    TDuration d      = cr->durationType();
-    const Groups& g  = cr->staff()->group(cr->tick());
+    // we need to figure out the longest note value beat upon which cr falls in the measure
+    Fraction maxTickLen = std::max(cr->ticks(), prev ? prev->ticks() : Fraction());
+    Fraction smallestTickLen = Fraction(1, 8); // start with 8th
+    Fraction tickLenLimit = Fraction(1, 32); // only check up to 32nds because that's all thats available
+                                             // in timesig properties
+    while (smallestTickLen > maxTickLen || cr->tick().ticks() % smallestTickLen.ticks() != 0) {
+        smallestTickLen /= 2; // proceed to 16th, 32nd, etc
+        if (smallestTickLen < tickLenLimit) {
+            smallestTickLen = cr->ticks();
+            break;
+        }
+    }
+    DurationType bigBeatDuration = TDuration(smallestTickLen).type();
+
+    TDuration crDuration = cr->durationType();
+    const Groups& g = cr->staff()->group(cr->tick());
     Fraction stretch = cr->staff()->timeStretch(cr->tick());
-    Fraction tick    = cr->rtick() * stretch;
+    Fraction tick = cr->rtick() * stretch;
 
-    BeamMode val = g.beamMode(tick.ticks(), d.type());
+    // We can choose to break beams based on its place in the measure, or by its duration. These
+    // can be consolidated mostly, with bias towards its duration.
+    BeamMode byType = g.beamMode(tick.ticks(), crDuration.type());
+    BeamMode byPos = g.beamMode(tick.ticks(), bigBeatDuration);
+    BeamMode val = byType == BeamMode::AUTO ? byPos : byType;
 
     // context-dependent checks
     if (val == BeamMode::AUTO && tick.isNotZero()) {
         // if current or previous cr is in tuplet (but not both in same tuplet):
         // consider it as if this were next shorter duration
-        if (prev && (cr->tuplet() != prev->tuplet()) && (d == prev->durationType())) {
-            if (d >= DurationType::V_EIGHTH) {
+        if (prev && (cr->tuplet() != prev->tuplet()) && (crDuration == prev->durationType())) {
+            if (crDuration >= DurationType::V_EIGHTH) {
                 val = g.beamMode(tick.ticks(), DurationType::V_16TH);
-            } else if (d == DurationType::V_16TH) {
+            } else if (crDuration == DurationType::V_16TH) {
                 val = g.beamMode(tick.ticks(), DurationType::V_32ND);
             } else {
                 val = g.beamMode(tick.ticks(), DurationType::V_64TH);
@@ -146,7 +175,7 @@ BeamMode Groups::beamMode(int tick, DurationType d) const
     default:
         return BeamMode::AUTO;
     }
-    const int dm = Constant::division / 8;
+    const int dm = Constants::division / 8;
     for (const GroupNode& e : m_nodes) {
         if (e.pos * dm < tick) {
             continue;
@@ -213,12 +242,11 @@ const Groups& Groups::endings(const Fraction& f)
 
 void Groups::write(XmlWriter& xml) const
 {
-    xml.startObject("Groups");
+    xml.startElement("Groups");
     for (const GroupNode& n : m_nodes) {
-        xml.tagE(QString("Node pos=\"%1\" action=\"%2\"")
-                 .arg(n.pos).arg(n.action));
+        xml.tag("Node", { { "pos", n.pos }, { "action", n.action } });
     }
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -228,7 +256,7 @@ void Groups::write(XmlWriter& xml) const
 void Groups::read(XmlReader& e)
 {
     while (e.readNextStartElement()) {
-        const QStringRef& tag(e.name());
+        const AsciiStringView tag(e.name());
         if (tag == "Node") {
             GroupNode n;
             n.pos    = e.intAttribute("pos");

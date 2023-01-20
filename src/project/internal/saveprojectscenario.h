@@ -28,12 +28,14 @@
 #include "modularity/ioc.h"
 #include "iprojectconfiguration.h"
 #include "global/iinteractive.h"
+#include "cloud/iauthorizationservice.h"
 
 namespace mu::project {
 class SaveProjectScenario : public ISaveProjectScenario
 {
     INJECT(project, IProjectConfiguration, configuration)
     INJECT(project, framework::IInteractive, interactive)
+    INJECT(project, cloud::IAuthorizationService, authorizationService)
 
 public:
     SaveProjectScenario() = default;
@@ -41,19 +43,22 @@ public:
     RetVal<SaveLocation> askSaveLocation(INotationProjectPtr project, SaveMode mode,
                                          SaveLocationType preselectedType = SaveLocationType::Undefined) const override;
 
-    RetVal<io::path> askLocalPath(INotationProjectPtr project, SaveMode mode) const override;
-    RetVal<SaveLocation::CloudInfo> askCloudLocation(INotationProjectPtr project,
-                                                     CloudProjectVisibility defaultVisibility = CloudProjectVisibility::Private) const
-    override;
+    RetVal<io::path_t> askLocalPath(INotationProjectPtr project, SaveMode mode) const override;
+    RetVal<CloudProjectInfo> askCloudLocation(INotationProjectPtr project, SaveMode mode) const override;
+    RetVal<CloudProjectInfo> askPublishLocation(INotationProjectPtr project) const override;
+
+    bool warnBeforeSavingToExistingPubliclyVisibleCloudProject() const override;
 
 private:
     RetVal<SaveLocationType> saveLocationType() const;
     RetVal<SaveLocationType> askSaveLocationType() const;
 
-    RetVal<SaveLocation::CloudInfo> doAskCloudLocation(INotationProjectPtr project, bool canSaveLocallyInstead = true,
-                                                       CloudProjectVisibility defaultVisibility = CloudProjectVisibility::Private) const;
+    /// \param isPublish:
+    ///     false -> this is part of a "Save to cloud" action
+    ///     true -> this is part of a "Publish" action
+    RetVal<CloudProjectInfo> doAskCloudLocation(INotationProjectPtr project, SaveMode mode, bool isPublish) const;
 
-    bool warnBeforePublishing() const;
+    bool warnBeforePublishing(bool isPublish, cloud::Visibility visibility) const;
 };
 
 class QMLSaveLocationType
@@ -75,8 +80,8 @@ class QMLCloudVisibility
 
 public:
     enum CloudVisibility {
-        Private = int(CloudProjectVisibility::Private),
-        Public = int(CloudProjectVisibility::Public)
+        Private = int(cloud::Visibility::Private),
+        Public = int(cloud::Visibility::Public)
     };
     Q_ENUM(CloudVisibility);
 };

@@ -68,7 +68,11 @@ Item {
         navigation.panel: root.navigationPanel
         navigation.row: root.navigationRow
         navigation.column: 1
-        accessible.name: qsTrc("palette", "Expand")
+        navigation.accessible.name: root.expanded
+                                    //: Collapse a tree item
+                                    ? qsTrc("global", "Collapse")
+                                    //: Expand a tree item
+                                    : qsTrc("global", "Expand")
 
         onClicked: root.toggleExpandRequested()
     }
@@ -143,7 +147,7 @@ Item {
         navigation.column: 3
 
         menuModel: [
-            {id: "hide", title: root.custom ? qsTrc("palette", "Hide/delete palette") : qsTrc("palette", "Hide palette") },
+            {id: "hide", title: root.custom ? qsTrc("palette", "Hide/Delete palette") : qsTrc("palette", "Hide palette") },
             {id: "new", title: qsTrc("palette", "Insert new palette") },
             {id: "", title: "" }, // separator
             {id: "edit", title: qsTrc("palette", "Enable editing"), checkable: true, checked: root.editingEnabled },

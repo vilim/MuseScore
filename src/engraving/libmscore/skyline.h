@@ -25,27 +25,28 @@
 
 #include <vector>
 
-#include "infrastructure/draw/geometry.h"
+#include "draw/types/geometry.h"
+#include "shape.h"
 
 namespace mu::draw {
 class Painter;
 }
 
-namespace Ms {
+namespace mu::engraving {
 class Segment;
-class Shape;
 
 //---------------------------------------------------------
 //   SkylineSegment
 //---------------------------------------------------------
 
 struct SkylineSegment {
-    qreal x;
-    qreal y;
-    qreal w;
+    double x;
+    double y;
+    double w;
+    int staffSpan;
 
-    SkylineSegment(qreal _x, qreal _y, qreal _w)
-        : x(_x), y(_y), w(_w) {}
+    SkylineSegment(double _x, double _y, double _w, int _staffSpan = 0)
+        : x(_x), y(_y), w(_w), staffSpan(_staffSpan) {}
 };
 
 //---------------------------------------------------------
@@ -59,22 +60,24 @@ class SkylineLine
     typedef std::vector<SkylineSegment>::iterator SegIter;
     typedef std::vector<SkylineSegment>::const_iterator SegConstIter;
 
-    SegIter insert(SegIter i, qreal x, qreal y, qreal w);
-    void append(qreal x, qreal y, qreal w);
-    SegIter find(qreal x);
-    SegConstIter find(qreal x) const;
+    SegIter insert(SegIter i, double x, double y, double w, int span);
+    void append(double x, double y, double w, int span);
+    SegIter find(double x);
+    SegConstIter find(double x) const;
 
 public:
     SkylineLine(bool n)
         : north(n) {}
     void add(const Shape& s);
-    void add(const mu::RectF& r);
-    void add(qreal x, qreal y, qreal w);
+    void add(const ShapeElement& r);
+    void add(double x, double y, double w, int span = 0);
+    void add(const RectF& r) { add(ShapeElement(r)); }
+
     void clear() { seg.clear(); }
     void paint(mu::draw::Painter& painter) const;
     void dump() const;
-    qreal minDistance(const SkylineLine&) const;
-    qreal max() const;
+    double minDistance(const SkylineLine&) const;
+    double max() const;
     bool valid() const;
     bool valid(const SkylineSegment& s) const;
     bool isNorth() const { return north; }
@@ -100,18 +103,19 @@ public:
 
     void clear();
     void add(const Shape& s);
-    void add(const mu::RectF& r);
+    void add(const ShapeElement& r);
+    void add(const RectF& r) { add(ShapeElement(r)); }
 
-    qreal minDistance(const Skyline&) const;
+    double minDistance(const Skyline&) const;
 
     SkylineLine& north() { return _north; }
     SkylineLine& south() { return _south; }
     const SkylineLine& north() const { return _north; }
     const SkylineLine& south() const { return _south; }
 
-    void paint(mu::draw::Painter& painter, qreal lineWidth) const;
+    void paint(mu::draw::Painter& painter, double lineWidth) const;
     void dump(const char*, bool north = false) const;
 };
-} // namespace Ms
+} // namespace mu::engraving
 
 #endif

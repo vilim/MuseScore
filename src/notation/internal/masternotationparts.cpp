@@ -24,6 +24,7 @@
 
 #include "libmscore/masterscore.h"
 #include "libmscore/scoreorder.h"
+#include "libmscore/excerpt.h"
 #include "libmscore/undo.h"
 
 #include "log.h"
@@ -82,41 +83,58 @@ void MasterNotationParts::removeStaves(const IDList& stavesIds)
     endGlobalEdit();
 }
 
-void MasterNotationParts::appendStaff(Staff* staff, const ID& destinationPartId)
+bool MasterNotationParts::appendStaff(Staff* staff, const ID& destinationPartId)
 {
     TRACEFUNC;
+
+    IF_ASSERT_FAILED(staff) {
+        return false;
+    }
 
     startGlobalEdit();
 
     //! NOTE: will be generated later after adding to the score
-    staff->setId(Ms::INVALID_ID);
+    staff->setId(mu::engraving::INVALID_ID);
 
     NotationParts::appendStaff(staff, destinationPartId);
 
     for (INotationPartsPtr parts : excerptsParts()) {
-        Staff* excerptStaff = Ms::toStaff(staff->linkedClone());
-        parts->appendStaff(excerptStaff, destinationPartId);
+        Staff* excerptStaff = mu::engraving::toStaff(staff->linkedClone());
+        if (!parts->appendStaff(excerptStaff, destinationPartId)) {
+            excerptStaff->unlink();
+            delete excerptStaff;
+        }
     }
 
     endGlobalEdit();
+    return true;
 }
 
-void MasterNotationParts::appendLinkedStaff(Staff* staff, const mu::ID& sourceStaffId, const mu::ID& destinationPartId)
+bool MasterNotationParts::appendLinkedStaff(Staff* staff, const mu::ID& sourceStaffId, const mu::ID& destinationPartId)
 {
     TRACEFUNC;
+
+    IF_ASSERT_FAILED(staff) {
+        return false;
+    }
 
     startGlobalEdit();
 
     //! NOTE: will be generated later after adding to the score
-    staff->setId(Ms::INVALID_ID);
+    staff->setId(mu::engraving::INVALID_ID);
 
     NotationParts::appendLinkedStaff(staff, sourceStaffId, destinationPartId);
 
     for (INotationPartsPtr parts : excerptsParts()) {
-        parts->appendLinkedStaff(staff->clone(), sourceStaffId, destinationPartId);
+        Staff* excerptStaff = staff->clone();
+        if (!parts->appendLinkedStaff(excerptStaff, sourceStaffId, destinationPartId)) {
+            excerptStaff->unlink();
+            delete excerptStaff;
+        }
     }
 
     endGlobalEdit();
+    return true;
 }
 
 void MasterNotationParts::replaceInstrument(const InstrumentKey& instrumentKey, const Instrument& newInstrument)
@@ -125,10 +143,20 @@ void MasterNotationParts::replaceInstrument(const InstrumentKey& instrumentKey, 
 
     startGlobalEdit();
 
+    const Part* part = partModifiable(instrumentKey.partId);
+    bool isMainInstrument = part && isMainInstrumentForPart(instrumentKey, part);
+
     NotationParts::replaceInstrument(instrumentKey, newInstrument);
 
     for (INotationPartsPtr parts : excerptsParts()) {
         parts->replaceInstrument(instrumentKey, newInstrument);
+    }
+
+    if (isMainInstrument) {
+        if (mu::engraving::Excerpt* excerpt = findExcerpt(part->id())) {
+            String newName = mu::engraving::Excerpt::formatName(part->partName(), score()->masterScore()->excerpts());
+            excerpt->excerptScore()->undo(new mu::engraving::ChangeExcerptTitle(excerpt, newName));
+        }
     }
 
     endGlobalEdit();
@@ -149,6 +177,27 @@ void MasterNotationParts::replaceDrumset(const InstrumentKey& instrumentKey, con
     endGlobalEdit();
 }
 
+void MasterNotationParts::onPartsRemoved(const std::vector<Part*>& parts)
+{
+    mu::engraving::MasterScore* master = score()->masterScore();
+    std::vector<mu::engraving::Excerpt*> excerpts = master->excerpts();
+
+    for (mu::engraving::Excerpt* excerpt : excerpts) {
+        const ID& initialPartId = excerpt->initialPartId();
+        if (!initialPartId.isValid()) {
+            continue;
+        }
+
+        bool deleteExcerpt = std::find_if(parts.cbegin(), parts.cend(), [initialPartId](const Part* part) {
+            return part->id() == initialPartId;
+        }) != parts.cend();
+
+        if (deleteExcerpt) {
+            master->deleteExcerpt(excerpt);
+        }
+    }
+}
+
 std::vector<INotationPartsPtr> MasterNotationParts::excerptsParts() const
 {
     std::vector<INotationPartsPtr> result;
@@ -158,4 +207,16 @@ std::vector<INotationPartsPtr> MasterNotationParts::excerptsParts() const
     }
 
     return result;
+}
+
+mu::engraving::Excerpt* MasterNotationParts::findExcerpt(const ID& initialPartId) const
+{
+    const std::vector<mu::engraving::Excerpt*>& excerpts = score()->masterScore()->excerpts();
+    for (mu::engraving::Excerpt* excerpt : excerpts) {
+        if (excerpt->initialPartId() == initialPartId) {
+            return excerpt;
+        }
+    }
+
+    return nullptr;
 }

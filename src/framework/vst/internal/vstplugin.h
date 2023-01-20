@@ -34,6 +34,7 @@
 #include "audio/iaudiothreadsecurer.h"
 #include "audio/audiotypes.h"
 
+#include "ivstmodulesrepository.h"
 #include "vsttypes.h"
 #include "vstcomponenthandler.h"
 #include "vsterrors.h"
@@ -42,33 +43,40 @@ namespace mu::vst {
 class VstPlugin : public async::Asyncable
 {
     INJECT_STATIC(vst, audio::IAudioThreadSecurer, threadSecurer)
+    INJECT_STATIC(vst, IVstModulesRepository, modulesRepo)
 
 public:
-    VstPlugin(PluginModulePtr module);
+    VstPlugin(const audio::AudioResourceId& resourceId);
 
+    const audio::AudioResourceId& resourceId() const;
     const std::string& name() const;
 
-    PluginViewPtr view() const;
+    PluginViewPtr createView() const;
     PluginProviderPtr provider() const;
     bool isAbleForInput() const;
 
     void updatePluginConfig(const audio::AudioUnitConfig& config);
+    void refreshConfig();
 
     void load();
+    void unload();
 
     bool isValid() const;
     bool isLoaded() const;
 
     async::Notification loadingCompleted() const;
+    async::Notification unloadingCompleted() const;
+
     async::Channel<audio::AudioUnitConfig> pluginSettingsChanged() const;
 
 private:
     void rescanParams();
     void stateBufferFromString(VstMemoryStream& buffer, char* strData, const size_t strSize) const;
 
+    audio::AudioResourceId m_resourceId;
+
     PluginModulePtr m_module = nullptr;
     PluginProviderPtr m_pluginProvider = nullptr;
-    mutable PluginViewPtr m_pluginView = nullptr;
     ClassInfo m_classInfo;
 
     Steinberg::FUnknownPtr<VstComponentHandler> m_componentHandlerPtr = nullptr;
@@ -79,6 +87,7 @@ private:
 
     std::atomic_bool m_isLoaded = false;
     async::Notification m_loadingCompleted;
+    async::Notification m_unloadingCompleted;
 
     mutable std::mutex m_mutex;
 };

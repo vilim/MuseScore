@@ -26,7 +26,7 @@
 #include "modularity/imoduleexport.h"
 #include "inotationproject.h"
 
-#include "retval.h"
+#include "types/retval.h"
 
 namespace mu::project {
 class ISaveProjectScenario : MODULE_EXPORT_INTERFACE
@@ -37,10 +37,11 @@ public:
     virtual RetVal<SaveLocation> askSaveLocation(INotationProjectPtr project, SaveMode mode,
                                                  SaveLocationType preselectedType = SaveLocationType::Undefined) const = 0;
 
-    virtual RetVal<io::path> askLocalPath(INotationProjectPtr project, SaveMode mode) const = 0;
-    virtual RetVal<SaveLocation::CloudInfo> askCloudLocation(INotationProjectPtr project,
-                                                             CloudProjectVisibility defaultVisibility = CloudProjectVisibility::Private)
-    const = 0;
+    virtual RetVal<io::path_t> askLocalPath(INotationProjectPtr project, SaveMode mode) const = 0;
+    virtual RetVal<CloudProjectInfo> askCloudLocation(INotationProjectPtr project, SaveMode mode) const = 0;
+    virtual RetVal<CloudProjectInfo> askPublishLocation(INotationProjectPtr project) const = 0;
+
+    virtual bool warnBeforeSavingToExistingPubliclyVisibleCloudProject() const = 0;
 };
 }
 

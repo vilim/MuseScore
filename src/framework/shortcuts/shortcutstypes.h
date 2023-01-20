@@ -26,8 +26,11 @@
 #include <list>
 #include <QKeySequence>
 
+#include "utils.h"
 #include "stringutils.h"
 #include "midi/midievent.h"
+
+#include "translation.h"
 
 namespace mu::shortcuts {
 struct Shortcut
@@ -43,7 +46,7 @@ struct Shortcut
 
     bool isValid() const
     {
-        return !action.empty() && (!sequences.empty() || standardKey != QKeySequence::UnknownKey);
+        return !action.empty();
     }
 
     bool operator ==(const Shortcut& sc) const
@@ -55,14 +58,20 @@ struct Shortcut
 
     static std::string sequencesToString(const std::vector<std::string>& seqs)
     {
-        return strings::join(seqs, "; ");
+        return strings::join(seqs, ", ");
     }
 
     static std::vector<std::string> sequencesFromString(const std::string& str)
     {
         std::vector<std::string> seqs;
-        strings::split(str, seqs, "; ");
+        strings::split(str, seqs, ", ");
         return seqs;
+    }
+
+    void clear()
+    {
+        sequences.clear();
+        standardKey = QKeySequence::StandardKey::UnknownKey;
     }
 };
 
@@ -85,6 +94,20 @@ struct RemoteEvent {
     bool isValid() const
     {
         return type != RemoteEventType::Undefined && value != -1;
+    }
+
+    String name() const
+    {
+        if (this->type == RemoteEventType::Note) {
+            //: A MIDI remote event, namely a note event
+            return mtrc("shortcuts", "Note %1").arg(String::fromStdString(pitchToString(this->value)));
+        } else if (this->type == RemoteEventType::Controller) {
+            //: A MIDI remote event, namely a MIDI controller event
+            return mtrc("shortcuts", "CC %1").arg(String::number(this->value));
+        }
+
+        //: No MIDI remote event
+        return mtrc("shortcuts", "None");
     }
 
     bool operator ==(const RemoteEvent& other) const
@@ -177,6 +200,21 @@ inline QString sequencesToNativeText(const std::vector<std::string>& sequences)
     }
 
     return QKeySequence::listToString(keySequenceList, QKeySequence::NativeText);
+}
+
+inline bool areContextPrioritiesEqual(const std::string& shortcutCtx1, const std::string& shortcutCtx2)
+{
+    static constexpr std::string_view ANY_CTX("any");
+
+    if (shortcutCtx1 == ANY_CTX || shortcutCtx2 == ANY_CTX) {
+        return true;
+    }
+
+    if (shortcutCtx1.empty() || shortcutCtx2.empty()) {
+        return true;
+    }
+
+    return shortcutCtx1 == shortcutCtx2;
 }
 }
 

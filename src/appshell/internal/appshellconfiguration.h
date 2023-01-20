@@ -57,24 +57,17 @@ public:
     StartupModeType startupModeType() const override;
     void setStartupModeType(StartupModeType type) override;
 
-    io::path startupScorePath() const override;
-    void setStartupScorePath(const io::path& scorePath) override;
+    io::path_t startupScorePath() const override;
+    void setStartupScorePath(const io::path_t& scorePath) override;
 
-    io::path userDataPath() const override;
-
-    bool isAppUpdatable() const override;
-
-    bool needCheckForUpdate() const override;
-    void setNeedCheckForUpdate(bool needCheck) override;
+    io::path_t userDataPath() const override;
 
     std::string handbookUrl() const override;
     std::string askForHelpUrl() const override;
     std::string bugReportUrl() const override;
-    std::string leaveFeedbackUrl() const override;
     std::string museScoreUrl() const override;
     std::string museScoreForumUrl() const override;
     std::string museScoreContributionUrl() const override;
-    std::string museScorePrivacyPolicyUrl() const override;
     std::string musicXMLLicenseUrl() const override;
     std::string musicXMLLicenseDeedUrl() const override;
 
@@ -92,10 +85,10 @@ public:
     void applySettings() override;
     void rollbackSettings() override;
 
-    void revertToFactorySettings(bool keepDefaultSettings = false) const override;
+    void revertToFactorySettings(bool keepDefaultSettings = false, bool notifyAboutChanges = true) const override;
 
-    io::paths sessionProjectsPaths() const override;
-    Ret setSessionProjectsPaths(const io::paths& paths) override;
+    io::paths_t sessionProjectsPaths() const override;
+    Ret setSessionProjectsPaths(const io::paths_t& paths) override;
 
 private:
     std::string utmParameters(const std::string& utmMedium) const;
@@ -103,13 +96,13 @@ private:
 
     std::string currentLanguageCode() const;
 
-    io::path sessionDataPath() const;
-    io::path sessionFilePath() const;
+    io::path_t sessionDataPath() const;
+    io::path_t sessionFilePath() const;
 
-    RetVal<QByteArray> readSessionState() const;
+    RetVal<mu::ByteArray> readSessionState() const;
     Ret writeSessionState(const QByteArray& data);
 
-    io::paths parseSessionProjectsPaths(const QByteArray& json) const;
+    io::paths_t parseSessionProjectsPaths(const QByteArray& json) const;
 };
 }
 

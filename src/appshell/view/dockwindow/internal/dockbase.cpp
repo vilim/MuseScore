@@ -33,9 +33,17 @@
 #include "thirdparty/KDDockWidgets/src/private/FloatingWindow_p.h"
 
 namespace mu::dock {
-static QSize adjustSizeByContraints(const QSize& size, const QSize& min, const QSize& max)
+static QSize adjustSizeByConstraints(const QSize& size, const QSize& min, const QSize& max)
 {
     return size.expandedTo(min).boundedTo(max);
+}
+
+static bool sizeInRange(const QSize& size, const QSize& min, const QSize& max)
+{
+    bool widthInRange = size.width() >= min.width() && size.width() <= max.width();
+    bool heightInRange = size.height() >= min.height() && size.height() <= max.height();
+
+    return widthInRange && heightInRange;
 }
 
 class DockWidgetImpl : public KDDockWidgets::DockWidgetQuick
@@ -341,6 +349,8 @@ void DockBase::init()
 
     setVisible(m_dockWidget->isOpen());
     setInited(true);
+
+    applySizeConstraints();
 }
 
 void DockBase::deinit()
@@ -367,6 +377,8 @@ void DockBase::open()
 
     m_dockWidget->show();
     setVisible(true);
+
+    applySizeConstraints();
 }
 
 void DockBase::close()
@@ -522,6 +534,11 @@ void DockBase::applySizeConstraints()
     int maxWidth = m_maximumWidth > 0 ? m_maximumWidth : m_dockWidget->maximumWidth();
     int maxHeight = m_maximumHeight > 0 ? m_maximumHeight : m_dockWidget->maximumHeight();
 
+    minWidth = std::min(minWidth, maxWidth);
+    minHeight = std::min(minHeight, maxHeight);
+    maxWidth = std::max(maxWidth, minWidth);
+    maxHeight = std::max(maxHeight, minHeight);
+
     QSize minimumSize(minWidth, minHeight);
     QSize maximumSize(maxWidth, maxHeight);
 
@@ -529,7 +546,9 @@ void DockBase::applySizeConstraints()
         maximumSize = minimumSize;
     }
 
-    if (auto frame = m_dockWidget->frame()) {
+    KDDockWidgets::Frame* frame = m_dockWidget->frame();
+
+    if (frame) {
         frame->setMinimumSize(minimumSize);
         frame->setMaximumSize(maximumSize);
     }
@@ -537,17 +556,40 @@ void DockBase::applySizeConstraints()
     m_dockWidget->setMinimumSize(minimumSize);
     m_dockWidget->setMaximumSize(maximumSize);
 
-    if (auto window = m_dockWidget->floatingWindow()) {
+    if (KDDockWidgets::FloatingWindow* window = m_dockWidget->floatingWindow()) {
         window->setMinimumSize(minimumSize);
         window->setMaximumSize(maximumSize);
 
-        QSize winSize = adjustSizeByContraints(window->frameGeometry().size(), minimumSize, maximumSize);
+        QSize winSize = adjustSizeByConstraints(window->frameGeometry().size(), minimumSize, maximumSize);
         QRect winRect(window->dragRect().topLeft(), winSize);
 
         window->setGeometry(winRect);
 
-        if (auto layout = window->layoutWidget()) {
+        if (KDDockWidgets::LayoutWidget* layout = window->layoutWidget()) {
             layout->setLayoutSize(winSize);
+        }
+    }
+
+    if (!frame || !m_inited) {
+        return;
+    }
+
+    QSize currentSize = m_dockWidget->size();
+
+    //! NOTE: Initial size for all dock-widgets
+    //! See QWidgetAdapter_quick.cpp, QWidgetAdapter::QWidgetAdapter
+    static constexpr QSize INITIAL_DOCK_SIZE(800, 800);
+    if (currentSize == INITIAL_DOCK_SIZE) {
+        return;
+    }
+
+    if (sizeInRange(currentSize, minimumSize, maximumSize)) {
+        return;
+    }
+
+    if (const Layouting::Item* layout = frame->layoutItem()) {
+        if (Layouting::ItemBoxContainer* container = layout->parentBoxContainer()) {
+            container->layoutEqually_recursive();
         }
     }
 }
@@ -580,10 +622,14 @@ void DockBase::listenFloatingChanges()
         //! and emit floatingChanged() after that
         QTimer::singleShot(0, this, [this]() {
             updateFloatingStatus();
+
+            if (m_floating) {
+                applySizeConstraints();
+            }
         });
 
-        *frameConn
-            = connect(frame, &KDDockWidgets::Frame::isInMainWindowChanged, this, &DockBase::updateFloatingStatus, Qt::UniqueConnection);
+        *frameConn = connect(frame, &KDDockWidgets::Frame::isInMainWindowChanged,
+                             this, &DockBase::onIsInMainWindowChanged, Qt::UniqueConnection);
     });
 
     connect(m_dockWidget->toggleAction(), &QAction::toggled, this, [this]() {
@@ -598,7 +644,12 @@ void DockBase::updateFloatingStatus()
     bool floating = m_dockWidget && m_dockWidget->floatingWindow();
 
     doSetFloating(floating);
+}
+
+void DockBase::onIsInMainWindowChanged()
+{
     applySizeConstraints();
+    updateFloatingStatus();
 }
 
 void DockBase::doSetFloating(bool floating)

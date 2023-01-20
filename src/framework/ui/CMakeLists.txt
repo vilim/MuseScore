@@ -114,8 +114,6 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/view/navigationevent.h
     ${CMAKE_CURRENT_LIST_DIR}/view/qmlaccessible.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/qmlaccessible.h
-    ${CMAKE_CURRENT_LIST_DIR}/view/widgetview.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/view/widgetview.h
     ${CMAKE_CURRENT_LIST_DIR}/view/mainwindowprovider.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/mainwindowprovider.h
     ${CMAKE_CURRENT_LIST_DIR}/view/focuslistener.cpp
@@ -125,6 +123,9 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/view/widgetstatestore.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/widgetstatestore.h
     ${CMAKE_CURRENT_LIST_DIR}/view/widgetutils.h
+
+    ${CMAKE_CURRENT_LIST_DIR}/view/internal/errordetailsmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/internal/errordetailsmodel.h
 
     ${CMAKE_CURRENT_LIST_DIR}/dev/interactivetestsmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/dev/interactivetestsmodel.h

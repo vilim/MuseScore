@@ -51,7 +51,7 @@ StyledDialogView {
         directoriesModel.load(root.startDir, root.selectedDirectories)
     }
 
-    onOpened: {
+    onNavigationActivateRequested: {
         view.focusOnFirst()
     }
 
@@ -105,8 +105,7 @@ StyledDialogView {
             navigationPanel.order: 3
 
             onRejected: {
-                root.ret = { errcode: 0, value: directoriesModel.originDirectories() }
-                root.hide()
+                root.reject()
             }
 
             onAccepted: {

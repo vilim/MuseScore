@@ -29,9 +29,11 @@
 #include "context/iglobalcontext.h"
 #include "ui/iuiconfiguration.h"
 
-namespace Ms {
+namespace mu::engraving {
 class TimeSig;
+}
 
+namespace mu::palette {
 //---------------------------------------------------------
 //   TimeSigProperties
 //---------------------------------------------------------
@@ -40,8 +42,8 @@ class TimeSignaturePropertiesDialog : public QDialog, public Ui::TimeSigProperti
 {
     Q_OBJECT
 
-    INJECT(Ms, mu::context::IGlobalContext, globalContext)
-    INJECT(Ms, mu::ui::IUiConfiguration, uiConfiguration)
+    INJECT(palette, mu::context::IGlobalContext, globalContext)
+    INJECT(palette, mu::ui::IUiConfiguration, uiConfiguration)
 
 public:
     TimeSignaturePropertiesDialog(QWidget* parent = nullptr);
@@ -58,11 +60,11 @@ private:
 
     mu::notation::INotationPtr notation() const;
 
-    TimeSig* m_originTimeSig = nullptr;
-    TimeSig* m_editedTimeSig = nullptr;
+    engraving::TimeSig* m_originTimeSig = nullptr;
+    engraving::TimeSig* m_editedTimeSig = nullptr;
 };
 }
 
-Q_DECLARE_METATYPE(Ms::TimeSignaturePropertiesDialog)
+Q_DECLARE_METATYPE(mu::palette::TimeSignaturePropertiesDialog)
 
 #endif // MU_PALETTE_TIMESIGNATUREPROPERTIESDIALOG_H

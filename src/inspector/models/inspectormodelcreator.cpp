@@ -23,6 +23,7 @@
 
 #include "notation/notes/notesettingsproxymodel.h"
 #include "notation/notes/noteheads/noteheadsettingsmodel.h"
+#include "notation/notes/chords/chordsettingsmodel.h"
 #include "notation/notes/beams/beamsettingsmodel.h"
 #include "notation/notes/hooks/hooksettingsmodel.h"
 #include "notation/notes/stems/stemsettingsmodel.h"
@@ -48,6 +49,7 @@
 #include "notation/lines/palmmutesettingsmodel.h"
 #include "notation/lines/vibratosettingsmodel.h"
 #include "notation/lines/slurandtiesettingsmodel.h"
+#include "notation/lines/gradualtempochangesettingsmodel.h"
 #include "notation/stafftype/stafftypesettingsmodel.h"
 #include "notation/frames/textframesettingsmodel.h"
 #include "notation/frames/verticalframesettingsmodel.h"
@@ -66,6 +68,7 @@
 #include "notation/measurerepeats/measurerepeatsettingsmodel.h"
 #include "notation/tuplets/tupletsettingsmodel.h"
 #include "notation/instrumentname/instrumentnamesettingsmodel.h"
+#include "notation/lyrics/lyricssettingsmodel.h"
 
 using namespace mu::inspector;
 
@@ -77,6 +80,8 @@ AbstractInspectorModel* InspectorModelCreator::newInspectorModel(InspectorModelT
         return new NoteSettingsProxyModel(parent, repository);
     case InspectorModelType::TYPE_NOTEHEAD:
         return new NoteheadSettingsModel(parent, repository);
+    case InspectorModelType::TYPE_CHORD:
+        return new ChordSettingsModel(parent, repository);
     case InspectorModelType::TYPE_STEM:
         return new StemSettingsModel(parent, repository);
     case InspectorModelType::TYPE_HOOK:
@@ -127,6 +132,8 @@ AbstractInspectorModel* InspectorModelCreator::newInspectorModel(InspectorModelT
         return new LetRingSettingsModel(parent, repository);
     case InspectorModelType::TYPE_TEXT_LINE:
         return new TextLineSettingsModel(parent, repository);
+    case InspectorModelType::TYPE_GRADUAL_TEMPO_CHANGE:
+        return new GradualTempoChangeSettingsModel(parent, repository);
     case InspectorModelType::TYPE_VIBRATO:
         return new VibratoSettingsModel(parent, repository);
     case InspectorModelType::TYPE_SLUR:
@@ -169,6 +176,8 @@ AbstractInspectorModel* InspectorModelCreator::newInspectorModel(InspectorModelT
         return new TupletSettingsModel(parent, repository);
     case InspectorModelType::TYPE_INSTRUMENT_NAME:
         return new InstrumentNameSettingsModel(parent, repository);
+    case InspectorModelType::TYPE_LYRICS:
+        return new LyricsSettingsModel(parent, repository);
     case InspectorModelType::TYPE_BREATH:
     case InspectorModelType::TYPE_ARPEGGIO:
     case InspectorModelType::TYPE_DYNAMIC:

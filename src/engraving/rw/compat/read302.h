@@ -22,21 +22,32 @@
 #ifndef MU_ENGRAVING_READ302_H
 #define MU_ENGRAVING_READ302_H
 
-#include "libmscore/masterscore.h"
+#include "modularity/ioc.h"
+#include "iengravingfontsprovider.h"
 
-namespace Ms {
+#include "engravingerrors.h"
+
+namespace mu::engraving {
+class Instrument;
+class MasterScore;
+class Score;
+
+class ReadContext;
 class XmlReader;
 }
 
 namespace mu::engraving::compat {
 class Read302
 {
+    INJECT_STATIC(engraving, IEngravingFontsProvider, engravingFonts)
 public:
 
-    static Ms::Score::FileError read302(Ms::MasterScore* masterScore, Ms::XmlReader& e, ReadContext& ctx);
+    static Err read302(MasterScore* masterScore, XmlReader& e, ReadContext& ctx);
 
 private:
-    static bool readScore302(Ms::Score* score, Ms::XmlReader& e, ReadContext& ctx);
+    static bool readScore302(Score* score, XmlReader& e, ReadContext& ctx);
+
+    static void fixInstrumentId(Instrument* instrument);
 };
 }
 

@@ -20,13 +20,16 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "interactiveprovider.h"
-#include "log.h"
 
 #include <QMetaType>
 #include <QMetaProperty>
 #include <QDialog>
+#include <QFileDialog>
 #include <QGuiApplication>
 #include <QWindow>
+
+#include "containers.h"
+#include "log.h"
 
 using namespace mu;
 using namespace mu::ui;
@@ -36,7 +39,7 @@ class WidgetDialogEventFilter : public QObject
 {
 public:
     WidgetDialogEventFilter(QObject* parent, const std::function<void()>& onShownCallBack,
-                            const std::function<void()>& onHideCallBack)
+                            const std::function<void()>& onHideCallBack = std::function<void()>())
         : QObject(parent), m_onShownCallBack(onShownCallBack), m_onHideCallBack(onHideCallBack)
     {
     }
@@ -100,28 +103,50 @@ RetVal<Val> InteractiveProvider::question(const std::string& title, const IInter
                                           const IInteractive::ButtonDatas& buttons, int defBtn,
                                           const IInteractive::Options& options)
 {
-    return openStandardDialog("QUESTION", QString::fromStdString(title), text, buttons, defBtn, options);
+    return openStandardDialog("QUESTION", title, text, {}, buttons, defBtn, options);
 }
 
-RetVal<Val> InteractiveProvider::info(const std::string& title, const std::string& text, const IInteractive::ButtonDatas& buttons,
+RetVal<Val> InteractiveProvider::info(const std::string& title, const IInteractive::Text& text, const IInteractive::ButtonDatas& buttons,
                                       int defBtn,
                                       const IInteractive::Options& options)
 {
-    return openStandardDialog("INFO", QString::fromStdString(title), text, buttons, defBtn, options);
+    return openStandardDialog("INFO", title, text, {}, buttons, defBtn, options);
 }
 
-RetVal<Val> InteractiveProvider::warning(const std::string& title, const std::string& text, const IInteractive::ButtonDatas& buttons,
+RetVal<Val> InteractiveProvider::warning(const std::string& title, const IInteractive::Text& text,
+                                         const std::string& detailedText,
+                                         const IInteractive::ButtonDatas& buttons,
                                          int defBtn,
                                          const IInteractive::Options& options)
 {
-    return openStandardDialog("WARNING", QString::fromStdString(title), text, buttons, defBtn, options);
+    return openStandardDialog("WARNING", title, text, detailedText, buttons, defBtn, options);
 }
 
-RetVal<Val> InteractiveProvider::error(const std::string& title, const std::string& text, const IInteractive::ButtonDatas& buttons,
+RetVal<Val> InteractiveProvider::error(const std::string& title, const framework::IInteractive::Text& text,
+                                       const std::string& detailedText,
+                                       const IInteractive::ButtonDatas& buttons,
                                        int defBtn,
                                        const IInteractive::Options& options)
 {
-    return openStandardDialog("ERROR", QString::fromStdString(title), text, buttons, defBtn, options);
+    return openStandardDialog("ERROR", title, text, detailedText, buttons, defBtn, options);
+}
+
+RetVal<io::path_t> InteractiveProvider::selectOpeningFile(const std::string& title, const io::path_t& dir,
+                                                          const std::vector<std::string>& filter)
+{
+    return openFileDialog(FileDialogType::SelectOpenningFile, title, dir, filter);
+}
+
+RetVal<io::path_t> InteractiveProvider::selectSavingFile(const std::string& title, const io::path_t& path,
+                                                         const std::vector<std::string>& filter,
+                                                         bool confirmOverwrite)
+{
+    return openFileDialog(FileDialogType::SelectSavingFile, title, path, filter, confirmOverwrite);
+}
+
+RetVal<io::path_t> InteractiveProvider::selectDirectory(const std::string& title, const io::path_t& dir)
+{
+    return openFileDialog(FileDialogType::SelectDirectory, title, dir);
 }
 
 RetVal<Val> InteractiveProvider::open(const UriQuery& q)
@@ -161,7 +186,7 @@ RetVal<Val> InteractiveProvider::open(const UriQuery& q)
 
 RetVal<bool> InteractiveProvider::isOpened(const Uri& uri) const
 {
-    for (const ObjectInfo& objectInfo: m_stack) {
+    for (const ObjectInfo& objectInfo: allOpenObjects()) {
         if (objectInfo.uriQuery.uri() == uri) {
             return RetVal<bool>::make_ok(true);
         }
@@ -172,7 +197,7 @@ RetVal<bool> InteractiveProvider::isOpened(const Uri& uri) const
 
 RetVal<bool> InteractiveProvider::isOpened(const UriQuery& uri) const
 {
-    for (const ObjectInfo& objectInfo: m_stack) {
+    for (const ObjectInfo& objectInfo: allOpenObjects()) {
         if (objectInfo.uriQuery == uri) {
             return RetVal<bool>::make_ok(true);
         }
@@ -188,7 +213,7 @@ async::Channel<Uri> InteractiveProvider::opened() const
 
 void InteractiveProvider::raise(const UriQuery& uri)
 {
-    for (const ObjectInfo& objectInfo: m_stack) {
+    for (const ObjectInfo& objectInfo: allOpenObjects()) {
         if (objectInfo.uriQuery != uri) {
             continue;
         }
@@ -213,7 +238,7 @@ void InteractiveProvider::raise(const UriQuery& uri)
 
 void InteractiveProvider::close(const Uri& uri)
 {
-    for (const ObjectInfo& obj : m_stack) {
+    for (const ObjectInfo& obj : allOpenObjects()) {
         if (obj.uriQuery.uri() == uri) {
             closeObject(obj);
         }
@@ -222,9 +247,20 @@ void InteractiveProvider::close(const Uri& uri)
 
 void InteractiveProvider::close(const UriQuery& uri)
 {
-    for (const ObjectInfo& obj : m_stack) {
+    for (const ObjectInfo& obj : allOpenObjects()) {
         if (obj.uriQuery == uri) {
             closeObject(obj);
+        }
+    }
+}
+
+void InteractiveProvider::closeAllDialogs()
+{
+    for (const ObjectInfo& objectInfo: allOpenObjects()) {
+        UriQuery uriQuery = objectInfo.uriQuery;
+        ContainerMeta openMeta = uriRegister()->meta(uriQuery.uri());
+        if (openMeta.type == ContainerType::QWidgetDialog || openMeta.type == ContainerType::QmlDialog) {
+            closeObject(objectInfo);
         }
     }
 }
@@ -282,12 +318,14 @@ void InteractiveProvider::fillData(QObject* object, const UriQuery& q) const
     }
 }
 
-void InteractiveProvider::fillStandardDialogData(QmlLaunchData* data, const QString& type, const QString& title,
-                                                 const IInteractive::Text& text, const IInteractive::ButtonDatas& buttons, int defBtn,
+void InteractiveProvider::fillStandardDialogData(QmlLaunchData* data, const QString& type, const std::string& title,
+                                                 const IInteractive::Text& text, const std::string& detailedText,
+                                                 const IInteractive::ButtonDatas& buttons, int defBtn,
                                                  const IInteractive::Options& options) const
 {
     auto format = [](IInteractive::TextFormat f) {
         switch (f) {
+        case IInteractive::TextFormat::Auto:      return Qt::AutoText;
         case IInteractive::TextFormat::PlainText: return Qt::PlainText;
         case IInteractive::TextFormat::RichText:  return Qt::RichText;
         }
@@ -296,8 +334,9 @@ void InteractiveProvider::fillStandardDialogData(QmlLaunchData* data, const QStr
 
     QVariantMap params;
     params["type"] = type;
-    params["title"] = title;
+    params["title"] = QString::fromStdString(title);
     params["text"] = QString::fromStdString(text.text);
+    params["detailedText"] = QString::fromStdString(detailedText);
     params["textFormat"] = format(text.format);
     params["defaultButtonId"] = defBtn;
 
@@ -319,11 +358,45 @@ void InteractiveProvider::fillStandardDialogData(QmlLaunchData* data, const QStr
         params["withIcon"] = true;
     }
 
-    if (options.testFlag(IInteractive::Option::WithShowAgain)) {
-        params["withShowAgain"] = true;
+    if (options.testFlag(IInteractive::Option::WithDontShowAgainCheckBox)) {
+        params["withDontShowAgainCheckBox"] = true;
     }
 
     data->setValue("params", params);
+}
+
+void InteractiveProvider::fillFileDialogData(QmlLaunchData* data, FileDialogType type, const std::string& title, const io::path_t& path,
+                                             const std::vector<std::string>& filter, bool confirmOverwrite) const
+{
+    QVariantMap params;
+    params["title"] = QString::fromStdString(title);
+
+    if (type == FileDialogType::SelectOpenningFile || type == FileDialogType::SelectSavingFile) {
+        QStringList filterList;
+        for (const std::string& nameFilter : filter) {
+            filterList << QString::fromStdString(nameFilter);
+        }
+
+        params["nameFilters"] = filterList;
+        params["selectExisting"] = type == FileDialogType::SelectOpenningFile;
+
+        if (type == FileDialogType::SelectOpenningFile) {
+            // see QQuickPlatformFileDialog::FileMode::OpenFile
+            params["fileMode"] = 0;
+            params["folder"] = QUrl::fromLocalFile(path.toQString());
+        } else {
+            // see QQuickPlatformFileDialog::FileMode::SaveFile
+            params["fileMode"] = 2;
+            params["currentFile"] = QUrl::fromLocalFile(path.toQString());
+
+            if (!confirmOverwrite) {
+                params["options"] = QFileDialog::DontConfirmOverwrite;
+            }
+        }
+    }
+
+    data->setValue("params", params);
+    data->setValue("selectFolder", type == FileDialogType::SelectDirectory);
 }
 
 ValCh<Uri> InteractiveProvider::currentUri() const
@@ -471,6 +544,7 @@ RetVal<InteractiveProvider::OpenData> InteractiveProvider::openWidgetDialog(cons
         dialog->exec();
     } else {
         dialog->show();
+        dialog->activateWindow(); // give keyboard focus to aid blind users
     }
 
     result.ret = make_ret(Ret::Code::Ok);
@@ -497,12 +571,13 @@ RetVal<InteractiveProvider::OpenData> InteractiveProvider::openQml(const UriQuer
     return result;
 }
 
-RetVal<Val> InteractiveProvider::openStandardDialog(const QString& type, const QString& title, const IInteractive::Text& text,
+RetVal<Val> InteractiveProvider::openStandardDialog(const QString& type, const std::string& title, const IInteractive::Text& text,
+                                                    const std::string& detailedText,
                                                     const IInteractive::ButtonDatas& buttons, int defBtn,
                                                     const IInteractive::Options& options)
 {
     QmlLaunchData* data = new QmlLaunchData();
-    fillStandardDialogData(data, type, title, text, buttons, defBtn, options);
+    fillStandardDialogData(data, type, title, text, detailedText, buttons, defBtn, options);
 
     emit fireOpenStandardDialog(data);
 
@@ -527,6 +602,33 @@ RetVal<Val> InteractiveProvider::openStandardDialog(const QString& type, const Q
     return result;
 }
 
+RetVal<io::path_t> InteractiveProvider::openFileDialog(FileDialogType type, const std::string& title, const io::path_t& path,
+                                                       const std::vector<std::string>& filter, bool confirmOverwrite)
+{
+    RetVal<io::path_t> result;
+
+    QmlLaunchData* data = new QmlLaunchData();
+    fillFileDialogData(data, type, title, path, filter, confirmOverwrite);
+
+    emit fireOpenFileDialog(data);
+
+    m_fileDialogEventLoop.exec();
+
+    QString objectId = data->value("objectId").toString();
+
+    delete data;
+
+    if (!objectId.isEmpty()) {
+        RetVal<Val> rv = m_retvals.take(objectId);
+        if (rv.ret.valid()) {
+            result.ret = rv.ret;
+            result.val = QUrl::fromUserInput(rv.val.toQString()).toLocalFile();
+        }
+    }
+
+    return result;
+}
+
 void InteractiveProvider::closeQml(const QVariant& objectId)
 {
     emit fireClose(objectId);
@@ -545,17 +647,18 @@ void InteractiveProvider::onOpen(const QVariant& type, const QVariant& objectId,
         containerType = ContainerType::QmlDialog;
     }
 
-    if (m_openingUriQuery.param("floating").toBool()) {
-        m_openingUriQuery = UriQuery();
-        return;
-    }
-
     ObjectInfo objectInfo;
     objectInfo.uriQuery = m_openingUriQuery;
     objectInfo.objectId = objectId;
     objectInfo.window = window;
     if (!objectInfo.window) {
         objectInfo.window = (containerType == ContainerType::PrimaryPage) ? mainWindow()->qWindow() : qApp->focusWindow();
+    }
+
+    if (m_openingUriQuery.param("floating").toBool()) {
+        m_openingUriQuery = UriQuery();
+        m_floatingObjects.push_back(objectInfo);
+        return;
     }
 
     if (ContainerType::PrimaryPage == containerType) {
@@ -594,7 +697,23 @@ void InteractiveProvider::onClose(const QString& objectId, const QVariant& jsrv)
     //! for example, a floating dialog (usually diagnostic dialogs)
     if (found) {
         notifyAboutCurrentUriChanged();
+    } else {
+        mu::remove_if(m_floatingObjects, [objectId](const ObjectInfo& obj) {
+            return obj.objectId == objectId;
+        });
     }
+
+    m_fileDialogEventLoop.quit();
+}
+
+std::vector<InteractiveProvider::ObjectInfo> InteractiveProvider::allOpenObjects() const
+{
+    std::vector<ObjectInfo> result;
+
+    result.insert(result.end(), m_stack.cbegin(), m_stack.cend());
+    result.insert(result.end(), m_floatingObjects.cbegin(), m_floatingObjects.cend());
+
+    return result;
 }
 
 void InteractiveProvider::notifyAboutCurrentUriChanged()

@@ -22,16 +22,31 @@
 
 #include "musesamplerconfiguration.h"
 
+#include <cstdlib>
+
 using namespace mu;
 using namespace mu::musesampler;
 
-#ifdef Q_OS_UNIX
-static const io::path DEFAULT_PATH("/libMuseSamplerCoreLib.so");
+#if defined(Q_OS_LINUX)
+static const io::path_t DEFAULT_PATH("libMuseSamplerCoreLib.so");
+#elif defined(Q_OS_MAC)
+static const io::path_t DEFAULT_PATH("/usr/local/lib/libMuseSamplerCoreLib.dylib");
 #else
-static const io::path DEFAULT_PATH("/libMuseSamplerCoreLib.dll");
+static const io::path_t DEFAULT_PATH("MuseSamplerCoreLib.dll");
 #endif
 
-io::path MuseSamplerConfiguration::libraryPath() const
+static const std::string MINIMUM_SUPPORTED_VERSION = "0.2.2";
+
+io::path_t MuseSamplerConfiguration::libraryPath() const
 {
-    return globalConfig()->appBinPath() + DEFAULT_PATH;
+    if (const char* path = std::getenv("MUSESAMPLER_PATH")) {
+        return io::path_t(path);
+    }
+
+    return DEFAULT_PATH;
+}
+
+std::string MuseSamplerConfiguration::minimumSupportedVersion() const
+{
+    return MINIMUM_SUPPORTED_VERSION;
 }

@@ -21,20 +21,22 @@
  */
 #include "layoutmeasure.h"
 
-#include "libmscore/factory.h"
-#include "libmscore/score.h"
-#include "libmscore/measure.h"
-#include "libmscore/undo.h"
-#include "libmscore/mmrest.h"
 #include "libmscore/ambitus.h"
 #include "libmscore/barline.h"
+#include "libmscore/beam.h"
+#include "libmscore/factory.h"
 #include "libmscore/keysig.h"
-#include "libmscore/stem.h"
+#include "libmscore/layoutbreak.h"
 #include "libmscore/lyrics.h"
 #include "libmscore/marker.h"
+#include "libmscore/measure.h"
+#include "libmscore/mmrest.h"
 #include "libmscore/part.h"
+#include "libmscore/score.h"
+#include "libmscore/stem.h"
+#include "libmscore/timesig.h"
+#include "libmscore/undo.h"
 
-#include "layout.h"
 #include "layoutcontext.h"
 #include "layoutbeams.h"
 #include "layoutchords.h"
@@ -43,7 +45,6 @@
 #include "log.h"
 
 using namespace mu::engraving;
-using namespace Ms;
 
 //---------------------------------------------------------
 //   createMMRest
@@ -191,7 +192,7 @@ void LayoutMeasure::createMMRest(const LayoutOptions& options, Score* score, Mea
     for (size_t staffIdx = 0; staffIdx < score->nstaves(); ++staffIdx) {
         track_idx_t track = staffIdx * VOICES;
         if (s->element(track) == 0) {
-            MMRest* mmr = new MMRest(s);
+            MMRest* mmr = Factory::createMMRest(s);
             mmr->setDurationType(DurationType::V_MEASURE);
             mmr->setTicks(mmrMeasure->ticks());
             mmr->setTrack(track);
@@ -338,7 +339,7 @@ void LayoutMeasure::createMMRest(const LayoutOptions& options, Score* score, Mea
         // clone elements from underlying measure to mmr
         for (EngravingItem* e : underlyingSeg->annotations()) {
             // look at elements in underlying measure
-            if (!(e->isRehearsalMark() || e->isTempoText() || e->isHarmony() || e->isStaffText() || e->isSystemText()
+            if (!(e->isRehearsalMark() || e->isTempoText() || e->isHarmony() || e->isStaffText() || e->isSystemText() || e->isTripletFeel()
                   || e->isPlayTechAnnotation() || e->isInstrumentChange())) {
                 continue;
             }
@@ -360,9 +361,9 @@ void LayoutMeasure::createMMRest(const LayoutOptions& options, Score* score, Mea
 
         // remove stray elements (possibly leftover from a previous layout of this mmr)
         // this should not happen since the elements are linked?
-        for (EngravingItem* e : s->annotations()) {
-            // look at elements in mmr
-            if (!(e->isRehearsalMark() || e->isTempoText() || e->isHarmony() || e->isStaffText() || e->isSystemText()
+        const auto annotations = s->annotations(); // make a copy since we alter the list
+        for (EngravingItem* e : annotations) { // look at elements in mmr
+            if (!(e->isRehearsalMark() || e->isTempoText() || e->isHarmony() || e->isStaffText() || e->isSystemText() || e->isTripletFeel()
                   || e->isPlayTechAnnotation() || e->isInstrumentChange())) {
                 continue;
             }
@@ -401,7 +402,7 @@ static bool validMMRestMeasure(const LayoutContext& ctx, Measure* m)
     int n = 0;
     for (Segment* s = m->first(); s; s = s->next()) {
         for (EngravingItem* e : s->annotations()) {
-            if (!(e->isRehearsalMark() || e->isTempoText() || e->isHarmony() || e->isStaffText() || e->isSystemText()
+            if (!(e->isRehearsalMark() || e->isTempoText() || e->isHarmony() || e->isStaffText() || e->isSystemText() || e->isTripletFeel()
                   || e->isPlayTechAnnotation() || e->isInstrumentChange())) {
                 return false;
             }
@@ -462,7 +463,7 @@ static bool breakMultiMeasureRest(const LayoutContext& ctx, Measure* m)
     for (auto i : sl) {
         Spanner* s = i.value;
         // break for first measure of volta or textline and first measure *after* volta
-        if ((s->isVolta() || s->isTextLine()) && (s->tick() == m->tick() || s->tick2() == m->tick())) {
+        if ((s->isVolta() || s->isGradualTempoChange() || s->isTextLine()) && (s->tick() == m->tick() || s->tick2() == m->tick())) {
             return true;
         }
     }
@@ -507,7 +508,8 @@ static bool breakMultiMeasureRest(const LayoutContext& ctx, Measure* m)
             }
             if (e->isRehearsalMark()
                 || e->isTempoText()
-                || ((e->isHarmony() || e->isStaffText() || e->isSystemText() || e->isPlayTechAnnotation() || e->isInstrumentChange())
+                || ((e->isHarmony() || e->isStaffText() || e->isSystemText() || e->isTripletFeel() || e->isPlayTechAnnotation()
+                     || e->isInstrumentChange())
                     && (e->systemFlag() || ctx.score()->staff(e->staffIdx())->show()))) {
                 return true;
             }
@@ -559,7 +561,7 @@ static bool breakMultiMeasureRest(const LayoutContext& ctx, Measure* m)
 //   layoutDrumsetChord
 //---------------------------------------------------------
 
-static void layoutDrumsetChord(Chord* c, const Drumset* drumset, const StaffType* st, qreal spatium)
+static void layoutDrumsetChord(Chord* c, const Drumset* drumset, const StaffType* st, double spatium)
 {
     for (Note* note : c->notes()) {
         int pitch = note->pitch();
@@ -571,15 +573,15 @@ static void layoutDrumsetChord(Chord* c, const Drumset* drumset, const StaffType
             note->setLine(line);
 
             int off  = st->stepOffset();
-            qreal ld = st->lineDistance().val();
-            note->rypos()  = (line + off * 2.0) * spatium * .5 * ld;
+            double ld = st->lineDistance().val();
+            note->setPosY((line + off * 2.0) * spatium * .5 * ld);
         }
     }
 }
 
 void LayoutMeasure::getNextMeasure(const LayoutOptions& options, LayoutContext& ctx)
 {
-    Ms::Score* score = ctx.score();
+    Score* score = ctx.score();
     ctx.prevMeasure = ctx.curMeasure;
     ctx.curMeasure  = ctx.nextMeasure;
     if (!ctx.curMeasure) {
@@ -688,7 +690,12 @@ void LayoutMeasure::getNextMeasure(const LayoutOptions& options, LayoutContext& 
                     if (!cr) {
                         continue;
                     }
-                    qreal m = staff->staffMag(&segment);
+                    // Check if requested cross-staff is possible
+                    if (cr->staffMove() || cr->storedStaffMove()) {
+                        cr->checkStaffMoveValidity();
+                    }
+
+                    double m = staff->staffMag(&segment);
                     if (cr->isSmall()) {
                         m *= score->styleD(Sid::smallNoteMag);
                     }
@@ -720,7 +727,7 @@ void LayoutMeasure::getNextMeasure(const LayoutOptions& options, LayoutContext& 
                             Stem* stem1 = chord->tremolo()->chord1()->stem();
                             Stem* stem2 = chord->tremolo()->chord2()->stem();
                             if (stem1 && stem2) {
-                                std::pair<qreal, qreal> extendedLen = LayoutTremolo::extendedStemLenWithTwoNoteTremolo(
+                                std::pair<double, double> extendedLen = LayoutTremolo::extendedStemLenWithTwoNoteTremolo(
                                     chord->tremolo(),
                                     stem1->p2().y(),
                                     stem2->p2().y());
@@ -756,16 +763,7 @@ void LayoutMeasure::getNextMeasure(const LayoutOptions& options, LayoutContext& 
         if (!s.isChordRestType()) {
             continue;
         }
-        for (EngravingItem* e : s.elist()) {
-            if (!e || !e->isChordRest() || !score->staff(e->staffIdx())->show()) {
-                continue;
-            }
-            ChordRest* cr = toChordRest(e);
-            if (LayoutBeams::isTopBeam(cr)) {
-                Beam* b = cr->beam();
-                b->layout();
-            }
-        }
+        LayoutBeams::layoutNonCrossBeams(&s);
     }
 
     for (staff_idx_t staffIdx = 0; staffIdx < score->nstaves(); ++staffIdx) {
@@ -826,6 +824,8 @@ void LayoutMeasure::getNextMeasure(const LayoutOptions& options, LayoutContext& 
         s.createShapes();
     }
 
+    LayoutChords::updateGraceNotes(measure);
+
     measure->computeTicks(); // Must be called *after* Segment::createShapes() because it relies on the
     // Segment::visible() property, which is determined by Segment::createShapes().
 
@@ -850,4 +850,39 @@ int LayoutMeasure::adjustMeasureNo(LayoutContext& lc, MeasureBase* m)
     }
 
     return lc.measureNo;
+}
+
+/****************************************************************
+ * computePreSpacingItems
+ * Computes information that is needed before horizontal spacing.
+ * Caution: assumes that the system is known! (which is why we
+ * cannot compute this stuff in LayoutMeasure::getNextMeasure().)
+ * **************************************************************/
+void LayoutMeasure::computePreSpacingItems(Measure* m)
+{
+    // Compute chord properties
+    bool isFirstChordInMeasure = true;
+    LayoutChords::clearLineAttachPoints(m);
+    for (Segment& seg : m->segments()) {
+        if (!seg.isChordRestType()) {
+            continue;
+        }
+        for (EngravingItem* e : seg.elist()) {
+            if (!e || !e->isChord()) {
+                continue;
+            }
+            Chord* chord = toChord(e);
+
+            LayoutChords::updateLineAttachPoints(chord, isFirstChordInMeasure);
+            for (Chord* gn : chord->graceNotes()) {
+                LayoutChords::updateLineAttachPoints(gn, false);
+            }
+            isFirstChordInMeasure = false;
+
+            chord->layoutArticulations();
+            chord->checkStartEndSlurs();
+            chord->computeKerningExceptions();
+        }
+        seg.createShapes();
+    }
 }

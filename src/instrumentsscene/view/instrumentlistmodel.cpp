@@ -170,7 +170,7 @@ void InstrumentListModel::init(const QString& genreId, const QString& groupId)
     loadInstruments();
 }
 
-QString InstrumentListModel::resolveInstrumentGroupId(const QString& instrumentId) const
+QString InstrumentListModel::resolveInstrumentGroupId(const String& instrumentId) const
 {
     for (const InstrumentTemplate* templ : repository()->instrumentTemplates()) {
         if (templ->id == instrumentId) {
@@ -181,7 +181,7 @@ QString InstrumentListModel::resolveInstrumentGroupId(const QString& instrumentI
     return NONE_GROUP_ID;
 }
 
-void InstrumentListModel::focusOnInstrument(const QString& instrumentId)
+void InstrumentListModel::focusOnInstrument(const String& instrumentId)
 {
     TRACEFUNC;
 
@@ -284,9 +284,19 @@ void InstrumentListModel::loadInstruments()
     QList<CombinedInstrument> instruments;
 
     for (const InstrumentName& instrumentName : templatesByInstrumentName.keys()) {
+        const InstrumentTemplateList& templates = templatesByInstrumentName[instrumentName];
         CombinedInstrument instrument;
-        instrument.name = instrumentName;
-        instrument.templates = templatesByInstrumentName[instrumentName];
+
+        if (templates.length() == 1) {
+            // Only one trait option so let's display it in the instrument name.
+            const InstrumentTemplate* templ = templates.at(0);
+            instrument.name = formatInstrumentTitle(instrumentName, templ->trait);
+        } else {
+            // Multiple traits to choose from so don't add any to instrument name yet.
+            instrument.name = instrumentName;
+        }
+
+        instrument.templates = templates;
         instrument.currentTemplateIndex = 0;
 
         instruments << instrument;
@@ -319,7 +329,15 @@ void InstrumentListModel::sortInstruments(Instruments& instruments) const
         int searchTextPosition2 = instrumentName2.indexOf(searchText);
 
         if (searchTextPosition1 == searchTextPosition2) {
-            return instrumentName1 < instrumentName2;
+            int ti1 = instrument1.currentTemplateIndex;
+            int ti2 = instrument2.currentTemplateIndex;
+            if (ti1 >= 0 && ti1 < instrument1.templates.size() && ti2 >= 0 && ti2 < instrument2.templates.size()) {
+                int instrumentIndex1 = instrument1.templates[ti1]->sequenceOrder;
+                int instrumentIndex2 = instrument2.templates[ti2]->sequenceOrder;
+                return instrumentIndex1 < instrumentIndex2;
+            } else {
+                return instrumentName1 < instrumentName2;
+            }
         }
 
         return searchTextPosition1 < searchTextPosition2;
@@ -360,9 +378,9 @@ void InstrumentListModel::selectInstrument(int instrumentIndex)
     }
 }
 
-QVariantList InstrumentListModel::selectedInstruments() const
+QStringList InstrumentListModel::selectedInstrumentIdList() const
 {
-    QVariantList result;
+    QSet<QString> result;
 
     for (int row : m_selection->selectedRows()) {
         const CombinedInstrument& instrument = m_instruments[row];
@@ -372,13 +390,15 @@ QVariantList InstrumentListModel::selectedInstruments() const
             continue;
         }
 
-        QVariantMap obj;
-        obj[INSTRUMENT_TEMPLATE_KEY] = QVariant::fromValue(*instrument.templates[templateIndex]);
+        const InstrumentTemplate* templ = instrument.templates[templateIndex];
+        if (templ->id.empty()) {
+            continue;
+        }
 
-        result << obj;
+        result << templ->id.toQString();
     }
 
-    return result;
+    return QStringList(result.begin(), result.end());
 }
 
 void InstrumentListModel::saveCurrentGroup()
@@ -423,14 +443,21 @@ bool InstrumentListModel::hasSelection() const
     return m_selection->hasSelection();
 }
 
-QString InstrumentListModel::selectedInstrumentDescription() const
+QVariant InstrumentListModel::selectedInstrument() const
 {
     QList<int> selectedRows = m_selection->selectedRows();
     if (selectedRows.length() != 1) {
-        return QString();
+        return QVariant();
     }
-    CombinedInstrument instrument = m_instruments.at(selectedRows.at(0));
-    return instrument.templates.at(instrument.currentTemplateIndex)->description;
+
+    const CombinedInstrument& instrument = m_instruments.at(selectedRows.at(0));
+    const InstrumentTemplate* templ = instrument.templates[instrument.currentTemplateIndex];
+
+    QVariantMap obj;
+    obj["instrumentId"] = templ->id.toQString();
+    obj["description"] = templ->description.toQString();
+
+    return obj;
 }
 
 bool InstrumentListModel::isSearching() const
@@ -470,7 +497,7 @@ void InstrumentListModel::updateStateBySearch()
 bool InstrumentListModel::isInstrumentAccepted(const InstrumentTemplate& instrument, bool compareWithCurrentGroup) const
 {
     if (isSearching()) {
-        return instrument.trackName.contains(m_searchText, Qt::CaseInsensitive);
+        return instrument.trackName.toQString().contains(m_searchText, Qt::CaseInsensitive);
     }
 
     if (instrument.groupId != m_currentGroupId && compareWithCurrentGroup) {

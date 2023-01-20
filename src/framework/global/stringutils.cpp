@@ -91,6 +91,21 @@ std::string mu::strings::toLower(const std::string& source)
     return str;
 }
 
+bool mu::strings::startsWith(const std::string& str, const std::string& start)
+{
+    if (str.size() < start.size()) {
+        return false;
+    }
+
+    for (size_t i = 0; i < start.size(); ++i) {
+        if (str.at(i) != start.at(i)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool mu::strings::endsWith(const std::string& str, const std::string& ending)
 {
     if (ending.size() > str.size()) {
@@ -104,8 +119,8 @@ std::string mu::strings::leftJustified(const std::string& val, size_t width)
 {
     std::string str;
     str.resize(width, ' ');
-    size_t lenght = width < val.size() ? width : val.size();
-    for (size_t i = 0; i < lenght; ++i) {
+    size_t length = width < val.size() ? width : val.size();
+    for (size_t i = 0; i < length; ++i) {
         str[i] = val[i];
     }
     return str;

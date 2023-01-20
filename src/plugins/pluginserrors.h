@@ -22,7 +22,7 @@
 #ifndef MU_PLUGINS_PLUGINSERRORS_H
 #define MU_PLUGINS_PLUGINSERRORS_H
 
-#include "ret.h"
+#include "types/ret.h"
 #include "translation.h"
 
 namespace mu::plugins {
@@ -31,7 +31,8 @@ enum class Err {
     NoError         = int(Ret::Code::Ok),
     UnknownError    = int(Ret::Code::PluginsFirst),
 
-    PluginNotFound
+    PluginNotFound,
+    PluginLoadError
 };
 
 inline Ret make_ret(Err e)
@@ -43,6 +44,7 @@ inline Ret make_ret(Err e)
     case Err::NoError: return Ret(retCode);
     case Err::UnknownError: return Ret(retCode);
     case Err::PluginNotFound: return Ret(retCode, trc("plugins", "Plugin not found"));
+    case Err::PluginLoadError: return Ret(retCode, trc("plugins", "Could not load plugin"));
     }
 
     return Ret(static_cast<int>(e));

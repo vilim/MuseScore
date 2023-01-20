@@ -24,7 +24,7 @@
 #define MU_IO_IODEVICE_H
 
 #include <cstdint>
-#include "bytearray.h"
+#include "types/bytearray.h"
 
 namespace mu::io {
 class IODevice
@@ -60,6 +60,10 @@ public:
     size_t write(const uint8_t* data, size_t len);
     size_t write(const ByteArray& ba);
 
+#ifndef NO_QT_SUPPORT
+    size_t write(const QByteArray& ba);
+#endif
+
 protected:
 
     virtual bool doOpen(OpenMode m) = 0;
@@ -68,10 +72,11 @@ protected:
     virtual bool resizeData(size_t size) = 0;
     virtual size_t writeData(const uint8_t* data, size_t len) = 0;
 
-private:
-
     bool isOpenModeReadable() const;
     bool isOpenModeWriteable() const;
+
+private:
+
     const uint8_t* cdataOffsetted() const;
 
     OpenMode m_mode = OpenMode::Unknown;

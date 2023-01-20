@@ -22,9 +22,13 @@
 
 #include "qmlplugin.h"
 
-#include "libmscore/musescoreCore.h"
+#include "version.h"
 
-namespace Ms {
+#include "engraving/libmscore/mscore.h"
+
+#include "log.h"
+
+namespace mu::plugins {
 //---------------------------------------------------------
 //   QmlPlugin
 //---------------------------------------------------------
@@ -32,4 +36,134 @@ namespace Ms {
 QmlPlugin::QmlPlugin(QQuickItem* parent)
     : QQuickItem(parent)
 {}
+
+void QmlPlugin::setMenuPath(const QString&)
+{
+    NOT_SUPPORTED_USE("title");
+}
+
+QString QmlPlugin::menuPath() const
+{
+    return QString();
+}
+
+void QmlPlugin::setTitle(const QString& s)
+{
+    _title = s;
+}
+
+QString QmlPlugin::title() const
+{
+    return _title;
+}
+
+void QmlPlugin::setVersion(const QString& s)
+{
+    _version = s;
+}
+
+QString QmlPlugin::version() const
+{
+    return _version;
+}
+
+void QmlPlugin::setDescription(const QString& s)
+{
+    _description = s;
+}
+
+QString QmlPlugin::description() const
+{
+    return _description;
+}
+
+void QmlPlugin::setFilePath(const QString s)
+{
+    _filePath = s;
+}
+
+QString QmlPlugin::filePath() const
+{
+    return _filePath;
+}
+
+void QmlPlugin::setThumbnailName(const QString& s)
+{
+    _thumbnailName = s;
+}
+
+QString QmlPlugin::thumbnailName() const
+{
+    return _thumbnailName;
+}
+
+void QmlPlugin::setCategoryCode(const QString& s)
+{
+    _categoryCode = s;
+}
+
+QString QmlPlugin::categoryCode() const
+{
+    return _categoryCode;
+}
+
+void QmlPlugin::setPluginType(const QString& s)
+{
+    _pluginType = s;
+}
+
+QString QmlPlugin::pluginType() const
+{
+    return _pluginType;
+}
+
+void QmlPlugin::setDockArea(const QString&)
+{
+    NOT_SUPPORTED;
+}
+
+QString QmlPlugin::dockArea() const
+{
+    return QString();
+}
+
+void QmlPlugin::setRequiresScore(bool b)
+{
+    _requiresScore = b;
+}
+
+bool QmlPlugin::requiresScore() const
+{
+    return _requiresScore;
+}
+
+int QmlPlugin::division() const
+{
+    return engraving::Constants::division;
+}
+
+int QmlPlugin::mscoreVersion() const
+{
+    return mscoreMajorVersion() * 10000 + mscoreMinorVersion() * 100 + mscoreUpdateVersion();
+}
+
+int QmlPlugin::mscoreMajorVersion() const
+{
+    return framework::Version::majorVersion();
+}
+
+int QmlPlugin::mscoreMinorVersion() const
+{
+    return framework::Version::minorVersion();
+}
+
+int QmlPlugin::mscoreUpdateVersion() const
+{
+    return framework::Version::patchVersion();
+}
+
+qreal QmlPlugin::mscoreDPI() const
+{
+    return engraving::DPI;
+}
 }

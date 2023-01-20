@@ -25,33 +25,38 @@
 
 #include <QQuickView>
 
-#include "plugins/pluginstypes.h"
+#include "types/ret.h"
 
-#include "framework/ui/iuiengine.h"
 #include "modularity/ioc.h"
-#include "io/path.h"
+#include "framework/ui/iuiengine.h"
+#include "plugins/ipluginsconfiguration.h"
 
-namespace Ms {
-class QmlPlugin;
-}
-
-class QQuickView;
 class QQmlComponent;
+class QQuickView;
 
 namespace mu::plugins {
+class QmlPlugin;
+
 class PluginView : public QObject
 {
     Q_OBJECT
 
     INJECT(plugins, ui::IUiEngine, uiEngine)
+    INJECT(plugins, IPluginsConfiguration, configuration)
 
 public:
-    PluginView(const QUrl& url, QObject* parent = nullptr);
+    PluginView(QObject* parent = nullptr);
     ~PluginView();
+
+    Ret load(const QUrl& url);
 
     QString name() const;
     QString description() const;
     QVersionNumber version() const;
+    QString thumbnailName() const;
+    QString categoryCode() const;
+
+    QmlPlugin* qmlPlugin() const;
 
     void run();
 
@@ -62,9 +67,11 @@ private:
     QQmlEngine* engine() const;
     QString pluginName() const;
 
+    bool pluginHasUi() const;
+
     void destroyView();
 
-    Ms::QmlPlugin* m_qmlPlugin = nullptr;
+    QmlPlugin* m_qmlPlugin = nullptr;
     QQmlComponent* m_component = nullptr;
     QQuickView* m_view = nullptr;
 };

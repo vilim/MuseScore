@@ -21,14 +21,16 @@
  */
 
 #include "mmrestrange.h"
+
 #include "rw/xml.h"
-#include "score.h"
+
 #include "measure.h"
+#include "score.h"
 
 using namespace mu;
 using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   mmRestRangeStyle
 //---------------------------------------------------------
@@ -107,14 +109,14 @@ bool MMRestRange::readProperties(XmlReader& xml)
 ///   This is reimplemented from TextBase::setXmlText to take care of the brackets
 //---------------------------------------------------------
 
-void MMRestRange::setXmlText(const QString& s)
+void MMRestRange::setXmlText(const String& s)
 {
     switch (bracketType()) {
     case MMRestRangeBracketType::BRACKETS:
-        TextBase::setXmlText("[" + s + "]");
+        TextBase::setXmlText(u"[" + s + u"]");
         break;
     case MMRestRangeBracketType::PARENTHESES:
-        TextBase::setXmlText("(" + s + ")");
+        TextBase::setXmlText(u"(" + s + u")");
         break;
     case MMRestRangeBracketType::NONE:
     default:

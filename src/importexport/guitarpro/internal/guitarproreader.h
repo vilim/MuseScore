@@ -23,12 +23,16 @@
 #define MU_IMPORTEXPORT_GUITARPROREADER_H
 
 #include "project/inotationreader.h"
+#include "modularity/ioc.h"
+#include "iguitarproconfiguration.h"
 
 namespace mu::iex::guitarpro {
 class GuitarProReader : public project::INotationReader
 {
+    INJECT(iex_guitarpro, mu::iex::guitarpro::IGuitarProConfiguration, guitarProConfiguration)
+
 public:
-    Ret read(Ms::MasterScore* score, const io::path& path, const Options& options = Options()) override;
+    Ret read(mu::engraving::MasterScore* score, const io::path_t& path, const Options& options = Options()) override;
 };
 }
 

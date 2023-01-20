@@ -35,7 +35,7 @@
 using namespace mu;
 using namespace mu::io;
 
-Ret FileSystem::exists(const io::path& path) const
+Ret FileSystem::exists(const io::path_t& path) const
 {
     QFileInfo fileInfo(path.toQString());
     if (!fileInfo.exists()) {
@@ -45,7 +45,7 @@ Ret FileSystem::exists(const io::path& path) const
     return make_ret(Err::NoError);
 }
 
-Ret FileSystem::remove(const io::path& path_) const
+Ret FileSystem::remove(const io::path_t& path_) const
 {
     QString path = path_.toQString();
     QFileInfo fileInfo(path);
@@ -56,7 +56,12 @@ Ret FileSystem::remove(const io::path& path_) const
     return make_ret(Err::NoError);
 }
 
-Ret FileSystem::copy(const io::path& src, const io::path& dst, bool replace) const
+Ret FileSystem::removeFolderIfEmpty(const io::path_t& path) const
+{
+    return removeDir(path, false);
+}
+
+Ret FileSystem::copy(const io::path_t& src, const io::path_t& dst, bool replace) const
 {
     QFileInfo srcFileInfo(src.toQString());
     if (!srcFileInfo.exists()) {
@@ -66,7 +71,7 @@ Ret FileSystem::copy(const io::path& src, const io::path& dst, bool replace) con
     QFileInfo dstFileInfo(dst.toQString());
     if (dstFileInfo.exists()) {
         if (!replace) {
-            return make_ret(Err::FSIsExist);
+            return make_ret(Err::FSAlreadyExists);
         }
 
         Ret ret = remove(dst);
@@ -79,7 +84,7 @@ Ret FileSystem::copy(const io::path& src, const io::path& dst, bool replace) con
     return ret;
 }
 
-Ret FileSystem::move(const io::path& src, const io::path& dst, bool replace) const
+Ret FileSystem::move(const io::path_t& src, const io::path_t& dst, bool replace) const
 {
     QFileInfo srcFileInfo(src.toQString());
     if (!srcFileInfo.exists()) {
@@ -89,7 +94,7 @@ Ret FileSystem::move(const io::path& src, const io::path& dst, bool replace) con
     QFileInfo dstFileInfo(dst.toQString());
     if (dstFileInfo.exists()) {
         if (!replace) {
-            return make_ret(Err::FSIsExist);
+            return make_ret(Err::FSAlreadyExists);
         }
 
         Ret ret = remove(dst);
@@ -111,9 +116,9 @@ Ret FileSystem::move(const io::path& src, const io::path& dst, bool replace) con
     return make_ret(Ret::Code::Ok);
 }
 
-RetVal<QByteArray> FileSystem::readFile(const io::path& filePath) const
+RetVal<ByteArray> FileSystem::readFile(const io::path_t& filePath) const
 {
-    RetVal<QByteArray> result;
+    RetVal<ByteArray> result;
     Ret ret = exists(filePath);
     if (!ret) {
         result.ret = ret;
@@ -126,31 +131,46 @@ RetVal<QByteArray> FileSystem::readFile(const io::path& filePath) const
         return result;
     }
 
-    result.ret = make_ret(Err::NoError);
-    result.val = file.readAll();
+    qint64 size = file.size();
+    result.val.resize(static_cast<size_t>(size));
 
+    file.read(reinterpret_cast<char*>(result.val.data()), size);
     file.close();
 
+    result.ret = make_ret(Err::NoError);
     return result;
 }
 
-Ret FileSystem::writeToFile(const io::path& filePath, const QByteArray& data) const
+bool FileSystem::readFile(const io::path_t& filePath, ByteArray& data) const
 {
-    Ret ret = make_ret(Err::NoError);
-
     QFile file(filePath.toQString());
-    if (!file.open(QIODevice::WriteOnly)) {
-        ret = make_ret(Err::FSWriteError);
-        return ret;
+    if (!file.open(QIODevice::ReadOnly)) {
+        return false;
     }
 
-    file.write(data);
+    qint64 size = file.size();
+    data.resize(static_cast<size_t>(size));
+
+    file.read(reinterpret_cast<char*>(data.data()), size);
     file.close();
 
-    return ret;
+    return make_ret(Err::NoError);
 }
 
-Ret FileSystem::makePath(const io::path& path) const
+Ret FileSystem::writeFile(const io::path_t& filePath, const ByteArray& data) const
+{
+    QFile file(filePath.toQString());
+    if (!file.open(QIODevice::WriteOnly)) {
+        return make_ret(Err::FSWriteError);
+    }
+
+    file.write(reinterpret_cast<const char*>(data.constData()), static_cast<qint64>(data.size()));
+    file.close();
+
+    return true;
+}
+
+Ret FileSystem::makePath(const io::path_t& path) const
 {
     if (!QDir().mkpath(path.toQString())) {
         return make_ret(Err::FSMakingError);
@@ -159,7 +179,7 @@ Ret FileSystem::makePath(const io::path& path) const
     return make_ret(Err::NoError);
 }
 
-RetVal<uint64_t> FileSystem::fileSize(const io::path& path) const
+RetVal<uint64_t> FileSystem::fileSize(const io::path_t& path) const
 {
     RetVal<uint64_t> rv;
     rv.ret = exists(path);
@@ -172,17 +192,37 @@ RetVal<uint64_t> FileSystem::fileSize(const io::path& path) const
     return rv;
 }
 
-RetVal<io::paths> FileSystem::scanFiles(const io::path& rootDir, const QStringList& filters, ScanMode mode) const
+RetVal<io::paths_t> FileSystem::scanFiles(const io::path_t& rootDir, const std::vector<std::string>& nameFilters, ScanMode mode) const
 {
-    RetVal<io::paths> result;
+    RetVal<io::paths_t> result;
     Ret ret = exists(rootDir);
     if (!ret) {
         result.ret = ret;
         return result;
     }
 
-    QDirIterator::IteratorFlags flags = (mode == ScanMode::IncludeSubdirs ? QDirIterator::Subdirectories : QDirIterator::NoIteratorFlags);
-    QDirIterator it(rootDir.toQString(), filters, QDir::NoDotAndDotDot | QDir::NoSymLinks | QDir::Readable | QDir::Files, flags);
+    QDirIterator::IteratorFlags flags = QDirIterator::NoIteratorFlags;
+    QDir::Filters filters = QDir::NoDotAndDotDot | QDir::NoSymLinks | QDir::Readable;
+
+    switch (mode) {
+    case ScanMode::FilesInCurrentDir:
+        filters |= QDir::Files;
+        break;
+    case ScanMode::FilesAndFoldersInCurrentDir:
+        filters |= QDir::Files | QDir::Dirs;
+        break;
+    case ScanMode::FilesInCurrentDirAndSubdirs:
+        flags |= QDirIterator::Subdirectories;
+        filters |= QDir::Files;
+        break;
+    }
+
+    QStringList qnameFilters;
+    for (const std::string& f : nameFilters) {
+        qnameFilters << QString::fromStdString(f);
+    }
+
+    QDirIterator it(rootDir.toQString(), qnameFilters, filters, flags);
 
     while (it.hasNext()) {
         result.val.push_back(it.next());
@@ -192,7 +232,7 @@ RetVal<io::paths> FileSystem::scanFiles(const io::path& rootDir, const QStringLi
     return result;
 }
 
-Ret FileSystem::removeFile(const io::path& path) const
+Ret FileSystem::removeFile(const io::path_t& path) const
 {
     QFile file(path.toQString());
     if (!file.remove()) {
@@ -202,9 +242,14 @@ Ret FileSystem::removeFile(const io::path& path) const
     return make_ret(Err::NoError);
 }
 
-Ret FileSystem::removeDir(const io::path& path) const
+Ret FileSystem::removeDir(const io::path_t& path, bool recursively) const
 {
     QDir dir(path.toQString());
+
+    if (!recursively && !dir.isEmpty()) {
+        return make_ret(Err::FSDirNotEmptyError);
+    }
+
     if (!dir.removeRecursively()) {
         return make_ret(Err::FSRemoveError);
     }
@@ -212,7 +257,7 @@ Ret FileSystem::removeDir(const io::path& path) const
     return make_ret(Err::NoError);
 }
 
-Ret FileSystem::copyRecursively(const io::path& src, const io::path& dst) const
+Ret FileSystem::copyRecursively(const io::path_t& src, const io::path_t& dst) const
 {
     QString srcPath = src.toQString();
     QString dstPath = dst.toQString();
@@ -243,7 +288,7 @@ Ret FileSystem::copyRecursively(const io::path& src, const io::path& dst) const
     return make_ret(Err::NoError);
 }
 
-void FileSystem::setAttribute(const io::path& path, Attribute attribute) const
+void FileSystem::setAttribute(const io::path_t& path, Attribute attribute) const
 {
     switch (attribute) {
     case Attribute::Hidden: {
@@ -254,4 +299,44 @@ void FileSystem::setAttribute(const io::path& path, Attribute attribute) const
     } break;
     }
     UNUSED(path);
+}
+
+bool FileSystem::setPermissionsAllowedForAll(const io::path_t& path) const
+{
+    return QFile::setPermissions(path.toQString(),
+                                 QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner
+                                 | QFile::ReadUser | QFile::WriteUser | QFile::ExeUser
+                                 | QFile::ReadGroup | QFile::WriteGroup | QFile::ExeGroup
+                                 | QFile::ReadOther | QFile::WriteOther
+                                 | QFile::ExeOther);
+}
+
+io::path_t FileSystem::canonicalFilePath(const io::path_t& filePath) const
+{
+    return QFileInfo(filePath.toQString()).canonicalFilePath();
+}
+
+io::path_t FileSystem::absolutePath(const io::path_t& filePath) const
+{
+    return QFileInfo(filePath.toQString()).absolutePath();
+}
+
+path_t FileSystem::absoluteFilePath(const path_t& filePath) const
+{
+    return QFileInfo(filePath.toQString()).absoluteFilePath();
+}
+
+DateTime FileSystem::birthTime(const io::path_t& filePath) const
+{
+    return DateTime::fromQDateTime(QFileInfo(filePath.toQString()).birthTime());
+}
+
+DateTime FileSystem::lastModified(const io::path_t& filePath) const
+{
+    return DateTime::fromQDateTime(QFileInfo(filePath.toQString()).lastModified());
+}
+
+bool FileSystem::isWritable(const io::path_t& filePath) const
+{
+    return QFileInfo(filePath.toQString()).isWritable();
 }

@@ -40,7 +40,6 @@ class PartListModel : public QAbstractListModel
     INJECT(notation, framework::IInteractive, interactive)
 
     Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
-    Q_PROPERTY(bool isRemovingAvailable READ isRemovingAvailable NOTIFY selectionChanged)
 
 public:
     explicit PartListModel(QObject* parent = nullptr);
@@ -50,29 +49,30 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     bool hasSelection() const;
-    bool isRemovingAvailable() const;
 
     Q_INVOKABLE void load();
     Q_INVOKABLE void createNewPart();
-    Q_INVOKABLE void removeSelectedParts();
     Q_INVOKABLE void openSelectedParts();
+    Q_INVOKABLE void openAllParts();
 
     Q_INVOKABLE void selectPart(int partIndex);
     Q_INVOKABLE void removePart(int partIndex);
-    Q_INVOKABLE void setPartTitle(int partIndex, const QString& title);
-    Q_INVOKABLE void validatePartTitle(int partIndex);
     Q_INVOKABLE void copyPart(int partIndex);
+
+    Q_INVOKABLE QString validatePartTitle(int partIndex, const QString& title) const;
+    Q_INVOKABLE void setPartTitle(int partIndex, const QString& title);
 
 signals:
     void selectionChanged();
     void partAdded(int index);
 
 private:
-    void setTitle(INotationPtr notation, const QString& title);
+    void openNotations(const QList<int>& rows) const;
+
+    Ret doValidatePartTitle(int partIndex, const QString& title) const;
 
     bool isExcerptIndexValid(int index) const;
 
-    bool userAgreesToRemoveParts(int partCount) const;
     void doRemovePart(int partIndex);
 
     IMasterNotationPtr masterNotation() const;
@@ -83,7 +83,7 @@ private:
     enum Roles {
         RoleTitle = Qt::UserRole + 1,
         RoleIsSelected,
-        RoleIsCreated
+        RoleIsCustom
     };
 
     uicomponents::ItemMultiSelectionModel* m_selectionModel = nullptr;

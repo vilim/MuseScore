@@ -68,9 +68,6 @@ Item {
 
         function resetSelectedPlugin() {
             selectedPlugin = undefined
-
-            disabledPluginsView.resetSelectedPlugin()
-            enabledPluginsView.resetSelectedPlugin()
         }
     }
 
@@ -105,9 +102,7 @@ Item {
 
         anchors.top: parent.top
         anchors.left: parent.left
-        anchors.leftMargin: root.sideMargin
         anchors.right: parent.right
-        anchors.rightMargin: root.sideMargin
         anchors.bottom: panel.visible ? panel.top : parent.bottom
 
         contentWidth: width
@@ -116,20 +111,12 @@ Item {
         topMargin: topGradient.height
         bottomMargin: 24
 
-        ScrollBar.vertical: StyledScrollBar {
-            parent: flickable.parent
-
-            anchors.top: parent.top
-            anchors.bottom: panel.visible ? panel.top : parent.bottom
-            anchors.right: parent.right
-
-            visible: flickable.contentHeight > flickable.height
-            z: 1
-        }
-
         Column {
             id: column
+
             anchors.fill: parent
+            anchors.leftMargin: root.sideMargin
+            anchors.rightMargin: root.sideMargin
 
             spacing: 24
 
@@ -143,6 +130,7 @@ Item {
                 search: root.search
                 pluginIsEnabled: true
                 selectedCategory: root.selectedCategory
+                selectedPluginCodeKey: prv.selectedPlugin ? prv.selectedPlugin.codeKey : ""
 
                 model: pluginsModel
 
@@ -173,6 +161,7 @@ Item {
                 search: root.search
                 pluginIsEnabled: false
                 selectedCategory: root.selectedCategory
+                selectedPluginCodeKey: prv.selectedPlugin ? prv.selectedPlugin.codeKey : ""
 
                 model: pluginsModel
 
@@ -208,6 +197,7 @@ Item {
 
         additionalInfoModel: [
             {"title": qsTrc("plugins", "Version:"), "value": Boolean(selectedPlugin) ? selectedPlugin.version : "" },
+            //: Keyboard shortcut
             {"title": qsTrc("plugins", "Shortcut:"), "value": Boolean(selectedPlugin) ? selectedPlugin.shortcuts : ""}
         ]
 
@@ -222,7 +212,7 @@ Item {
 
         onClosed: {
             prv.resetSelectedPlugin()
-            Qt.callLater(resetNavigationFocus)
+            resetNavigationFocus()
         }
 
         function resetNavigationFocus() {

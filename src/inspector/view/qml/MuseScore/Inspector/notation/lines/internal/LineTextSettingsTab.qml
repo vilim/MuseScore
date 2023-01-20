@@ -50,7 +50,7 @@ FocusableItem {
         TextSection {
             id: beginningTextSection
             titleText: qsTrc("inspector", "Beginning text")
-            propertyItem: root.model ? root.model.beginingText : null
+            propertyItem: root.model ? root.model.beginningText : null
 
             navigationPanel: root.navigationPanel
             navigationRowStart: root.navigationRowStart + 1
@@ -58,8 +58,8 @@ FocusableItem {
 
         OffsetSection {
             id: beginningTextOffsetSection
-            titleText: qsTrc("inspector", "Vertical offset")
-            verticalOffset: root.model ? root.model.beginingTextVerticalOffset : null
+            titleText: qsTrc("inspector", "Offset")
+            propertyItem: root.model ? root.model.beginningTextOffset : null
 
             navigationPanel: root.navigationPanel
             navigationRowStart: beginningTextSection.navigationRowEnd + 1
@@ -68,21 +68,21 @@ FocusableItem {
         SeparatorLine { anchors.margins: -12 }
 
         TextSection {
-            id: continiousTextSection
+            id: continuousTextSection
             titleText:  qsTrc("inspector", "Text when continuing to a new system")
-            propertyItem: root.model ? root.model.continiousText : null
+            propertyItem: root.model ? root.model.continuousText : null
 
             navigationPanel: root.navigationPanel
             navigationRowStart: beginningTextOffsetSection.navigationRowEnd + 1
         }
 
         OffsetSection {
-            id: continiousTextOffsetSection
-            titleText: qsTrc("inspector", "Vertical offset")
-            verticalOffset: root.model ? root.model.continiousTextVerticalOffset : null
+            id: continuousTextOffsetSection
+            titleText: qsTrc("inspector", "Offset")
+            propertyItem: root.model ? root.model.continuousTextOffset : null
 
             navigationPanel: root.navigationPanel
-            navigationRowStart: continiousTextSection.navigationRowEnd + 1
+            navigationRowStart: continuousTextSection.navigationRowEnd + 1
         }
 
         SeparatorLine { anchors.margins: -12; visible: endTextSection.visible }
@@ -93,13 +93,13 @@ FocusableItem {
             propertyItem: root.model ? root.model.endText : null
 
             navigationPanel: root.navigationPanel
-            navigationRowStart: continiousTextOffsetSection.navigationRowEnd + 1
+            navigationRowStart: continuousTextOffsetSection.navigationRowEnd + 1
         }
 
         OffsetSection {
             id: endTextOffsetSection
-            titleText: qsTrc("inspector", "Vertical offset")
-            verticalOffset: root.model ? root.model.endTextVerticalOffset : null
+            titleText: qsTrc("inspector", "Offset")
+            propertyItem: root.model ? root.model.endTextOffset : null
 
             navigationPanel: root.navigationPanel
             navigationRowStart: endTextSection.navigationRowEnd + 1

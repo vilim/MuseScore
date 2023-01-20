@@ -21,26 +21,24 @@
  */
 #include "guitarproconfiguration.h"
 
-#include "settings.h"
-
-#include "libmscore/mscore.h"
-
-using namespace mu::framework;
-using namespace mu::iex::guitarpro;
-
-static const Settings::Key IMPORT_GUITARPRO_CHARSET_KEY("iex_guitarpro", "import/guitarpro/charset");
-
-void GuitarProConfiguration::init()
+namespace mu::iex::guitarpro {
+bool GuitarProConfiguration::linkedTabStaffCreated() const
 {
-    settings()->setDefaultValue(IMPORT_GUITARPRO_CHARSET_KEY, Val("UTF-8"));
+    return m_linkedTabStaffCreated;
 }
 
-std::string GuitarProConfiguration::importGuitarProCharset() const
+void GuitarProConfiguration::setLinkedTabStaffCreated(bool created)
 {
-    return settings()->value(IMPORT_GUITARPRO_CHARSET_KEY).toString();
+    m_linkedTabStaffCreated = created;
 }
 
-void GuitarProConfiguration::setImportGuitarProCharset(const std::string& charset)
+bool GuitarProConfiguration::experimental() const
 {
-    settings()->setSharedValue(IMPORT_GUITARPRO_CHARSET_KEY, Val(charset));
+    return m_experimental;
+}
+
+void GuitarProConfiguration::setExperimental(bool experimental)
+{
+    m_experimental = experimental;
+}
 }

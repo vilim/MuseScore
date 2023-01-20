@@ -34,7 +34,7 @@
     <lyricsPosAbove x="0" y="-2"/>
     <lyricsPosBelow x="0" y="3"/>
     <lyricsMinTopDistance>1</lyricsMinTopDistance>
-    <lyricsMinBottomDistance>2</lyricsMinBottomDistance>
+    <lyricsMinBottomDistance>1.5</lyricsMinBottomDistance>
     <lyricsMinDistance>0.25</lyricsMinDistance>
     <lyricsLineHeight>1</lyricsLineHeight>
     <lyricsDashMinLength>0.4</lyricsDashMinLength>
@@ -91,10 +91,10 @@
     <repeatBarTips>0</repeatBarTips>
     <startBarlineSingle>0</startBarlineSingle>
     <startBarlineMultiple>1</startBarlineMultiple>
-    <bracketWidth>0.44</bracketWidth>
-    <bracketDistance>0.1</bracketDistance>
-    <akkoladeWidth>1.6</akkoladeWidth>
-    <akkoladeBarDistance>0.4</akkoladeBarDistance>
+    <bracketWidth>0.45</bracketWidth>
+    <bracketDistance>0.45</bracketDistance>
+    <akkoladeWidth>1.5</akkoladeWidth>
+    <akkoladeBarDistance>0.35</akkoladeBarDistance>
     <dividerLeft>0</dividerLeft>
     <dividerLeftSym>systemDivider</dividerLeftSym>
     <dividerLeftX>0</dividerLeftX>
@@ -103,7 +103,7 @@
     <dividerRightSym>systemDivider</dividerRightSym>
     <dividerRightX>0</dividerRightX>
     <dividerRightY>0</dividerRightY>
-    <clefLeftMargin>0.8</clefLeftMargin>
+    <clefLeftMargin>0.75</clefLeftMargin>
     <keysigLeftMargin>0.5</keysigLeftMargin>
     <ambitusMargin>0.5</ambitusMargin>
     <timesigLeftMargin>0.63</timesigLeftMargin>
@@ -124,14 +124,12 @@
     <shortenStem>1</shortenStem>
     <stemLength>3.5</stemLength>
     <stemLengthSmall>2.25</stemLengthSmall>
-    <shortStemProgression>0.25</shortStemProgression>
     <shortStemStartLocation>1</shortStemStartLocation>
     <shortestStem>2.5</shortestStem>
     <minStaffSizeForAutoStems>4</minStaffSizeForAutoStems>
     <smallStaffStemDirection>1</smallStaffStemDirection>
-    <preferStemDirectionMatchContext>1</preferStemDirectionMatchContext>
     <beginRepeatLeftMargin>1</beginRepeatLeftMargin>
-    <minNoteDistance>0.6</minNoteDistance>
+    <minNoteDistance>0.5</minNoteDistance>
     <barNoteDistance>1.3</barNoteDistance>
     <barAccidentalDistance>0.65</barAccidentalDistance>
     <noteBarDistance>1.5</noteBarDistance>
@@ -144,7 +142,7 @@
     <fourMeasureRepeatShowExtenders>0</fourMeasureRepeatShowExtenders>
     <staffLineWidth>0.11</staffLineWidth>
     <ledgerLineWidth>0.16</ledgerLineWidth>
-    <ledgerLineLength>0.35</ledgerLineLength>
+    <ledgerLineLength>0.33</ledgerLineLength>
     <accidentalDistance>0.22</accidentalDistance>
     <accidentalNoteDistance>0.25</accidentalNoteDistance>
     <bracketedAccidentalPadding>0.175</bracketedAccidentalPadding>
@@ -153,15 +151,15 @@
     <keysigNaturalDistance>0.4</keysigNaturalDistance>
     <beamWidth>0.5</beamWidth>
     <beamDistance>0.5</beamDistance>
-    <beamMinLen>1.2</beamMinLen>
+    <beamMinLen>1.1</beamMinLen>
     <beamNoSlope>0</beamNoSlope>
     <dotMag>1</dotMag>
     <dotNoteDistance>0.5</dotNoteDistance>
     <dotRestDistance>0.25</dotRestDistance>
     <dotDotDistance>0.65</dotDotDistance>
-    <propertyDistanceHead>1</propertyDistanceHead>
-    <propertyDistanceStem>1.8</propertyDistanceStem>
-    <propertyDistance>1</propertyDistance>
+    <propertyDistanceHead>0.4</propertyDistanceHead>
+    <propertyDistanceStem>0.4</propertyDistanceStem>
+    <propertyDistance>0.4</propertyDistance>
     <articulationMag>1</articulationMag>
     <articulationPosAbove x="0" y="0"/>
     <articulationAnchorDefault>2</articulationAnchorDefault>
@@ -171,8 +169,8 @@
     <hairpinPlacement>1</hairpinPlacement>
     <hairpinPosAbove x="0" y="-2"/>
     <hairpinPosBelow x="0" y="2"/>
-    <hairpinLinePosAbove x="0" y="-3"/>
-    <hairpinLinePosBelow x="0" y="4"/>
+    <hairpinLinePosAbove x="0" y="-1.5"/>
+    <hairpinLinePosBelow x="0" y="2.5"/>
     <hairpinHeight>1.15</hairpinHeight>
     <hairpinContHeight>0.5</hairpinContHeight>
     <hairpinWidth>0.12</hairpinWidth>
@@ -230,7 +228,6 @@
     <harmonyPlacement>0</harmonyPlacement>
     <romanNumeralPlacement>1</romanNumeralPlacement>
     <nashvilleNumberPlacement>0</nashvilleNumberPlacement>
-    <harmonyPlay>1</harmonyPlay>
     <harmonyVoiceLiteral>1</harmonyVoiceLiteral>
     <harmonyVoicing>0</harmonyVoicing>
     <harmonyDuration>0</harmonyDuration>
@@ -374,7 +371,7 @@
     <ArpeggioLineWidth>0.18</ArpeggioLineWidth>
     <ArpeggioHookLen>0.8</ArpeggioHookLen>
     <ArpeggioHiddenInStdIfTab>0</ArpeggioHiddenInStdIfTab>
-    <slurEndWidth>0.07</slurEndWidth>
+    <slurEndWidth>0.05</slurEndWidth>
     <slurMidWidth>0.21</slurMidWidth>
     <slurDottedWidth>0.1</slurDottedWidth>
     <minTieLength>1</minTieLength>
@@ -482,9 +479,9 @@
     <tupletOufOfStaff>1</tupletOufOfStaff>
     <tupletVHeadDistance>0.5</tupletVHeadDistance>
     <tupletVStemDistance>0.5</tupletVStemDistance>
-    <tupletStemLeftDistance>0</tupletStemLeftDistance>
+    <tupletStemLeftDistance>0.5</tupletStemLeftDistance>
     <tupletStemRightDistance>0.5</tupletStemRightDistance>
-    <tupletNoteLeftDistance>-0.5</tupletNoteLeftDistance>
+    <tupletNoteLeftDistance>0.0</tupletNoteLeftDistance>
     <tupletNoteRightDistance>0</tupletNoteRightDistance>
     <tupletBracketWidth>0.1</tupletBracketWidth>
     <tupletDirection>0</tupletDirection>
@@ -1239,7 +1236,7 @@
     <letRingPlacement>1</letRingPlacement>
     <letRingPosAbove x="0" y="0"/>
     <letRingPosBelow x="0" y="0"/>
-    <letRingLineWidth>0.15</letRingLineWidth>
+    <letRingLineWidth>0.11</letRingLineWidth>
     <letRingLineStyle>2</letRingLineStyle>
     <letRingBeginTextOffset x="0" y="0.15"/>
     <letRingText>let ring</letRingText>
@@ -1261,7 +1258,7 @@
     <palmMutePlacement>1</palmMutePlacement>
     <palmMutePosAbove x="0" y="-4"/>
     <palmMutePosBelow x="0" y="4"/>
-    <palmMuteLineWidth>0.15</palmMuteLineWidth>
+    <palmMuteLineWidth>0.11</palmMuteLineWidth>
     <palmMuteLineStyle>2</palmMuteLineStyle>
     <palmMuteBeginTextOffset x="0" y="0.15"/>
     <palmMuteText>P.M.</palmMuteText>
@@ -1276,7 +1273,7 @@
     <fermataPosBelow x="0" y="0.5"/>
     <fermataMinDistance>0.4</fermataMinDistance>
     <fingeringPlacement>0</fingeringPlacement>
-    <articulationMinDistance>0.5</articulationMinDistance>
+    <articulationMinDistance>0.4</articulationMinDistance>
     <fingeringMinDistance>0.5</fingeringMinDistance>
     <hairpinMinDistance>0.7</hairpinMinDistance>
     <letRingMinDistance>0.7</letRingMinDistance>

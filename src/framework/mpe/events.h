@@ -40,6 +40,7 @@ using PlaybackEvent = std::variant<NoteEvent, RestEvent>;
 using PlaybackEventList = std::vector<PlaybackEvent>;
 using PlaybackEventsMap = std::map<msecs_t, PlaybackEventList>;
 using PlaybackEventsChanges = async::Channel<PlaybackEventsMap>;
+using DynamicLevelChanges = async::Channel<DynamicLevelMap>;
 
 struct ArrangementContext
 {
@@ -48,6 +49,7 @@ struct ArrangementContext
     duration_t nominalDuration = 0;
     duration_t actualDuration = 0;
     voice_layer_idx_t voiceLayerIndex = 0;
+    double bps = 0;
 
     bool operator==(const ArrangementContext& other) const
     {
@@ -55,7 +57,8 @@ struct ArrangementContext
                && actualTimestamp == other.actualTimestamp
                && nominalDuration == other.nominalDuration
                && actualDuration == other.actualDuration
-               && voiceLayerIndex == other.voiceLayerIndex;
+               && voiceLayerIndex == other.voiceLayerIndex
+               && bps == other.bps;
     }
 };
 
@@ -101,18 +104,21 @@ struct NoteEvent
                        const voice_layer_idx_t voiceIdx,
                        const pitch_level_t nominalPitchLevel,
                        const dynamic_level_t nominalDynamicLevel,
-                       const ArticulationMap& articulationsApplied)
+                       const ArticulationMap& articulationsApplied,
+                       const double bps,
+                       const float requiredVelocityFraction = 0.f)
     {
         m_arrangementCtx.nominalDuration = nominalDuration;
         m_arrangementCtx.nominalTimestamp = nominalTimestamp;
         m_arrangementCtx.voiceLayerIndex = voiceIdx;
+        m_arrangementCtx.bps = bps;
 
         m_pitchCtx.nominalPitchLevel = nominalPitchLevel;
 
         m_expressionCtx.articulations = articulationsApplied;
         m_expressionCtx.nominalDynamicLevel = nominalDynamicLevel;
 
-        setUp();
+        setUp(requiredVelocityFraction);
     }
 
     const ArrangementContext& arrangementCtx() const
@@ -145,14 +151,14 @@ private:
         return static_cast<T>(static_cast<float>(v) * f);
     }
 
-    void setUp()
+    void setUp(const float requiredVelocityFraction)
     {
         calculateActualDuration(m_expressionCtx.articulations);
         calculateActualTimestamp(m_expressionCtx.articulations);
 
         calculatePitchCurve(m_expressionCtx.articulations);
 
-        calculateExpressionCurve(m_expressionCtx.articulations);
+        calculateExpressionCurve(m_expressionCtx.articulations, requiredVelocityFraction);
     }
 
     void calculateActualTimestamp(const ArticulationMap& articulationsApplied)
@@ -195,11 +201,11 @@ private:
         float patternUnitRatio = PITCH_LEVEL_STEP / static_cast<float>(ONE_PERCENT);
 
         for (auto& pair : m_pitchCtx.pitchCurve) {
-            pair.second = RealRound(static_cast<float>(pair.second) * ratio * patternUnitRatio, 0);
+            pair.second = static_cast<pitch_level_t>(RealRound(static_cast<float>(pair.second) * ratio * patternUnitRatio, 0));
         }
     }
 
-    void calculateExpressionCurve(const ArticulationMap& articulationsApplied)
+    void calculateExpressionCurve(const ArticulationMap& articulationsApplied, const float requiredVelocityFraction)
     {
         const ExpressionPattern::DynamicOffsetMap& appliedOffsetMap = articulationsApplied.averageDynamicOffsetMap();
 
@@ -224,7 +230,11 @@ private:
         float ratio = static_cast<float>(actualDynamicLevel) / static_cast<float>(articulationDynamicLevel);
 
         for (auto& pair : m_expressionCtx.expressionCurve) {
-            pair.second = RealRound(static_cast<float>(pair.second) * ratio, 0);
+            pair.second = static_cast<dynamic_level_t>(RealRound(pair.second * ratio, 0));
+        }
+
+        if (!RealIsNull(requiredVelocityFraction)) {
+            m_expressionCtx.expressionCurve.amplifyVelocity(requiredVelocityFraction);
         }
     }
 
@@ -285,9 +295,17 @@ struct PlaybackSetupData
 
     bool operator<(const PlaybackSetupData& other) const
     {
-        return id < other.id
-               && category < other.category
-               && subCategorySet < other.subCategorySet;
+        if (other.id > id) {
+            return true;
+        } else if (other.id == id) {
+            if (other.category > category) {
+                return true;
+            } else if (other.category == category) {
+                return other.subCategorySet > subCategorySet;
+            }
+        }
+
+        return false;
     }
 
     bool isValid() const
@@ -295,7 +313,61 @@ struct PlaybackSetupData
         return id != SoundId::Undefined
                && category != SoundCategory::Undefined;
     }
+
+    String toString() const
+    {
+        String result;
+
+        if (!subCategorySet.empty()) {
+            result = String(u"%1.%2.%3")
+                     .arg(soundCategoryToString(category))
+                     .arg(soundIdToString(id))
+                     .arg(subCategorySet.toString());
+        } else {
+            result = String(u"%1.%2")
+                     .arg(soundCategoryToString(category))
+                     .arg(soundIdToString(id));
+        }
+
+        return result;
+    }
+
+    static PlaybackSetupData fromString(const String& str)
+    {
+        if (str.empty()) {
+            return PlaybackSetupData();
+        }
+
+        StringList subStrList = str.split(u".");
+
+        if (subStrList.size() < 2) {
+            return PlaybackSetupData();
+        }
+
+        SoundSubCategories subCategories;
+        if (subStrList.size() == 3) {
+            subCategories = SoundSubCategories::fromString(subStrList.at(2));
+        }
+
+        PlaybackSetupData result = {
+            soundIdFromString(subStrList.at(1)),
+            soundCategoryFromString(subStrList.at(0)),
+            std::move(subCategories),
+            std::nullopt
+        };
+
+        return result;
+    }
 };
+
+static const PlaybackSetupData GENERIC_SETUP_DATA = {
+    SoundId::Last,
+    SoundCategory::Last,
+    { SoundSubCategory::Last },
+    std::nullopt
+};
+
+static const String GENERIC_SETUP_DATA_STRING = GENERIC_SETUP_DATA.toString();
 
 struct PlaybackData {
     PlaybackEventsMap originEvents;
@@ -303,7 +375,7 @@ struct PlaybackData {
     PlaybackEventsChanges mainStream;
     PlaybackEventsChanges offStream;
     DynamicLevelMap dynamicLevelMap;
-    async::Channel<DynamicLevelMap> dynamicLevelChanges;
+    DynamicLevelChanges dynamicLevelChanges;
 
     bool operator==(const PlaybackData& other) const
     {

@@ -27,8 +27,7 @@
 
 #include "libmscore/excerpt.h"
 
-namespace Ms {
-namespace PluginAPI {
+namespace mu::plugins::api {
 class Score;
 
 //---------------------------------------------------------
@@ -36,8 +35,8 @@ class Score;
 //    Wrapper class for Excerpt
 //
 //   This is based on the wrapper in scoreelement.h, which
-//   we cannot use here, because Ms::Excerpt is not derived
-//   from Ms::ScoreElement.
+//   we cannot use here, because mu::engraving::Excerpt is not derived
+//   from mu::engraving::ScoreElement.
 //   Since a plugin should never need to create an Excerpt
 //   instance by itself, we don't care for Ownership here.
 //---------------------------------------------------------
@@ -46,18 +45,18 @@ class Excerpt : public QObject
 {
     Q_OBJECT
     /** The score object for this part */
-    Q_PROPERTY(Ms::PluginAPI::Score * partScore READ partScore)
+    Q_PROPERTY(mu::plugins::api::Score * partScore READ partScore)
     /** The title of this part */
     Q_PROPERTY(QString title READ title)
 
 protected:
     /// \cond MS_INTERNAL
-    Ms::Excerpt* const e;
+    mu::engraving::Excerpt* const e;
     /// \endcond
 
 public:
     /// \cond MS_INTERNAL
-    Excerpt(Ms::Excerpt* _e = nullptr)
+    Excerpt(mu::engraving::Excerpt* _e = nullptr)
         : QObject(), e(_e) {}
     Excerpt(const Excerpt&) = delete;
     Excerpt& operator=(const Excerpt&) = delete;
@@ -68,7 +67,7 @@ public:
     /// \endcond
 
     /// Checks whether two variables represent the same object. \since MuseScore 3.3
-    Q_INVOKABLE bool is(Ms::PluginAPI::Excerpt* other) { return other && e == other->e; }
+    Q_INVOKABLE bool is(mu::plugins::api::Excerpt* other) { return other && e == other->e; }
 };
 
 //---------------------------------------------------------
@@ -86,7 +85,7 @@ Wrapper* excerptWrap(T* t)
     return w;
 }
 
-extern Excerpt* excerptWrap(Ms::Excerpt* e);
+extern Excerpt* excerptWrap(mu::engraving::Excerpt* e);
 
 //---------------------------------------------------------
 //   qml access to containers of Excerpt
@@ -115,6 +114,6 @@ QmlExcerptsListAccess<T, Container> wrapExcerptsContainerProperty(QObject* obj, 
 {
     return QmlExcerptsListAccess<T, Container>(obj, c);
 }
-} // namespace PluginAPI
-} // namespace Ms
+} // namespace mu::plugins::api
+
 #endif

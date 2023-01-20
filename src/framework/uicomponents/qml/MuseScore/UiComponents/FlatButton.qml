@@ -111,6 +111,7 @@ FocusScope {
         accessible.name: Boolean(root.text) ? root.text : root.toolTipTitle
         accessible.description: root.toolTipDescription
         accessible.visualItem: root
+        accessible.enabled: navCtrl.enabled
 
         onTriggered: {
             if (navCtrl.enabled && root.isClickOnKeyNavTriggered) {
@@ -197,6 +198,7 @@ FocusScope {
                 text: root.text
                 font: root.textFont
                 textFormat: root.textFormat
+                maximumLineCount: 1
                 visible: !isEmpty
             }
         }
@@ -220,6 +222,7 @@ FocusScope {
                 text: root.text
                 font: root.textFont
                 textFormat: root.textFormat
+                maximumLineCount: 1
                 visible: !isEmpty
             }
         }
@@ -284,7 +287,7 @@ FocusScope {
         }
 
         onPressed: {
-            ui.tooltip.hide(root)
+            ui.tooltip.hide(root, true)
         }
 
         onPressAndHold: function(mouse) {

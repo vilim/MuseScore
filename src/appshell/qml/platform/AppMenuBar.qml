@@ -39,22 +39,36 @@ ListView {
 
     model: appMenuModel
 
+    function openedArea(menuLoader) {
+        if (menuLoader.isMenuOpened) {
+            if (menuLoader.menu.subMenuLoader && menuLoader.menu.subMenuLoader.isMenuOpened)
+                return openedArea(menuLoader.menu.subMenuLoader)
+            return Qt.rect(menuLoader.menu.x, menuLoader.menu.y, menuLoader.menu.width, menuLoader.menu.height)
+        }
+        return Qt.rect(0, 0, 0, 0)
+    } 
+
     AppMenuModel {
         id: appMenuModel
 
         appMenuAreaRect: Qt.rect(root.x, root.y, root.width, root.height)
-        openedMenuAreaRect: Boolean(prv.openedMenu) ? Qt.rect(prv.openedMenu.x, prv.openedMenu.y, prv.openedMenu.width, prv.openedMenu.height)
-                                                    : Qt.rect(0, 0, 0, 0)
+        openedMenuAreaRect: openedArea(menuLoader)
 
         onOpenMenuRequested: {
             prv.openMenu(menuId)
         }
 
         onCloseOpenedMenuRequested: {
-            if (Boolean(prv.openedMenu)) {
-                prv.openedMenu.close()
-            }
+            menuLoader.close()
         }
+    }
+
+    AccessibleItem {
+        id: panelAccessibleInfo
+
+        visualItem: root
+        role: MUAccessible.Panel
+        name: qsTrc("appshell", "Application menu")
     }
 
     Component.onCompleted: {
@@ -68,14 +82,23 @@ ListView {
         property bool needRestoreNavigationAfterClose: false
         property string lastOpenedMenuId: ""
 
-        function openMenu(menuId) {
+        function openMenu(menuId, byHover) {
             for (var i = 0; i < root.count; ++i) {
                 var item = root.itemAtIndex(i)
                 if (Boolean(item) && item.menuId === menuId) {
                     needRestoreNavigationAfterClose = true
                     lastOpenedMenuId = menuId
 
-                    item.toggleMenuOpened()
+                    if (!byHover) {
+                        if (menuLoader.isMenuOpened && menuLoader.parent === item) {
+                            menuLoader.close()
+                            return
+                        }
+                    }
+
+                    menuLoader.menuId = menuId
+                    menuLoader.parent = item
+                    menuLoader.open(item.item.subitems)
 
                     return
                 }
@@ -93,11 +116,17 @@ ListView {
         property var item: model ? model.itemRole : null
         property string menuId: Boolean(item) ? item.id : ""
         property string title: Boolean(item) ? item.title : ""
+        property string titleWithMnemonicUnderline: Boolean(item) ? item.titleWithMnemonicUnderline : ""
+
+        property bool isMenuOpened: menuLoader.isMenuOpened && menuLoader.parent === this
 
         property bool highlight: appMenuModel.highlightedMenuId === menuId
         onHighlightChanged: {
             if (highlight) {
                 forceActiveFocus()
+                accessibleInfo.readInfo()
+            } else {
+                accessibleInfo.resetFocus()
             }
         }
 
@@ -108,15 +137,36 @@ ListView {
         margins: 8
         drawFocusBorderInsideRect: true
 
-        transparent: !menuLoader.isMenuOpened
-        accentButton: menuLoader.isMenuOpened
+        transparent: !isMenuOpened
+        accentButton: isMenuOpened
+
+        navigation.accessible.ignored: true
+
+        AccessibleItem {
+            id: accessibleInfo
+
+            accessibleParent: panelAccessibleInfo
+            visualItem: radioButtonDelegate
+            role: MUAccessible.Button
+            name: radioButtonDelegate.title
+
+            function readInfo() {
+                accessibleInfo.ignored = false
+                accessibleInfo.focused = true
+            }
+
+            function resetFocus() {
+                accessibleInfo.ignored = true
+                accessibleInfo.focused = false
+            }
+        }
 
         contentItem: StyledTextLabel {
             id: textLabel
 
             width: textMetrics.width
 
-            text: correctText(radioButtonDelegate.title)
+            text: appMenuModel.isNavigationStarted ? radioButtonDelegate.titleWithMnemonicUnderline : radioButtonDelegate.title
             textFormat: Text.RichText
             font: ui.theme.defaultFont
 
@@ -124,23 +174,7 @@ ListView {
                 id: textMetrics
 
                 font: textLabel.font
-                text: textLabel.removeAmpersands(radioButtonDelegate.title)
-            }
-
-            function correctText(text) {
-                if (!appMenuModel.isNavigationStarted) {
-                    return removeAmpersands(text)
-                }
-
-                return makeMnemonicText(text)
-            }
-
-            function removeAmpersands(text) {
-                return Utils.removeAmpersands(text)
-            }
-
-            function makeMnemonicText(text) {
-                return Utils.makeMnemonicText(text)
+                text: radioButtonDelegate.title
             }
         }
 
@@ -152,45 +186,36 @@ ListView {
             color: radioButtonDelegate.normalColor
         }
 
-        Accessible.role: Accessible.Button
-        Accessible.name: Utils.removeAmpersands(title)
-
-        mouseArea.onContainsMouseChanged: {
-            if (!mouseArea.containsMouse || !prv.openedMenu || prv.openedMenu == menuLoader.menu) {
+        mouseArea.onHoveredChanged: {
+            if (!mouseArea.containsMouse) {
                 return
             }
 
-            appMenuModel.openMenu(radioButtonDelegate.menuId)
+            if (menuLoader.isMenuOpened && menuLoader.parent !== this) {
+                appMenuModel.openMenu(radioButtonDelegate.menuId, true)
+            }
         }
 
         onClicked: {
-            appMenuModel.openMenu(radioButtonDelegate.menuId)
+            appMenuModel.openMenu(radioButtonDelegate.menuId, false)
+        }
+    }
+
+    StyledMenuLoader {
+        id: menuLoader
+
+        property string menuId: ""
+
+        onHandleMenuItem: {
+            Qt.callLater(appMenuModel.handleMenuItem, itemId)
         }
 
-        function toggleMenuOpened() {
-            if (prv.openedMenu && prv.openedMenu != menuLoader.menu) {
-                prv.openedMenu.close()
-            }
-
-            Qt.callLater(menuLoader.toggleOpened, item.subitems)
+        onOpened: {
+            appMenuModel.openedMenuId = menuLoader.menuId
         }
 
-        StyledMenuLoader {
-            id: menuLoader
-
-            onHandleMenuItem: {
-                Qt.callLater(appMenuModel.handleMenuItem, itemId)
-            }
-
-            onOpened: {
-                prv.openedMenu = menu
-                appMenuModel.openedMenuId = radioButtonDelegate.menuId
-            }
-
-            onClosed: {
-                prv.openedMenu = null
-                appMenuModel.openedMenuId = ""
-            }
+        onClosed: {
+            appMenuModel.openedMenuId = ""
         }
     }
 }

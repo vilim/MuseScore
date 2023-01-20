@@ -24,6 +24,8 @@
 
 #include <QObject>
 
+#include "progress.h"
+
 #include "modularity/ioc.h"
 #include "async/asyncable.h"
 
@@ -55,6 +57,8 @@ class GeneralPreferencesModel : public QObject, public async::Asyncable
     Q_PROPERTY(bool isOSCRemoteControl READ isOSCRemoteControl WRITE setIsOSCRemoteControl NOTIFY isOSCRemoteControlChanged)
     Q_PROPERTY(int oscPort READ oscPort WRITE setOscPort NOTIFY oscPortChanged)
 
+    Q_PROPERTY(bool isNeedRestart READ isNeedRestart WRITE setIsNeedRestart NOTIFY isNeedRestartChanged)
+
 public:
     explicit GeneralPreferencesModel(QObject* parent = nullptr);
 
@@ -71,6 +75,7 @@ public:
     int autoSaveInterval() const;
     bool isOSCRemoteControl() const;
     int oscPort() const;
+    bool isNeedRestart() const;
 
 public slots:
     void setCurrentLanguageCode(const QString& currentLanguageCode);
@@ -79,6 +84,7 @@ public slots:
     void setAutoSaveInterval(int minutes);
     void setIsOSCRemoteControl(bool isOSCRemoteControl);
     void setOscPort(int oscPort);
+    void setIsNeedRestart(bool newIsNeedRestart);
 
 signals:
     void languagesChanged(QVariantList languages);
@@ -89,7 +95,13 @@ signals:
     void isOSCRemoteControlChanged(bool isOSCRemoteControl);
     void oscPortChanged(int oscPort);
 
-    void receivingUpdateForCurrentLanguage(int progressValue, QString progressStatus);
+    void receivingUpdateForCurrentLanguage(int current, int total, QString status);
+    void isNeedRestartChanged();
+
+private:
+    framework::Progress m_languageUpdateProgress;
+
+    bool m_isNeedRestart = false;
 };
 }
 

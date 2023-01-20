@@ -22,30 +22,30 @@
 
 #include "range.h"
 
-#include "factory.h"
-#include "measure.h"
-#include "segment.h"
-#include "rest.h"
-#include "chord.h"
-#include "score.h"
-#include "slur.h"
-#include "tie.h"
-#include "note.h"
-#include "tuplet.h"
 #include "barline.h"
-#include "utils.h"
-#include "staff.h"
+#include "chord.h"
 #include "excerpt.h"
-#include "measurerepeat.h"
-#include "tremolo.h"
+#include "factory.h"
 #include "linkedobjects.h"
+#include "measure.h"
+#include "measurerepeat.h"
+#include "note.h"
+#include "rest.h"
+#include "score.h"
+#include "segment.h"
+#include "slur.h"
+#include "staff.h"
+#include "tie.h"
+#include "tremolo.h"
+#include "tuplet.h"
+#include "utils.h"
 
 #include "log.h"
 
 using namespace mu;
 using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   cleanupTuplet
 //---------------------------------------------------------
@@ -177,7 +177,8 @@ void TrackList::append(EngravingItem* e)
                 ChordRest* src = toChordRest(e);
                 Segment* s1 = src->segment();
                 for (EngravingItem* ee : s1->annotations()) {
-                    if (ee->track() == e->track()) {
+                    bool addSysObject = ee->systemFlag() && !ee->isLinked() && ee->track() == 0 && e->track() == 0;
+                    if (addSysObject || (!ee->systemFlag() && ee->track() == e->track())) {
                         _range->annotations.push_back({ s1->tick(), ee->clone() });
                     }
                 }
@@ -441,12 +442,12 @@ Tuplet* TrackList::writeTuplet(Tuplet* parent, Tuplet* tuplet, Measure*& measure
                         }
                     }
                 } else {
-                    ASSERT_X(QString::asprintf("premature end of measure list in track %zu, rest %d/%d",
-                                               _track, duration.numerator(), duration.denominator()));
+                    ASSERT_X(String(u"premature end of measure list in track %1, rest %2/%3")
+                             .arg(_track).arg(duration.numerator(), duration.denominator()));
                 }
             }
             if (e->isChordRest()) {
-                Fraction dd = qMin(rest, duration) * ratio;
+                Fraction dd = std::min(rest, duration) * ratio;
                 std::vector<TDuration> dl = toDurationList(dd, false);
                 for (const TDuration& k : dl) {
                     Segment* segment = measure->undoGetSegmentR(SegmentType::ChordRest, measure->ticks() - rest);
@@ -539,7 +540,7 @@ bool TrackList::write(Score* score, const Fraction& tick) const
                     duration -= m->ticks();
                     remains.set(0, 1);
                 } else if (e->isChordRest()) {
-                    Fraction du               = qMin(remains, duration);
+                    Fraction du               = std::min(remains, duration);
                     std::vector<TDuration> dl = toDurationList(du, e->isChord());
                     if (dl.empty()) {
                         MScore::setError(MsError::CORRUPTED_MEASURE);
@@ -656,7 +657,7 @@ bool TrackList::write(Score* score, const Fraction& tick) const
 
 ScoreRange::~ScoreRange()
 {
-    qDeleteAll(tracks);
+    DeleteAll(tracks);
 }
 
 //---------------------------------------------------------
@@ -734,7 +735,7 @@ bool ScoreRange::write(Score* score, const Fraction& tick) const
         s->setTick(s->tick() + tick);
         if (s->isSlur()) {
             Slur* slur = toSlur(s);
-            if (slur->startCR()->isGrace()) {
+            if (slur->startCR() && slur->startCR()->isGrace()) {
                 Chord* sc = slur->startChord();
                 size_t idx = sc->graceIndex();
                 Chord* dc = toChord(score->findCR(s->tick(), s->track()));
@@ -742,7 +743,7 @@ bool ScoreRange::write(Score* score, const Fraction& tick) const
             } else {
                 s->setStartElement(0);
             }
-            if (slur->endCR()->isGrace()) {
+            if (slur->endCR() && slur->endCR()->isGrace()) {
                 Chord* sc = slur->endChord();
                 size_t idx = sc->graceIndex();
                 Chord* dc = toChord(score->findCR(s->tick2(), s->track2()));
@@ -778,7 +779,7 @@ void ScoreRange::fill(const Fraction& f)
     }
 
     Fraction diff = ticks() - oldDuration;
-    for (Spanner* sp : qAsConst(spanner)) {
+    for (Spanner* sp : spanner) {
         if (sp->tick2() >= oldEndTick && sp->tick() < oldEndTick) {
             sp->setTicks(sp->ticks() + diff);
         }

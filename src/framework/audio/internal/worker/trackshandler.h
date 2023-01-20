@@ -40,8 +40,8 @@ public:
 
     async::Promise<TrackIdList> trackIdList(const TrackSequenceId sequenceId) const override;
     async::Promise<TrackName> trackName(const TrackSequenceId sequenceId, const TrackId trackId) const override;
-    async::Promise<TrackId, AudioParams> addTrack(const TrackSequenceId sequenceId, const std::string& trackName, io::Device* playbackData,
-                                                  AudioParams&& params) override;
+    async::Promise<TrackId, AudioParams> addTrack(const TrackSequenceId sequenceId, const std::string& trackName,
+                                                  io::IODevice* playbackData, AudioParams&& params) override;
     async::Promise<TrackId, AudioParams> addTrack(const TrackSequenceId sequenceId, const std::string& trackName,
                                                   const mpe::PlaybackData& playbackData, AudioParams&& params) override;
     void removeTrack(const TrackSequenceId sequenceId, const TrackId trackId) override;
@@ -55,6 +55,8 @@ public:
     async::Promise<AudioInputParams> inputParams(const TrackSequenceId sequenceId, const TrackId trackId) const override;
     void setInputParams(const TrackSequenceId sequenceId, const TrackId trackId, const AudioInputParams& params) override;
     async::Channel<TrackSequenceId, TrackId, AudioInputParams> inputParamsChanged() const override;
+
+    void clearSources() override;
 
 private:
     ITrackSequencePtr sequence(const TrackSequenceId id) const;

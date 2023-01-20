@@ -54,5 +54,4 @@ void GuitarProModule::resolveImports()
 
 void GuitarProModule::onInit(const framework::IApplication::RunMode&)
 {
-    s_configuration->init();
 }

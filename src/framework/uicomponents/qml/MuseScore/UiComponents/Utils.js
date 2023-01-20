@@ -30,16 +30,16 @@ function colorWithAlpha(color, alpha) {
     return Qt.rgba(color.r, color.g, color.b, alpha)
 }
 
-function colorToString(color) {
-    var percentName = qsTrc("uicomponents", "percent")
+function accessibleColorDescription(color) {
+    var percentName = qsTrc("global", "percent")
     var colorValueToPercent = function(value) {
         return Math.floor(value * 100)
     }
 
-    var colorValueTemplate = "%1 %2 %3 "
-    var text = colorValueTemplate.arg(qsTrc("uicomponents", "Red")).arg(colorValueToPercent(color.r)).arg(percentName)
-            + colorValueTemplate.arg(qsTrc("uicomponents", "Green")).arg(colorValueToPercent(color.g)).arg(percentName)
-            + colorValueTemplate.arg(qsTrc("uicomponents", "Blue")).arg(colorValueToPercent(color.b)).arg(percentName)
+    var colorValueTemplate = "%1 %2 %3"
+    var text = colorValueTemplate.arg(qsTrc("ui", "Red")).arg(colorValueToPercent(color.r)).arg(percentName)
+            + " " + colorValueTemplate.arg(qsTrc("ui", "Green")).arg(colorValueToPercent(color.g)).arg(percentName)
+            + " " + colorValueTemplate.arg(qsTrc("ui", "Blue")).arg(colorValueToPercent(color.b)).arg(percentName)
 
     return text
 }
@@ -59,6 +59,10 @@ function ensureContentVisible(flickable, contentRect, margins) {
 }
 
 function getItem(model, index) {
+    if (!Boolean(model)) {
+        return null
+    }
+
     if (Boolean(model.get)) {
         return model.get(index)
     }
@@ -77,21 +81,4 @@ function getItemValue(model, index, roleName, def) {
     }
 
     return item
-}
-
-function makeMnemonicText(text) {
-    var index = text.indexOf("&")
-    if (index !== -1) {
-        if (index === text.lenght - 1) {
-            text = removeAmpersands(text)
-        } else {
-            text = text.replace(text.substr(index, 2), ("<u>" + text.substr(index + 1, 1) + "</u>"))
-        }
-    }
-
-    return text
-}
-
-function removeAmpersands(text) {
-    return text.replace('&', '')
 }

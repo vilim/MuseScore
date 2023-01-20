@@ -50,7 +50,7 @@
     <sym code="0x1d12a" name="##"/>
     <sym code="0x1d12b" name="bb"/>
 
-<!-- this allows "b" to render as a literal when when encountered as a note name -->
+<!-- this allows "b" to render as a literal when encountered as a note name -->
     <sym value="b" class="note" name="b"/>
 
 <!-- add "code" attributes (as for "b" and "#" above) to get these to render as flat and sharp signs -->
@@ -381,6 +381,26 @@
     <name>t</name>
     <name>^</name>
     <render>striangle</render>
+    </token>
+
+  <token class="modifier">
+    <name>add</name>
+    <render>add</render>
+    </token>
+
+  <token class="modifier">
+    <name>sus</name>
+    <render>sus</render>
+    </token>
+
+  <token class="modifier">
+    <name>no</name>
+    <render>no</render>
+    </token>
+
+  <token class="modifier">
+    <name>omit</name>
+    <render>omit</render>
     </token>
 
   <renderRoot>:n :a m:0.5:0</renderRoot>

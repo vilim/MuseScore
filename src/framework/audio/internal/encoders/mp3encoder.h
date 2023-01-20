@@ -25,15 +25,22 @@
 
 #include "abstractaudioencoder.h"
 
-namespace mu::audio::encode {
-class Mp3Encoder : public AbstractAudioEncoder<Mp3Encoder>
-{
-protected:
-    friend class AbstractAudioEncoder<Mp3Encoder>;
+struct LameHandler;
 
-    static size_t outputBufferSize(samples_t samplesPerChannel);
-    static samples_t doEncode(const SoundTrackFormat& format, samples_t samplesPerChannel, float* input, char* output);
-    static samples_t doFlush(char* output, size_t outputSize);
+namespace mu::audio::encode {
+class Mp3Encoder : public AbstractAudioEncoder
+{
+public:
+    bool init(const io::path_t& path, const SoundTrackFormat& format, const samples_t totalSamplesNumber) override;
+
+    size_t encode(samples_t samplesPerChannel, const float* input) override;
+    size_t flush() override;
+
+private:
+    size_t requiredOutputBufferSize(samples_t totalSamplesNumber) const override;
+    void closeDestination() override;
+
+    LameHandler* m_handler = nullptr;
 };
 }
 

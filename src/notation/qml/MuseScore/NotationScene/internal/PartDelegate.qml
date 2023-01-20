@@ -30,9 +30,11 @@ ListItemBlank {
     id: root
 
     property string title: ""
+    property string incorrectTitleWarning: ""
+
     property int currentPartIndex: -1
 
-    property bool isCreated: false
+    property bool isCustom: false
 
     property int sideMargin: 0
 
@@ -42,8 +44,9 @@ ListItemBlank {
     signal copyPartRequested()
     signal removePartRequested()
     signal partClicked()
+
     signal titleEdited(string newTitle)
-    signal titleEditingFinished()
+    signal titleEditingFinished(string newTitle)
 
     function startEditTitle() {
         if (titleLoader.sourceComponent !== editPartTitleField) {
@@ -51,10 +54,11 @@ ListItemBlank {
         }
     }
 
-    function endEditTitle() {
+    function endEditTitle(newTitle) {
         if (titleLoader.sourceComponent !== partTitle) {
             titleLoader.sourceComponent = partTitle
-            titleEditingFinished()
+            root.incorrectTitleWarning = ""
+            root.titleEditingFinished(newTitle)
             root.navigation.requestActive()
         }
     }
@@ -114,35 +118,57 @@ ListItemBlank {
             Component {
                 id: editPartTitleField
 
-                TextInputField {
-                    navigation.panel: root.navigation.panel
-                    navigation.row: root.navigation.row
-                    navigation.column: 1
 
-                    Component.onCompleted: {
-                        forceActiveFocus()
-                        navigation.requestActive()
+                RowLayout {
+                    spacing: 38
+
+                    TextInputField {
+                        Layout.fillWidth: true
+
+                        navigation.panel: root.navigation.panel
+                        navigation.row: root.navigation.row
+                        navigation.column: 1
+
+                        maximumLength: 40
+
+                        Component.onCompleted: {
+                            forceActiveFocus()
+                            navigation.requestActive()
+                        }
+
+                        currentText: root.title
+
+                        onTextChanged: function(newTextValue) {
+                            root.titleEdited(newTextValue)
+                        }
+
+                        onTextEditingFinished: function(newTextValue) {
+                            Qt.callLater(root.endEditTitle, newTextValue)
+                        }
                     }
 
-                    currentText: root.title
+                    StyledTextLabel {
+                        Layout.preferredWidth: parent.width / 3
 
-                    onCurrentTextEdited: function(newTextValue) {
-                        root.titleEdited(newTextValue)
-                    }
+                        text: root.incorrectTitleWarning
 
-                    onTextEditingFinished: {
-                        Qt.callLater(root.endEditTitle)
+                        horizontalAlignment: Text.AlignLeft
                     }
                 }
             }
         }
 
         MenuButton {
-            menuModel: [
-                { "id": "duplicate", "title": qsTrc("notation", "Duplicate"), "enabled": root.isCreated },
-                { "id": "delete", "title": qsTrc("notation", "Delete"), "enabled": root.isCreated },
-                { "id": "rename", "title": qsTrc("notation", "Rename") },
-            ]
+            Component.onCompleted: {
+                var operations = [ { "id": "duplicate", "title": qsTrc("notation", "Duplicate") },
+                                   { "id": "rename", "title": qsTrc("notation", "Rename") }]
+
+                if (root.isCustom) {
+                    operations.push({ "id": "delete", "title": qsTrc("notation", "Delete") })
+                }
+
+                menuModel = operations
+            }
 
             navigation.name: title
             navigation.panel: root.navigation.panel
@@ -154,12 +180,12 @@ ListItemBlank {
                 case "duplicate":
                     root.copyPartRequested()
                     break
+                case "rename":
+                    root.startEditTitle()
+                    break
                 case "delete":
                     root.removePartRequested()
                     break
-                case "rename":
-                    root.startEditTitle()
-                    break;
                 }
             }
         }

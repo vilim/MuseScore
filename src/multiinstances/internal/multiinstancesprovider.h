@@ -52,8 +52,8 @@ public:
     void init();
 
     // Project opening
-    bool isProjectAlreadyOpened(const io::path& projectPath) const override;
-    void activateWindowWithProject(const io::path& projectPath) override;
+    bool isProjectAlreadyOpened(const io::path_t& projectPath) const override;
+    void activateWindowWithProject(const io::path_t& projectPath) override;
     bool isHasAppInstanceWithoutProject() const override;
     void activateWindowWithoutProject() override;
     bool openNewAppInstance(const QStringList& args) override;
@@ -78,8 +78,12 @@ public:
     std::vector<InstanceMeta> instances() const override;
     async::Notification instancesChanged() const override;
 
+    void notifyAboutInstanceWasQuited() override;
+
     // Quit for all
     void quitForAll() override;
+    void quitAllAndRestartLast() override;
+    void quitAllAndRunInstallation(const io::path_t& installerPath) override;
 
 private:
 

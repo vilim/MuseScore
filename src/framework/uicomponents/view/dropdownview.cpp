@@ -45,7 +45,7 @@ void DropdownView::updatePosition()
     }
 
     QRectF anchorRect = anchorGeometry();
-    QRectF popupRect(m_globalPos, QSize(contentWidth(), contentHeight() + padding() * 2));
+    QRectF popupRect(m_globalPos, contentItem()->size());
 
     auto movePos = [this, &popupRect](qreal x, qreal y) {
         m_globalPos.setX(x);
@@ -70,6 +70,11 @@ void DropdownView::updatePosition()
     if (popupRect.right() > anchorRect.right()) {
         // move to the left to an area that doesn't fit
         movePos(m_globalPos.x() - (popupRect.right() - anchorRect.right()), m_globalPos.y());
+    }
+
+    if (popupRect.top() < anchorRect.top()) {
+        // move to the bottom to an area that doesn't fit
+        movePos(m_globalPos.x(), anchorRect.top() + padding());
     }
 
     // remove padding for arrow

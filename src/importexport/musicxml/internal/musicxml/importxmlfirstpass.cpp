@@ -24,7 +24,7 @@
 
 #include "log.h"
 
-namespace Ms {
+namespace mu::engraving {
 // TODO: move somewhere else
 
 MusicXmlPart::MusicXmlPart(QString id, QString name)
@@ -233,7 +233,7 @@ void MusicXmlOctaveShiftList::calcOctaveShiftShifts()
 void LyricNumberHandler::addNumber(const QString number)
 {
     if (_numberToNo.find(number) == _numberToNo.end()) {
-        _numberToNo[number] = -1;           // unassiged
+        _numberToNo[number] = -1;           // unassigned
     }
 }
 

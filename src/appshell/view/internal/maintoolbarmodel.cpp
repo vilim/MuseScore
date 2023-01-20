@@ -90,7 +90,10 @@ void MainToolBarModel::load()
     m_items << buildItem(mu::qtrc("appshell", "Home"), HOME_PAGE);
     m_items << buildItem(mu::qtrc("appshell", "Score"), NOTATION_PAGE);
     m_items << buildItem(mu::qtrc("appshell", "Publish"), PUBLISH_PAGE);
-    m_items << buildItem(mu::qtrc("appshell", "DevTools"), DEVTOOLS_PAGE);
+
+    if (globalConfiguration()->devModeEnabled()) {
+        m_items << buildItem(mu::qtrc("appshell", "DevTools"), DEVTOOLS_PAGE);
+    }
 
     endResetModel();
 

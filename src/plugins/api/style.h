@@ -25,10 +25,11 @@
 
 #include "engraving/style/style.h"
 
-namespace Ms {
+namespace mu::engraving {
 class Score;
+}
 
-namespace PluginAPI {
+namespace mu::plugins::api {
 //---------------------------------------------------------
 //   MStyle
 ///   Provides an access to score style settings.
@@ -49,14 +50,14 @@ class MStyle : public QObject
 {
     Q_OBJECT
 
-    Ms::MStyle* _style;
-    Ms::Score* _score;
+    mu::engraving::MStyle* _style;
+    mu::engraving::Score* _score;
 
-    static Sid keyToSid(const QString& key);
+    static engraving::Sid keyToSid(const QString& key);
 
 public:
     /// \cond MS_INTERNAL
-    MStyle(Ms::MStyle* style, Ms::Score* score)
+    MStyle(mu::engraving::MStyle* style, mu::engraving::Score* score)
         : QObject(), _style(style), _score(score) {}
     /// \endcond
 
@@ -64,8 +65,7 @@ public:
     Q_INVOKABLE void setValue(const QString& key, QVariant value);
 };
 
-extern MStyle* wrap(Ms::MStyle*, Ms::Score*);
-} // namespace PluginAPI
-} // namespace Ms
+extern MStyle* wrap(mu::engraving::MStyle*, mu::engraving::Score*);
+} // namespace mu::plugins::api
 
 #endif

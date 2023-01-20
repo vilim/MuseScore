@@ -44,7 +44,7 @@ class TextSettingsModel : public AbstractInspectorModel
     Q_PROPERTY(PropertyItem * isSizeSpatiumDependent READ isSizeSpatiumDependent CONSTANT)
     Q_PROPERTY(PropertyItem * frameType READ frameType CONSTANT)
     Q_PROPERTY(PropertyItem * frameBorderColor READ frameBorderColor CONSTANT)
-    Q_PROPERTY(PropertyItem * frameHighlightColor READ frameHighlightColor CONSTANT)
+    Q_PROPERTY(PropertyItem * frameFillColor READ frameFillColor CONSTANT)
     Q_PROPERTY(PropertyItem * frameThickness READ frameThickness CONSTANT)
     Q_PROPERTY(PropertyItem * frameMargin READ frameMargin CONSTANT)
     Q_PROPERTY(PropertyItem * frameCornerRadius READ frameCornerRadius CONSTANT)
@@ -52,6 +52,8 @@ class TextSettingsModel : public AbstractInspectorModel
     Q_PROPERTY(PropertyItem * textType READ textType CONSTANT)
     Q_PROPERTY(PropertyItem * textPlacement READ textPlacement CONSTANT)
     Q_PROPERTY(PropertyItem * textScriptAlignment READ textScriptAlignment CONSTANT)
+
+    Q_PROPERTY(QVariantList textStyles READ textStyles NOTIFY textStylesChanged)
 
     Q_PROPERTY(bool areStaffTextPropertiesAvailable READ areStaffTextPropertiesAvailable NOTIFY areStaffTextPropertiesAvailableChanged)
     Q_PROPERTY(
@@ -68,6 +70,9 @@ public:
     void loadProperties() override;
     void resetProperties() override;
 
+    void onNotationChanged(const mu::engraving::PropertyIdSet& changedPropertyIdSet,
+                           const mu::engraving::StyleIdSet& changedStyleIdSet) override;
+
     PropertyItem* fontFamily() const;
     PropertyItem* fontStyle() const;
     PropertyItem* fontSize() const;
@@ -77,7 +82,7 @@ public:
     PropertyItem* isSizeSpatiumDependent() const;
     PropertyItem* frameType() const;
     PropertyItem* frameBorderColor() const;
-    PropertyItem* frameHighlightColor() const;
+    PropertyItem* frameFillColor() const;
     PropertyItem* frameThickness() const;
     PropertyItem* frameMargin() const;
     PropertyItem* frameCornerRadius() const;
@@ -85,6 +90,8 @@ public:
     PropertyItem* textType() const;
     PropertyItem* textPlacement() const;
     PropertyItem* textScriptAlignment() const;
+
+    QVariantList textStyles();
 
     bool areStaffTextPropertiesAvailable() const;
 
@@ -95,6 +102,8 @@ public slots:
     void setIsSpecialCharactersInsertionAvailable(bool isSpecialCharactersInsertionAvailable);
 
 signals:
+    void textStylesChanged();
+
     void areStaffTextPropertiesAvailableChanged(bool areStaffTextPropertiesAvailable);
     void isSpecialCharactersInsertionAvailableChanged(bool isSpecialCharactersInsertionAvailable);
 
@@ -114,7 +123,7 @@ private:
     PropertyItem* m_isSizeSpatiumDependent = nullptr;
     PropertyItem* m_frameType = nullptr;
     PropertyItem* m_frameBorderColor = nullptr;
-    PropertyItem* m_frameHighlightColor = nullptr;
+    PropertyItem* m_frameFillColor = nullptr;
     PropertyItem* m_frameThickness = nullptr;
     PropertyItem* m_frameMargin = nullptr;
     PropertyItem* m_frameCornerRadius = nullptr;
@@ -122,6 +131,8 @@ private:
     PropertyItem* m_textType = nullptr;
     PropertyItem* m_textPlacement = nullptr;
     PropertyItem* m_textScriptAlignment = nullptr;
+
+    QVariantList m_textStyles;
 
     bool m_areStaffTextPropertiesAvailable = false;
     bool m_isSpecialCharactersInsertionAvailable = false;

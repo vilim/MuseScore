@@ -33,6 +33,7 @@ FocusScope {
     readonly property string indeterminateText: "--"
     property var currentText: ""
     property alias validator: valueInput.validator
+    property alias maximumLength: valueInput.maximumLength
     property alias measureUnitsSymbol: measureUnitsLabel.text
 
     property alias hint: valueInput.placeholderText
@@ -57,9 +58,12 @@ FocusScope {
 
     readonly property alias clearTextButton: clearTextButtonItem
 
-    signal currentTextEdited(var newTextValue)
+    signal textChanged(var newTextValue)
+    signal textEdited(var newTextValue)
     signal textCleared()
-    signal textEditingFinished()
+    signal textEditingFinished(var newTextValue)
+    signal accepted()
+    signal escapted()
 
     function selectAll() {
         valueInput.selectAll()
@@ -100,6 +104,11 @@ FocusScope {
         accessible.role: MUAccessible.EditableText
         accessible.name: Boolean(valueInput.text) ? valueInput.text + " " + measureUnitsLabel.text : valueInput.placeholderText
         accessible.visualItem: root
+        accessible.text: valueInput.text
+        accessible.selectedText: valueInput.selectedText
+        accessible.selectionStart: valueInput.selectionStart
+        accessible.selectionEnd: valueInput.selectionEnd
+        accessible.cursorPosition: valueInput.cursorPosition
 
         onActiveChanged: {
             if (navCtrl.active) {
@@ -169,21 +178,40 @@ FocusScope {
             }
 
             Keys.onShortcutOverride: function(event) {
+                if (readOnly) {
+                    return
+                }
+
+                if (event.key === Qt.Key_Enter || event.key === Qt.Key_Return
+                        || event.key === Qt.Key_Escape) {
+                    event.accepted = true
+                    return
+                }
+
                 if (textInputFieldModel.isShortcutAllowedOverride(event.key, event.modifiers)) {
                     event.accepted = true
                 } else {
                     event.accepted = false
 
                     root.focus = false
-                    root.textEditingFinished()
+                    root.textEditingFinished(valueInput.text)
                 }
             }
 
             Keys.onPressed: function(event) {
-                if (event.key === Qt.Key_Enter || event.key === Qt.Key_Return
-                        || event.key === Qt.Key_Escape) {
+                var isAcceptKey = event.key === Qt.Key_Enter || event.key === Qt.Key_Return
+                var isEscapeKey = event.key === Qt.Key_Escape
+                if (isAcceptKey || isEscapeKey) {
                     root.focus = false
-                    root.textEditingFinished()
+                    root.textEditingFinished(valueInput.text)
+                }
+
+                if (isAcceptKey) {
+                    root.accepted()
+                }
+
+                if (isEscapeKey) {
+                    root.escapted()
                 }
             }
 
@@ -193,7 +221,7 @@ FocusScope {
                     selectAll()
                 } else {
                     deselect()
-                    root.textEditingFinished()
+                    root.textEditingFinished(valueInput.text)
                 }
             }
 
@@ -202,7 +230,15 @@ FocusScope {
                     return
                 }
 
-                root.currentTextEdited(text)
+                root.textChanged(text)
+            }
+
+            onTextEdited: {
+                if (!acceptableInput) {
+                    return
+                }
+
+                root.textEdited(text)
             }
         }
 
@@ -222,6 +258,7 @@ FocusScope {
             Layout.preferredWidth: height
             Layout.margins: root.accessoriesPadding
 
+            toolTipTitle: qsTrc("global", "Clear")
             icon: IconCode.CLOSE_X_ROUNDED
             visible: root.clearTextButtonVisible
 
@@ -230,7 +267,6 @@ FocusScope {
 
             navigation.panel: navCtrl.panel
             navigation.order: navCtrl.order + 1
-            accessible.name: qsTrc("global", "Clear")
 
             onClicked: {
                 root.clear()

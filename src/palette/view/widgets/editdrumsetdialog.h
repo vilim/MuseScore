@@ -28,10 +28,11 @@
 #include "global/iinteractive.h"
 #include "context/iglobalcontext.h"
 #include "notation/inotationconfiguration.h"
+#include "engraving/iengravingfontsprovider.h"
 
 #include "libmscore/drumset.h"
 
-namespace Ms {
+namespace mu::palette {
 //---------------------------------------------------------
 //   EditDrumsetDialog
 //---------------------------------------------------------
@@ -40,9 +41,10 @@ class EditDrumsetDialog : public QDialog, private Ui::EditDrumsetDialog
 {
     Q_OBJECT
 
-    INJECT(Ms, mu::framework::IInteractive, interactive)
-    INJECT(Ms, mu::context::IGlobalContext, globalContext)
-    INJECT(Ms, mu::notation::INotationConfiguration, notationConfiguration)
+    INJECT(palette, framework::IInteractive, interactive)
+    INJECT(palette, context::IGlobalContext, globalContext)
+    INJECT(palette, notation::INotationConfiguration, notationConfiguration)
+    INJECT_STATIC(palette, engraving::IEngravingFontsProvider, engravingFonts)
 
 public:
     EditDrumsetDialog(QWidget* parent = nullptr);
@@ -63,8 +65,8 @@ private slots:
 
 private:
     void apply();
-    void updatePitchesList();
-    void refreshPitchesList();
+    void cancel();
+    void loadPitchesList();
     void updateExample();
 
     void fillCustomNoteheadsDataFromComboboxes(int pitch);
@@ -73,12 +75,14 @@ private:
     void setEnabledPitchControls(bool enable);
     void fillNoteheadsComboboxes(bool customGroup, int pitch);
 
-    mu::notation::INotationPtr m_notation;
-    mu::notation::InstrumentKey m_instrumentKey;
-    Drumset m_editedDrumset;
-};
-} // namespace Ms
+    notation::INotationPtr m_notation;
+    notation::InstrumentKey m_instrumentKey;
 
-Q_DECLARE_METATYPE(Ms::EditDrumsetDialog)
+    engraving::Drumset m_originDrumset;
+    engraving::Drumset m_editedDrumset;
+};
+}
+
+Q_DECLARE_METATYPE(mu::palette::EditDrumsetDialog)
 
 #endif // MU_PALETTE_EDITDRUMSETDIALOG_H

@@ -43,8 +43,24 @@ DialogView {
 
     property alias navigationSection: navSec
 
+    property bool closeOnEscape : true
+
     onOpened: {
         navSec.requestActive()
+        root.navigationActivateRequested()
+        accessibilityActiveTimer.start()
+    }
+
+    signal navigationActivateRequested()
+    signal accessibilityActivateRequested()
+
+    property Timer accessibilityActiveTimer: Timer {
+        interval: 500
+        repeat: false
+
+        onTriggered: {
+            root.accessibilityActivateRequested()
+        }
     }
 
     contentItem: FocusScope {
@@ -70,7 +86,7 @@ DialogView {
             }
 
             onNavigationEvent: function(event) {
-                if (event.type === NavigationEvent.Escape) {
+                if (event.type === NavigationEvent.Escape && root.closeOnEscape) {
                     root.close()
                 }
             }

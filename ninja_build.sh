@@ -27,10 +27,11 @@ MUSESCORE_LABEL=${MUSESCORE_LABEL:-""}
 MUSESCORE_BUILD_CONFIG=${MUSESCORE_BUILD_CONFIG:-"dev"}
 MUSESCORE_BUILD_NUMBER=${MUSESCORE_BUILD_NUMBER:-"12345678"}
 MUSESCORE_REVISION=${MUSESCORE_REVISION:-"abc123456"}
+MUSESCORE_RUN_LRELEASE=${MUSESCORE_RUN_LRELEASE:-"OFF"}
+MUSESCORE_BUILD_PORTABLEAPPS=${MUSESCORE_BUILD_PORTABLEAPPS:-"OFF"}
 MUSESCORE_CRASHREPORT_URL=${MUSESCORE_CRASHREPORT_URL:-""}
 MUSESCORE_DEBUGLEVEL_ENABLED="OFF"
 MUSESCORE_BUILD_JACK=${MUSESCORE_BUILD_JACK:-"OFF"}
-MUSESCORE_BUILD_WEBENGINE=${MUSESCORE_BUILD_WEBENGINE:-"OFF"}
 MUSESCORE_BUILD_VST=${MUSESCORE_BUILD_VST:-"OFF"}
 MUSESCORE_VST3_SDK_PATH=${MUSESCORE_VST3_SDK_PATH:-""}
 MUSESCORE_DOWNLOAD_SOUNDFONT=${MUSESCORE_DOWNLOAD_SOUNDFONT:-"ON"}
@@ -70,6 +71,8 @@ function do_build() {
         -DMUSESCORE_BUILD_CONFIG="${MUSESCORE_BUILD_CONFIG}" \
         -DCMAKE_BUILD_NUMBER="${MUSESCORE_BUILD_NUMBER}" \
         -DMUSESCORE_REVISION="${MUSESCORE_REVISION}" \
+        -DMUE_RUN_LRELEASE="${MUSESCORE_RUN_LRELEASE}" \
+        -DBUILD_PORTABLEAPPS="${MUSESCORE_BUILD_PORTABLEAPPS}" \
         -DCRASH_REPORT_URL="${MUSESCORE_CRASHREPORT_URL}" \
         -DLOGGER_DEBUGLEVEL_ENABLED="${MUSESCORE_DEBUGLEVEL_ENABLED}" \
         -DBUILD_JACK="${MUSESCORE_BUILD_JACK}" \
@@ -135,8 +138,8 @@ case $TARGET in
         ;;
 
     appimage)
-        MUSESCORE_INSTALL_DIR=MuseScore 
-        MUSESCORE_INSTALL_SUFFIX="-portable${MUSESCORE_INSTALL_SUFFIX}" # e.g. "-portable" or "-portable-nightly"
+        MUSESCORE_INSTALL_DIR=../MuseScore 
+        MUSESCORE_INSTALL_SUFFIX="4portable${MUSESCORE_INSTALL_SUFFIX}" # e.g. "4portable" or "4portablenightly"
         MUSESCORE_LABEL="Portable AppImage" 
         MUSESCORE_NO_RPATH=ON 
 
@@ -151,12 +154,12 @@ case $TARGET in
 
         ln -sf . usr # we installed into the root of our AppImage but some tools expect a "usr" subdirectory
         mscore="mscore${MUSESCORE_INSTALL_SUFFIX}"
-        dsktp="${mscore}.desktop" 
+        desktop="org.musescore.MuseScore${MUSESCORE_INSTALL_SUFFIX}.desktop"
         icon="${mscore}.svg" 
         mani="install_manifest.txt" 
-        cp "share/applications/${dsktp}" "${dsktp}" 
+        cp "share/applications/${desktop}" "${desktop}"
         cp "share/icons/hicolor/scalable/apps/${icon}" "${icon}" 
-        <"$build_dir/${mani}" >"${mani}" sed -rn 's/.*(share\/)(man|mime|icons|applications)(.*)/\1\2\3/p'
+        <"$build_dir/${mani}" >"${mani}" sed -rn 's/.*(share\/)(applications|icons|man|metainfo|mime)(.*)/\1\2\3/p'
 
         ;;     
 

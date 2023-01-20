@@ -21,15 +21,10 @@
  */
 
 #include "stafftext.h"
-#include "rw/xml.h"
-#include "score.h"
-#include "system.h"
-#include "staff.h"
-#include "measure.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   staffStyle
 //---------------------------------------------------------

@@ -33,8 +33,11 @@ class IGuitarProConfiguration : MODULE_EXPORT_INTERFACE
 public:
     virtual ~IGuitarProConfiguration() = default;
 
-    virtual std::string importGuitarProCharset() const = 0;
-    virtual void setImportGuitarProCharset(const std::string& charset) = 0;
+    virtual bool linkedTabStaffCreated() const = 0;
+    virtual void setLinkedTabStaffCreated(bool created) = 0;
+
+    virtual bool experimental() const = 0;
+    virtual void setExperimental(bool experimental) = 0;
 };
 }
 

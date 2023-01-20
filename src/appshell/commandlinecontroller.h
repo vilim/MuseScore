@@ -36,6 +36,7 @@
 #include "internal/istartupscenario.h"
 #include "notation/inotationconfiguration.h"
 #include "project/iprojectconfiguration.h"
+#include "importexport/guitarpro/iguitarproconfiguration.h"
 
 namespace mu::appshell {
 class CommandLineController
@@ -50,6 +51,7 @@ class CommandLineController
     INJECT(appshell, IStartupScenario, startupScenario)
     INJECT(appshell, notation::INotationConfiguration, notationConfiguration)
     INJECT(appshell, project::IProjectConfiguration, projectConfiguration)
+    INJECT(appshell, iex::guitarpro::IGuitarProConfiguration, guitarProConfiguration);
 
 public:
     CommandLineController() = default;
@@ -86,16 +88,30 @@ public:
         QMap<ParamKey, QVariant> params;
     };
 
+    enum class DiagnosticType {
+        Undefined = 0,
+        GenDrawData,
+        DrawDataToPng
+    };
+
+    struct Diagnostic {
+        DiagnosticType type = DiagnosticType::Undefined;
+        QString input;
+        QString output;
+    };
+
     void parse(const QStringList& args);
     void apply();
 
     ConverterTask converterTask() const;
+    Diagnostic diagnostic() const;
 
 private:
     void printLongVersion() const;
 
     QCommandLineParser m_parser;
     ConverterTask m_converterTask;
+    Diagnostic m_diagnostic;
 };
 }
 

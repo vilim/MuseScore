@@ -23,9 +23,9 @@
 #ifndef __TESTUTILS_H__
 #define __TESTUTILS_H__
 
-#include "libmscore/engravingitem.h"
+#include <QString>
 
-namespace Ms {
+namespace mu::engraving {
 class MScore;
 class MasterScore;
 class Score;
@@ -37,23 +37,19 @@ class Score;
 class MTest
 {
 protected:
-    Ms::MScore* mscore;
     QString root;       // root path of test source
 
-    MTest();
-    Ms::MasterScore* readScore(const QString& name);
-    bool saveScore(Ms::Score*, const QString& name) const;
+    mu::engraving::MasterScore* readScore(const QString& name);
+    bool saveScore(mu::engraving::Score*, const QString& name) const;
 
     bool compareFiles(const QString& saveName, const QString& compareWith) const;
-    bool saveCompareScore(Ms::Score*, const QString& saveName, const QString& compareWith) const;
+    bool saveCompareScore(mu::engraving::Score*, const QString& saveName, const QString& compareWith) const;
 
-    void initMTest(const QString& root);
+    void setRootDir(const QString& root);
 
 public:
     static bool compareFilesFromPaths(const QString& f1, const QString& f2);
 };
 }
-
-void initMuseScoreResources();
 
 #endif

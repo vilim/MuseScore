@@ -21,27 +21,31 @@
  */
 #include "layoutsystem.h"
 
-#include "libmscore/factory.h"
 #include "libmscore/barline.h"
+#include "libmscore/beam.h"
 #include "libmscore/box.h"
 #include "libmscore/chord.h"
 #include "libmscore/dynamic.h"
+#include "libmscore/factory.h"
 #include "libmscore/fingering.h"
+#include "libmscore/layoutbreak.h"
 #include "libmscore/measure.h"
 #include "libmscore/measurenumber.h"
 #include "libmscore/mmrestrange.h"
+#include "libmscore/note.h"
 #include "libmscore/part.h"
 #include "libmscore/score.h"
+#include "libmscore/slur.h"
 #include "libmscore/staff.h"
 #include "libmscore/stafflines.h"
+#include "libmscore/system.h"
 #include "libmscore/tie.h"
 #include "libmscore/tremolo.h"
 #include "libmscore/tuplet.h"
 #include "libmscore/volta.h"
-#include "libmscore/system.h"
-#include "libmscore/slur.h"
 
 #include "layoutbeams.h"
+#include "layoutchords.h"
 #include "layoutharmonies.h"
 #include "layoutlyrics.h"
 #include "layoutmeasure.h"
@@ -50,13 +54,12 @@
 #include "log.h"
 
 using namespace mu::engraving;
-using namespace Ms;
 
 //---------------------------------------------------------
 //   collectSystem
 //---------------------------------------------------------
 
-System* LayoutSystem::collectSystem(const LayoutOptions& options, LayoutContext& ctx, Ms::Score* score)
+System* LayoutSystem::collectSystem(const LayoutOptions& options, LayoutContext& ctx, Score* score)
 {
     TRACEFUNC;
 
@@ -72,7 +75,7 @@ System* LayoutSystem::collectSystem(const LayoutOptions& options, LayoutContext&
     if (measure) {
         const LayoutBreak* layoutBreak = measure->sectionBreakElement();
         ctx.firstSystem        = measure->sectionBreak() && !options.isMode(LayoutMode::FLOAT);
-        ctx.firstSystemIndent  = ctx.firstSystem && options.firstSystemIndent && layoutBreak->firstSystemIdentation();
+        ctx.firstSystemIndent  = ctx.firstSystem && options.firstSystemIndent && layoutBreak->firstSystemIndentation();
         ctx.startWithLongNames = ctx.firstSystem && layoutBreak->startWithLongNames();
     }
 
@@ -80,59 +83,80 @@ System* LayoutSystem::collectSystem(const LayoutOptions& options, LayoutContext&
     Fraction lcmTick = ctx.curMeasure->tick();
     system->setInstrumentNames(ctx, ctx.startWithLongNames, lcmTick);
 
-    qreal curSysWidth    = 0;
-    qreal layoutSystemMinWidth = 0;
+    double curSysWidth    = 0.0;
+    double layoutSystemMinWidth = 0.0;
     bool firstMeasure = true;
     bool createHeader = false;
-    qreal systemWidth = score->styleD(Sid::pagePrintableWidth) * DPI;
-    system->setWidth(systemWidth);
+    double targetSystemWidth = score->styleD(Sid::pagePrintableWidth) * DPI;
+    system->setWidth(targetSystemWidth);
 
     // save state of measure
     bool curHeader = ctx.curMeasure->header();
     bool curTrailer = ctx.curMeasure->trailer();
     MeasureBase* breakMeasure = nullptr;
 
-    Fraction minTicks = Fraction::max(); // Initializing this variable at an arbitrary high value.
-    // In principle, it just needs to be longer than any possible note.
+    Fraction minTicks = Fraction::max(); // Initializing at highest possible value
     Fraction prevMinTicks = Fraction(1, 1);
-    bool changeMinSysTicks = false;
-    qreal oldStretch = 1;
+    bool minSysTicksChanged = false;
+    Fraction maxTicks = Fraction(0, 1); // Initializing at lowest possible value
+    Fraction prevMaxTicks = Fraction(1, 1);
+    bool maxSysTicksChanged = false;
+    static constexpr double squeezability = 0.3; // We may consider exposing in Style settings (M.S.)
+    double oldStretch = 1.0;
+    double oldWidth = 0.0;
+    System* oldSystem = nullptr;
 
     while (ctx.curMeasure) {      // collect measure for system
-        System* oldSystem = ctx.curMeasure->system();
+        oldSystem = ctx.curMeasure->system();
         system->appendMeasure(ctx.curMeasure);
-
-        qreal ww  = 0;          // width of current measure
-
-        // After appending a new measure, the shortest note in the system may change, in which case
-        // we need to recompute the layout of the previous measures. When updating the width of these
-        // measures, curSysWidth must be updated accordingly.
+        if (system->hasCrossStaffOrModifiedBeams()) {
+            updateCrossBeams(system, ctx);
+        }
+        double ww  = 0.0; // width of current measure
         if (ctx.curMeasure->isMeasure()) {
-            if (toMeasure(ctx.curMeasure)->shortestChordRest() < minTicks) {
+            Measure* m = toMeasure(ctx.curMeasure);
+            // Construct information that is needed before horizontal spacing
+            LayoutMeasure::computePreSpacingItems(m);
+            // After appending a new measure, the shortest note in the system may change, in which case
+            // we need to recompute the layout of the previous measures. When updating the width of these
+            // measures, curSysWidth must be updated accordingly.
+            Fraction curMinTicks = m->shortestChordRest();
+            Fraction curMaxTicks = m->maxTicks();
+            if (curMinTicks < minTicks) {
                 prevMinTicks = minTicks; // We save the previous value in case we need to restore it (see later)
-                minTicks = toMeasure(ctx.curMeasure)->shortestChordRest();
-                changeMinSysTicks = true;
+                minTicks = curMinTicks;
+                minSysTicksChanged = true;
+            } else {
+                minSysTicksChanged = false;
+            }
+            if (curMaxTicks > maxTicks) {
+                prevMaxTicks = maxTicks;
+                maxTicks = curMaxTicks;
+                maxSysTicksChanged = true;
+            } else {
+                maxSysTicksChanged = false;
+            }
+            if (minSysTicksChanged || maxSysTicksChanged) {
                 for (MeasureBase* mb : system->measures()) {
-                    if (mb == ctx.curMeasure) {
+                    if (mb == m) {
                         break; // Cause I want to change only previous measures, not current one
                     }
                     if (mb->isMeasure()) {
-                        qreal prevWidth = toMeasure(mb)->width();
-                        toMeasure(mb)->computeWidth(minTicks, 1);
-                        qreal newWidth = toMeasure(mb)->width();
+                        Measure* mm = toMeasure(mb);
+                        double prevWidth = mm->width();
+                        mm->computeWidth(minTicks, maxTicks, 1);
+                        double newWidth = mm->width();
                         curSysWidth += newWidth - prevWidth;
                     }
                 }
-            } else {
-                changeMinSysTicks = false;
             }
-        }
 
-        if (ctx.curMeasure->isMeasure()) {
-            Measure* m = toMeasure(ctx.curMeasure);
             if (firstMeasure) {
                 layoutSystemMinWidth = curSysWidth;
                 system->layoutSystem(ctx, curSysWidth, ctx.firstSystem, ctx.firstSystemIndent);
+                if (system->hasCrossStaffOrModifiedBeams()) {
+                    updateCrossBeams(system, ctx);
+                }
                 curSysWidth += system->leftMargin();
                 if (m->repeatStart()) {
                     Segment* s = m->findSegmentR(SegmentType::StartRepeatBarLine, Fraction(0, 1));
@@ -160,7 +184,7 @@ System* LayoutSystem::collectSystem(const LayoutOptions& options, LayoutContext&
             } else {
                 m->addSystemTrailer(m->nextMeasure());
             }
-            m->computeWidth(minTicks, 1);
+            m->computeWidth(minTicks, maxTicks, 1);
             ww = m->width();
         } else if (ctx.curMeasure->isHBox()) {
             ctx.curMeasure->computeMinWidth();
@@ -175,10 +199,9 @@ System* LayoutSystem::collectSystem(const LayoutOptions& options, LayoutContext&
 
         // check if lc.curMeasure fits, remove if not
         // collect at least one measure and the break
-        static constexpr double squeezability = 0.3; // We may consider exposing in Style settings (M.S.)
         double acceptanceRange = squeezability * system->squeezableSpace();
-        bool doBreak = (system->measures().size() > 1) && ((curSysWidth + ww) > systemWidth + acceptanceRange);
-        /* acceptanceRange allows some systems to be inizially slightly larger than the margins and be
+        bool doBreak = (system->measures().size() > 1) && ((curSysWidth + ww) > targetSystemWidth + acceptanceRange);
+        /* acceptanceRange allows some systems to be initially slightly larger than the margins and be
          * justified by squeezing instead of stretching. Allows to make much better choices of how many
          * measures to fit per system. */
         if (doBreak) {
@@ -194,7 +217,7 @@ System* LayoutSystem::collectSystem(const LayoutOptions& options, LayoutContext&
 
                 ctx.nextMeasure = ctx.curMeasure;
                 ctx.curMeasure  = ctx.prevMeasure;
-                ctx.prevMeasure = ctx.curMeasure->prevMeasure();
+                ctx.prevMeasure = ctx.curMeasure->prev();
 
                 curSysWidth -= system->lastMeasure()->width();
                 system->removeLastMeasure();
@@ -202,13 +225,18 @@ System* LayoutSystem::collectSystem(const LayoutOptions& options, LayoutContext&
             }
             // If the last appended measure caused a re-layout of the previous measures, now that we are
             // removing it we need to re-layout the previous measures again.
-            if (changeMinSysTicks) {
+            if (minSysTicksChanged) {
                 minTicks = prevMinTicks; // If the last measure caused it to change, now we need to restore it!
+            }
+            if (maxSysTicksChanged) {
+                maxTicks = prevMaxTicks;
+            }
+            if (minSysTicksChanged || maxSysTicksChanged) {
                 for (MeasureBase* mb : system->measures()) {
                     if (mb->isMeasure()) {
-                        qreal prevWidth = toMeasure(mb)->width();
-                        toMeasure(mb)->computeWidth(minTicks, 1);
-                        qreal newWidth = toMeasure(mb)->width();
+                        double prevWidth = toMeasure(mb)->width();
+                        toMeasure(mb)->computeWidth(minTicks, maxTicks, 1);
+                        double newWidth = toMeasure(mb)->width();
                         curSysWidth += newWidth - prevWidth;
                     }
                 }
@@ -227,7 +255,7 @@ System* LayoutSystem::collectSystem(const LayoutOptions& options, LayoutContext&
             // we need to find the right time to re-enable the trailer,
             // since it seems to be disabled somewhere else
             if (m->trailer()) {
-                qreal ow = m->width();
+                double ow = m->width();
                 m->removeSystemTrailer();
                 curSysWidth += m->width() - ow;
             }
@@ -241,7 +269,7 @@ System* LayoutSystem::collectSystem(const LayoutOptions& options, LayoutContext&
                     Segment* s = m1->findSegmentR(SegmentType::StartRepeatBarLine, Fraction(0, 1));
                     if (!s->enabled()) {
                         s->setEnabled(true);
-                        m1->computeWidth(minTicks, 1);
+                        m1->computeWidth(minTicks, maxTicks, 1);
                         ww = m1->width();
                     }
                 }
@@ -280,6 +308,7 @@ System* LayoutSystem::collectSystem(const LayoutOptions& options, LayoutContext&
             }
             if (nmb->isMeasure()) {
                 oldStretch = toMeasure(nmb)->layoutStretch();
+                oldWidth = toMeasure(nmb)->width();
             }
             if (!ctx.curMeasure->noBreak()) {
                 // current measure is not a nobreak,
@@ -304,6 +333,8 @@ System* LayoutSystem::collectSystem(const LayoutOptions& options, LayoutContext&
             break;
         }
     }
+
+    assert(ctx.prevMeasure);
 
     if (ctx.endTick < ctx.prevMeasure->tick()) {
         // we've processed the entire range
@@ -336,7 +367,8 @@ System* LayoutSystem::collectSystem(const LayoutOptions& options, LayoutContext&
                     } else {
                         m->removeSystemTrailer();
                     }
-                    m->computeWidth(m->system()->minSysTicks(), oldStretch);
+                    m->computeWidth(m->system()->minSysTicks(), m->system()->maxSysTicks(), oldStretch);
+                    m->stretchToTargetWidth(oldWidth);
                     m->layoutMeasureElements();
                     LayoutBeams::restoreBeams(m);
                     if (m == nm || !m->noBreak()) {
@@ -349,79 +381,55 @@ System* LayoutSystem::collectSystem(const LayoutOptions& options, LayoutContext&
         }
     }
 
-    //
-    // now we have a complete set of measures for this system
-    //
-    // prevMeasure is the last measure in the system
+    /*************************************************************
+     * SYSTEM NOW HAS A COMPLETE SET OF MEASURES
+     * Now perform all operation to finalize system.
+     * **********************************************************/
+
+    // Brake cross-measure beams
+    // Create end barlines
     if (ctx.prevMeasure && ctx.prevMeasure->isMeasure()) {
-        LayoutBeams::breakCrossMeasureBeams(ctx, toMeasure(ctx.prevMeasure));
-        qreal w = toMeasure(ctx.prevMeasure)->createEndBarLines(true);
-        curSysWidth += w;
+        Measure* pm = toMeasure(ctx.prevMeasure);
+        LayoutBeams::breakCrossMeasureBeams(ctx, pm);
+        pm->createEndBarLines(true);
     }
 
+    // hide empty staves
     hideEmptyStaves(score, system, ctx.firstSystem);
-    // Relayout system decorations to reuse space properly for
-    // hidden staves' instrument names or other hidden elements.
+    // Relayout system to account for newly hidden/unhidden staves
     curSysWidth -= system->leftMargin();
     system->layoutSystem(ctx, layoutSystemMinWidth, ctx.firstSystem, ctx.firstSystemIndent);
     curSysWidth += system->leftMargin();
 
-    //-------------------------------------------------------
-    //    add system trailer if needed
-    //    (cautionary time/key signatures etc)
-    //-------------------------------------------------------
-
+    // add system trailer if needed (cautionary time/key signatures etc)
     Measure* lm  = system->lastMeasure();
     if (lm) {
         Measure* nm = lm->nextMeasure();
         if (nm) {
-            qreal w = lm->width();
             lm->addSystemTrailer(nm);
-            if (lm->trailer()) {
-                lm->computeWidth(minTicks, 1);
-            }
-            curSysWidth += lm->width() - w;
         }
     }
 
-    // BRING THE WIDTH OF THE SYSTEM TO THE DESIRED VALUE
-    // Gradient descent method: calls the computeWidth() function with a stretch parameter
-    // proportional to the difference between the current length and the target length.
-    // After few iterations, the length will converge to the target length.
-    qreal newRest = systemWidth - curSysWidth;
-    if ((ctx.curMeasure == 0 || (lm && lm->sectionBreak()))
-        && ((curSysWidth / systemWidth) <= score->styleD(Sid::lastSystemFillLimit))) {
-        // We do not stretch last system of a section (or the last of the piece) if curSysWidth is <= lastSystemFillLimit
-        newRest = 0;
-    }
-    if (MScore::noHorizontalStretch) { // Debug feature
-        newRest = 0;
-    }
-    qreal stretchCoeff = 1;
-    qreal prevWidth = 0;
-    int iter = 0;
-    double epsilon = score->spatium() * 0.05; // For reference: this is smaller than the width of a note stem
-    static constexpr float multiplier = 1.4f; // Empirically optimized value which allows the fastest convergence of the following algorithm.
-    static constexpr int maxIter = 100;
-    // Different systems need different numbers of iterations of the following loop to reach the target width.
-    // The average is less than 3 iterations, and the maximum I've ever seen (very rare) is 30-40 iterations.
-    // maxIter just serves as a safety exit to not get stuck in the loop in case a system can't be justified
-    // (which can only happen if errors are made before getting here). It's set to a very high value to make
-    // sure that the system really can't be justified, and it isn't just a "tricky" one needing more iterations.
-    while (abs(newRest) > epsilon && iter < maxIter) {
-        stretchCoeff *= (1 + multiplier * newRest / curSysWidth);
-        for (MeasureBase* mb : system->measures()) {
-            if (mb->isMeasure()) {
-                Measure* m = toMeasure(mb);
-                if (!(m->isWidthLocked() && stretchCoeff < m->layoutStretch())) { // It would be pointless to re-compute the layout of a measure
-                    prevWidth = m->width();                                       // that is already widthLocked to a larger value.
-                    m->computeWidth(minTicks, stretchCoeff);
-                    curSysWidth += m->width() - prevWidth;
-                }
-            }
+    // Recompute measure widths to account for the last changes (barlines, hidden staves, etc)
+    // If system is currently larger than margin (because of acceptanceRange) compute width
+    // with a reduced pre-stretch, because justifySystem expects curSysWidth < targetWidth
+    double preStretch = targetSystemWidth > curSysWidth ? 1.0 : 1 - squeezability;
+    for (MeasureBase* mb : system->measures()) {
+        if (!mb->isMeasure()) {
+            continue;
         }
-        newRest = systemWidth - curSysWidth;
-        iter++;
+        Measure* m = toMeasure(mb);
+        double oldWidth = m->width();
+        m->computeWidth(minTicks, maxTicks, preStretch);
+        curSysWidth += m->width() - oldWidth;
+    }
+
+    // JUSTIFY SYSTEM
+    // Do not justify last system of a section if curSysWidth is < lastSystemFillLimit
+    if (!((ctx.curMeasure == 0 || (lm && lm->sectionBreak()))
+          && ((curSysWidth / targetSystemWidth) < score->styleD(Sid::lastSystemFillLimit)))
+        && !MScore::noHorizontalStretch) { // debug feature
+        justifySystem(system, curSysWidth, targetSystemWidth);
     }
 
     // LAYOUT MEASURES
@@ -429,7 +437,7 @@ System* LayoutSystem::collectSystem(const LayoutOptions& options, LayoutContext&
     firstMeasure = true;
     bool createBrackets = false;
     for (MeasureBase* mb : system->measures()) {
-        qreal ww = mb->width();
+        double ww = mb->width();
         if (mb->isMeasure()) {
             if (firstMeasure) {
                 pos.rx() += system->leftMargin();
@@ -472,11 +480,55 @@ System* LayoutSystem::collectSystem(const LayoutOptions& options, LayoutContext&
     if (measure) {
         const LayoutBreak* layoutBreak = measure->sectionBreakElement();
         ctx.firstSystem        = measure->sectionBreak() && !options.isMode(LayoutMode::FLOAT);
-        ctx.firstSystemIndent  = ctx.firstSystem && options.firstSystemIndent && layoutBreak->firstSystemIdentation();
+        ctx.firstSystemIndent  = ctx.firstSystem && options.firstSystemIndent && layoutBreak->firstSystemIndentation();
         ctx.startWithLongNames = ctx.firstSystem && layoutBreak->startWithLongNames();
     }
 
+    if (oldSystem) {
+        // We may have previously processed the ties of the next system (in LayoutChords::updateLineAttachPoints()).
+        // We need to restore them to the correct state.
+        LayoutSystem::restoreTies(oldSystem);
+    }
+
     return system;
+}
+
+void LayoutSystem::justifySystem(System* system, double curSysWidth, double targetSystemWidth)
+{
+    double rest = targetSystemWidth - curSysWidth;
+    if (RealIsNull(rest)) {
+        return;
+    }
+    if (rest < 0) {
+        LOGE("*** System justification error ***");
+        return;
+    }
+
+    std::vector<Spring> springs;
+
+    for (MeasureBase* mb : system->measures()) {
+        if (!mb->isMeasure()) {
+            continue;
+        }
+        for (Segment& s : toMeasure(mb)->segments()) {
+            if (s.isChordRestType() && s.visible() && s.enabled() && !s.allElementsInvisible()) {
+                double springConst = 1 / s.stretch();
+                double width = s.width() - s.widthOffset();
+                double preTension = width * springConst;
+                springs.push_back(Spring(springConst, width, preTension, &s));
+            }
+        }
+    }
+
+    Segment::stretchSegmentsToWidth(springs, rest);
+
+    for (MeasureBase* mb : system->measures()) {
+        if (!mb->isMeasure()) {
+            continue;
+        }
+        Measure* m = toMeasure(mb);
+        m->respaceSegments();
+    }
 }
 
 //---------------------------------------------------------
@@ -485,7 +537,7 @@ System* LayoutSystem::collectSystem(const LayoutOptions& options, LayoutContext&
 
 System* LayoutSystem::getNextSystem(LayoutContext& ctx)
 {
-    Ms::Score* score = ctx.score();
+    Score* score = ctx.score();
     bool isVBox = ctx.curMeasure->isVBox();
     System* system = nullptr;
     if (ctx.systemList.empty()) {
@@ -513,7 +565,7 @@ void LayoutSystem::hideEmptyStaves(Score* score, System* system, bool isFirstSys
     staff_idx_t staffIdx = 0;
     bool systemIsEmpty = true;
 
-    for (Staff* staff : qAsConst(score->staves())) {
+    for (Staff* staff : score->staves()) {
         SysStaff* ss  = system->staff(staffIdx);
 
         Staff::HideMode hideMode = staff->hideWhenEmpty();
@@ -554,10 +606,11 @@ void LayoutSystem::hideEmptyStaves(Score* score, System* system, bool isFirstSys
                         for (Segment* s = m->first(SegmentType::ChordRest); s; s = s->next(SegmentType::ChordRest)) {
                             for (voice_idx_t voice = 0; voice < VOICES; ++voice) {
                                 ChordRest* cr = s->cr(st * VOICES + voice);
-                                if (cr == 0 || cr->isRest()) {
+                                int staffMove = cr ? cr->staffMove() : 0;
+                                if (!cr || cr->isRest() || cr->staffMove() == 0) {
+                                    // The case staffMove == 0 has already been checked by measure->isEmpty()
                                     continue;
                                 }
-                                int staffMove = cr->staffMove();
                                 if (staffIdx == st + staffMove) {
                                     hideStaff = false;
                                     break;
@@ -589,7 +642,7 @@ void LayoutSystem::hideEmptyStaves(Score* score, System* system, bool isFirstSys
     }
     Staff* firstVisible = nullptr;
     if (systemIsEmpty) {
-        for (Staff* staff : qAsConst(score->staves())) {
+        for (Staff* staff : score->staves()) {
             SysStaff* ss  = system->staff(staff->idx());
             if (staff->showIfEmpty() && !ss->show()) {
                 ss->setShow(true);
@@ -604,6 +657,14 @@ void LayoutSystem::hideEmptyStaves(Score* score, System* system, bool isFirstSys
         Staff* staff = firstVisible ? firstVisible : score->staves().front();
         SysStaff* ss = system->staff(staff->idx());
         ss->setShow(true);
+    }
+    // Re-create the shapes to account for newly hidden or un-hidden staves
+    for (auto mb : system->measures()) {
+        if (mb->isMeasure()) {
+            for (auto& seg : toMeasure(mb)->segments()) {
+                seg.createShapes();
+            }
+        }
     }
 }
 
@@ -645,23 +706,12 @@ void LayoutSystem::layoutSystemElements(const LayoutOptions& options, LayoutCont
     //-------------------------------------------------------------
 
     for (Segment* s : sl) {
-        for (EngravingItem* e : s->elist()) {
-            if (!e || !e->isChordRest() || !score->staff(e->staffIdx())->show()) {
-                // the beam and its system may still be referenced when selecting all,
-                // even if the staff is invisible. The old system is invalid and does cause problems in #284012
-                if (e && e->isChordRest() && !score->staff(e->staffIdx())->show() && toChordRest(e)->beam()) {
-                    toChordRest(e)->beam()->resetExplicitParent();
-                }
-                continue;
-            }
-            ChordRest* cr = toChordRest(e);
-
-            // layout beam
-            if (LayoutBeams::isTopBeam(cr)) {
-                Beam* b = cr->beam();
-                b->layout();
-            }
+        if (!s->isChordRestType()) {
+            continue;
         }
+        LayoutBeams::layoutNonCrossBeams(s);
+        // Must recreate the shapes because stem lengths may have been changed!
+        s->createShapes();
     }
 
     //-------------------------------------------------------------
@@ -871,7 +921,6 @@ void LayoutSystem::layoutSystemElements(const LayoutOptions& options, LayoutCont
             // don't layout any tuplets covered by this top level tuplet for this voice--
             // they've already been laid out by layoutTuplet().
             skipTo[track] = de->tick() + de->ticks();
-            break;
         }
     }
 
@@ -907,14 +956,8 @@ void LayoutSystem::layoutSystemElements(const LayoutOptions& options, LayoutCont
         sp->computeEndElement();
         lc.processedSpanners.insert(sp);
         if (sp->tick() < etick && sp->tick2() >= stick) {
-            if (sp->isSlur()) {
-                // skip cross-staff slurs
-                ChordRest* scr = sp->startCR();
-                ChordRest* ecr = sp->endCR();
-                staff_idx_t idx = sp->vStaffIdx();
-                if (scr && ecr && (scr->vStaffIdx() != idx || ecr->vStaffIdx() != idx)) {
-                    continue;
-                }
+            if (sp->isSlur() && !toSlur(sp)->isCrossStaff()) {
+                // skip cross-staff slurs, will be done after page layout
                 spanner.push_back(sp);
             }
         }
@@ -931,6 +974,22 @@ void LayoutSystem::layoutSystemElements(const LayoutOptions& options, LayoutCont
             toChord(ecr)->layoutArticulations3(slur);
         }
     }
+
+    //-------------------------------------------------------------
+    // Fermata, TremoloBar
+    //-------------------------------------------------------------
+
+    for (const Segment* s : sl) {
+        for (EngravingItem* e : s->annotations()) {
+            if (e->isFermata() || e->isTremoloBar()) {
+                e->layout();
+            }
+        }
+    }
+
+    //-------------------------------------------------------------
+    // Dynamics
+    //-------------------------------------------------------------
 
     std::vector<Dynamic*> dynamics;
     for (Segment* s : sl) {
@@ -964,7 +1023,7 @@ void LayoutSystem::layoutSystemElements(const LayoutOptions& options, LayoutCont
 
     //-------------------------------------------------------------
     // layout SpannerSegments for current system
-    // ottavas, pedals, voltas are collected here, but layouted later
+    // voltas and tempo change lines are collected here, but laid out later
     //-------------------------------------------------------------
 
     spanner.clear();
@@ -972,6 +1031,7 @@ void LayoutSystem::layoutSystemElements(const LayoutOptions& options, LayoutCont
     std::vector<Spanner*> ottavas;
     std::vector<Spanner*> pedal;
     std::vector<Spanner*> voltas;
+    std::vector<Spanner*> tempoChangeLines;
 
     for (auto interval : spanners) {
         Spanner* sp = interval.value;
@@ -988,6 +1048,8 @@ void LayoutSystem::layoutSystemElements(const LayoutOptions& options, LayoutCont
                 voltas.push_back(sp);
             } else if (sp->isHairpin()) {
                 hairpins.push_back(sp);
+            } else if (sp->isGradualTempoChange()) {
+                tempoChangeLines.push_back(sp);
             } else if (!sp->isSlur() && !sp->isVolta()) {      // slurs are already
                 spanner.push_back(sp);
             }
@@ -995,23 +1057,6 @@ void LayoutSystem::layoutSystemElements(const LayoutOptions& options, LayoutCont
     }
     processLines(system, hairpins, false);
     processLines(system, spanner, false);
-
-    //-------------------------------------------------------------
-    // Fermata, TremoloBar
-    //-------------------------------------------------------------
-
-    for (const Segment* s : sl) {
-        for (EngravingItem* e : s->annotations()) {
-            if (e->isFermata() || e->isTremoloBar()) {
-                e->layout();
-            }
-        }
-    }
-
-    //-------------------------------------------------------------
-    // Ottava, Pedal
-    //-------------------------------------------------------------
-
     processLines(system, ottavas, false);
     processLines(system, pedal,   true);
 
@@ -1055,23 +1100,47 @@ void LayoutSystem::layoutSystemElements(const LayoutOptions& options, LayoutCont
 
     if (!hasFretDiagram) {
         LayoutHarmonies::layoutHarmonies(sl);
-        LayoutHarmonies::alignHarmonies(system, sl, true, options.maxFretShiftAbove, options.maxFretShiftBelow);
+        LayoutHarmonies::alignHarmonies(system, sl, true, options.maxChordShiftAbove, options.maxChordShiftBelow);
     }
 
     //-------------------------------------------------------------
-    // StaffText, InstrumentChange
+    // StaffText
     //-------------------------------------------------------------
 
     for (const Segment* s : sl) {
         for (EngravingItem* e : s->annotations()) {
-            if (e->isPlayTechAnnotation() || e->isStaffText() || e->isSystemText() || e->isInstrumentChange()) {
+            if (e->isStaffText()) {
                 e->layout();
             }
         }
     }
 
     //-------------------------------------------------------------
-    // Jump, Marker
+    // InstrumentChange
+    //-------------------------------------------------------------
+
+    for (const Segment* s : sl) {
+        for (EngravingItem* e : s->annotations()) {
+            if (e->isInstrumentChange()) {
+                e->layout();
+            }
+        }
+    }
+
+    //-------------------------------------------------------------
+    // SystemText
+    //-------------------------------------------------------------
+
+    for (const Segment* s : sl) {
+        for (EngravingItem* e : s->annotations()) {
+            if (e->isPlayTechAnnotation() || e->isSystemText() || e->isTripletFeel()) {
+                e->layout();
+            }
+        }
+    }
+
+    //-------------------------------------------------------------
+    // Jump
     //-------------------------------------------------------------
 
     for (MeasureBase* mb : system->measures()) {
@@ -1080,19 +1149,7 @@ void LayoutSystem::layoutSystemElements(const LayoutOptions& options, LayoutCont
         }
         Measure* m = toMeasure(mb);
         for (EngravingItem* e : m->el()) {
-            if (e->isJump() || e->isMarker()) {
-                e->layout();
-            }
-        }
-    }
-
-    //-------------------------------------------------------------
-    // TempoText
-    //-------------------------------------------------------------
-
-    for (const Segment* s : sl) {
-        for (EngravingItem* e : s->annotations()) {
-            if (e->isTempoText()) {
+            if (e->isJump()) {
                 e->layout();
             }
         }
@@ -1116,7 +1173,7 @@ void LayoutSystem::layoutSystemElements(const LayoutOptions& options, LayoutCont
         }
         while (!voltaSegments.empty()) {
             // we assume voltas are sorted left to right (by tick values)
-            qreal y = 0;
+            double y = 0;
             int idx = 0;
             Volta* prevVolta = 0;
             for (SpannerSegment* ss : voltaSegments) {
@@ -1127,7 +1184,7 @@ void LayoutSystem::layoutSystemElements(const LayoutOptions& options, LayoutCont
                         break;
                     }
                 }
-                y = qMin(y, ss->rypos());
+                y = std::min(y, ss->ypos());
                 ++idx;
                 prevVolta = volta;
             }
@@ -1135,7 +1192,7 @@ void LayoutSystem::layoutSystemElements(const LayoutOptions& options, LayoutCont
             for (int i = 0; i < idx; ++i) {
                 SpannerSegment* ss = voltaSegments[i];
                 if (ss->autoplace() && ss->isStyled(Pid::OFFSET)) {
-                    ss->rypos() = y;
+                    ss->setPosY(y);
                 }
                 if (ss->addToSkyline()) {
                     system->staff(staffIdx)->skyline().add(ss->shape().translated(ss->pos()));
@@ -1170,6 +1227,35 @@ void LayoutSystem::layoutSystemElements(const LayoutOptions& options, LayoutCont
     }
 
     //-------------------------------------------------------------
+    // TempoText, tempo change lines
+    //-------------------------------------------------------------
+
+    for (const Segment* s : sl) {
+        for (EngravingItem* e : s->annotations()) {
+            if (e->isTempoText()) {
+                e->layout();
+            }
+        }
+    }
+    processLines(system, tempoChangeLines, false);
+
+    //-------------------------------------------------------------
+    // Marker
+    //-------------------------------------------------------------
+
+    for (MeasureBase* mb : system->measures()) {
+        if (!mb->isMeasure()) {
+            continue;
+        }
+        Measure* m = toMeasure(mb);
+        for (EngravingItem* e : m->el()) {
+            if (e->isMarker()) {
+                e->layout();
+            }
+        }
+    }
+
+    //-------------------------------------------------------------
     // RehearsalMark
     //-------------------------------------------------------------
 
@@ -1194,9 +1280,9 @@ void LayoutSystem::layoutSystemElements(const LayoutOptions& options, LayoutCont
     }
 }
 
-void LayoutSystem::doLayoutTies(System* system, std::vector<Ms::Segment*> sl, const Fraction& stick, const Fraction& etick)
+void LayoutSystem::doLayoutTies(System* system, std::vector<Segment*> sl, const Fraction& stick, const Fraction& etick)
 {
-    Q_UNUSED(etick);
+    UNUSED(etick);
 
     for (Segment* s : sl) {
         for (EngravingItem* e : s->elist()) {
@@ -1224,48 +1310,59 @@ void LayoutSystem::processLines(System* system, std::vector<Spanner*> lines, boo
 
     if (align && segments.size() > 1) {
         const size_t nstaves = system->staves().size();
-        constexpr qreal minY = -1000000.0;
-        const qreal defaultY = segments[0]->rypos();
-        std::vector<qreal> y(nstaves, minY);
+        constexpr double minY = -1000000.0;
+        const double defaultY = segments[0]->ypos();
+        std::vector<double> y(nstaves, minY);
 
         for (SpannerSegment* ss : segments) {
             if (ss->visible()) {
-                qreal& staffY = y[ss->staffIdx()];
-                staffY = qMax(staffY, ss->rypos());
+                double& staffY = y[ss->staffIdx()];
+                staffY = std::max(staffY, ss->ypos());
             }
         }
         for (SpannerSegment* ss : segments) {
             if (!ss->isStyled(Pid::OFFSET)) {
                 continue;
             }
-            const qreal staffY = y[ss->staffIdx()];
+            const double staffY = y[ss->staffIdx()];
             if (staffY > minY) {
-                ss->rypos() = staffY;
+                ss->setPosY(staffY);
             } else {
-                ss->rypos() = defaultY;
+                ss->setPosY(defaultY);
             }
         }
     }
 
     if (segments.size() > 1) {
         //how far vertically an endpoint should adjust to avoid other slur endpoints:
-        const qreal slurCollisionVertOffset = 0.65 * system->spatium();
-        const qreal fuzzyHorizCompare = 0.1 * system->spatium();
-        auto compare = [fuzzyHorizCompare](qreal x1, qreal x2) { return std::abs(x1 - x2) < fuzzyHorizCompare; };
+        const double slurCollisionVertOffset = 0.65 * system->spatium();
+        const double slurCollisionHorizOffset = 0.2 * system->spatium();
+        const double fuzzyHorizCompare = 0.25 * system->spatium();
+        auto compare = [fuzzyHorizCompare](double x1, double x2) { return std::abs(x1 - x2) < fuzzyHorizCompare; };
         for (SpannerSegment* seg1 : segments) {
             if (!seg1->isSlurSegment()) {
                 continue;
             }
             SlurSegment* slur1 = toSlurSegment(seg1);
             for (SpannerSegment* seg2 : segments) {
-                if (!seg2->isSlurTieSegment()) {
+                if (!seg2->isSlurTieSegment() || seg1 == seg2) {
                     continue;
                 }
-
+                if (seg2->isSlurSegment()) {
+                    SlurSegment* slur2 = toSlurSegment(seg2);
+                    if (slur1->slur()->endChord() == slur2->slur()->startChord()
+                        && compare(slur1->ups(Grip::END).p.y(), slur2->ups(Grip::START).p.y())) {
+                        slur1->ups(Grip::END).p.rx() -= slurCollisionHorizOffset;
+                        slur2->ups(Grip::START).p.rx() += slurCollisionHorizOffset;
+                        slur1->computeBezier();
+                        slur2->computeBezier();
+                        continue;
+                    }
+                }
                 SlurTieSegment* slurTie2 = toSlurTieSegment(seg2);
 
                 // slurs don't collide with themselves or slurs on other staves
-                if (slur1 == slurTie2 || slur1->vStaffIdx() != slurTie2->vStaffIdx()) {
+                if (slur1->vStaffIdx() != slurTie2->vStaffIdx()) {
                     continue;
                 }
                 // slurs which don't overlap don't need to be checked
@@ -1300,7 +1397,11 @@ void LayoutSystem::processLines(System* system, std::vector<Spanner*> lines, boo
     //
     for (SpannerSegment* ss : segments) {
         if (ss->addToSkyline()) {
-            system->staff(ss->staffIdx())->skyline().add(ss->shape().translated(ss->pos()));
+            staff_idx_t stfIdx = ss->systemFlag() ? ss->staffIdxOrNextVisible() : ss->staffIdx();
+            if (stfIdx == mu::nidx) {
+                continue;
+            }
+            system->staff(stfIdx)->skyline().add(ss->shape().translated(ss->pos()));
         }
     }
 }
@@ -1329,4 +1430,78 @@ void LayoutSystem::layoutTies(Chord* ch, System* system, const Fraction& stick)
             }
         }
     }
+}
+
+/****************************************************************************
+ * updateCrossBeams
+ * Performs a pre-calculation of staff distances (final staff distances will
+ * be calculated at the very end of layout) and updates the up() property
+ * of cross-beam chords accordingly.
+ * *************************************************************************/
+
+void LayoutSystem::updateCrossBeams(System* system, const LayoutContext& ctx)
+{
+    system->layout2(ctx); // Computes staff distances, essential for the rest of the calculations
+    // Update grace cross beams
+    for (MeasureBase* mb : system->measures()) {
+        if (!mb->isMeasure()) {
+            continue;
+        }
+        for (Segment& seg : toMeasure(mb)->segments()) {
+            if (!seg.isChordRestType()) {
+                continue;
+            }
+            for (EngravingItem* e : seg.elist()) {
+                if (!e || !e->isChord()) {
+                    continue;
+                }
+                for (Chord* grace : toChord(e)->graceNotes()) {
+                    if (grace->beam() && (grace->beam()->cross() || grace->beam()->userModified())) {
+                        grace->computeUp();
+                    }
+                }
+            }
+        }
+    }
+    // Update normal chords cross beams and respective segments
+    for (MeasureBase* mb : system->measures()) {
+        if (!mb->isMeasure()) {
+            continue;
+        }
+        for (Segment& seg : toMeasure(mb)->segments()) {
+            for (EngravingItem* e : seg.elist()) {
+                if (!e || !e->isChord()) {
+                    continue;
+                }
+                Chord* chord = toChord(e);
+                if (chord->beam() && (chord->beam()->cross() || chord->beam()->userModified())) {
+                    bool prevUp = chord->up();
+                    chord->computeUp();
+                    if (chord->up() != prevUp) {
+                        // If the chord has changed direction needs to be re-laid out
+                        LayoutChords::layoutChords1(chord->score(), &seg, chord->vStaffIdx());
+                        seg.createShape(chord->vStaffIdx());
+                    }
+                }
+            }
+        }
+    }
+}
+
+void LayoutSystem::restoreTies(System* system)
+{
+    std::vector<Segment*> segList;
+    for (MeasureBase* mb : system->measures()) {
+        if (!mb->isMeasure()) {
+            continue;
+        }
+        for (Segment& seg : toMeasure(mb)->segments()) {
+            if (seg.isChordRestType()) {
+                segList.push_back(&seg);
+            }
+        }
+    }
+    Fraction stick = system->measures().front()->tick();
+    Fraction etick = system->measures().back()->endTick();
+    doLayoutTies(system, segList, stick, etick);
 }

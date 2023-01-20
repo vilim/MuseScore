@@ -28,14 +28,16 @@ namespace mu::plugins {
 class PluginsConfigurationStub : public IPluginsConfiguration
 {
 public:
+    io::paths_t availablePluginsPaths() const override;
 
-    io::paths availablePluginsPaths() const override;
+    io::path_t userPluginsPath() const override;
+    void setUserPluginsPath(const io::path_t& path) override;
+    async::Channel<io::path_t> userPluginsPathChanged() const override;
 
-    ValCh<io::path> pluginsPath() const override;
-    void setPluginsPath(const io::path& path) override;
+    const PluginsConfigurationHash& pluginsConfiguration() const override;
+    mu::Ret setPluginsConfiguration(const PluginsConfigurationHash& configuration) override;
 
-    ValCh<CodeKeyList> installedPlugins() const override;
-    void setInstalledPlugins(const CodeKeyList& codeKeyList) override;
+    QColor viewBackgroundColor() const override;
 };
 }
 

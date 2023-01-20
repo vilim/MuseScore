@@ -20,17 +20,16 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "score.h"
-#include "measure.h"
-#include "undo.h"
-#include "range.h"
-#include "spanner.h"
-
 #include "masterscore.h"
+#include "measure.h"
+#include "range.h"
+#include "score.h"
+#include "spanner.h"
+#include "undo.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   cmdJoinMeasure
 //    join measures from m1 upto (including) m2

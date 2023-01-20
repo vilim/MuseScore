@@ -24,61 +24,26 @@
  File handling: loading and saving.
  */
 
-#include "style/style.h"
 #include "rw/xml.h"
+#include "style/style.h"
 
-#include "engravingitem.h"
-#include "note.h"
-#include "chord.h"
-#include "rest.h"
-#include "sig.h"
-#include "clef.h"
-#include "key.h"
-#include "score.h"
-#include "page.h"
-#include "dynamic.h"
-#include "tempo.h"
-#include "select.h"
-#include "staff.h"
-#include "part.h"
-#include "utils.h"
 #include "barline.h"
-#include "slur.h"
-#include "hairpin.h"
-#include "ottava.h"
-#include "textline.h"
-#include "pedal.h"
-#include "trill.h"
-#include "volta.h"
-#include "timesig.h"
-#include "box.h"
+#include "engravingitem.h"
 #include "excerpt.h"
-#include "system.h"
-#include "tuplet.h"
-#include "keysig.h"
-#include "measure.h"
-#include "undo.h"
-#include "repeatlist.h"
-#include "beam.h"
-#include "stafftype.h"
-#include "revisions.h"
-#include "lyrics.h"
-#include "segment.h"
-#include "tempotext.h"
-#include "image.h"
-#include "tiemap.h"
-#include "tie.h"
-#include "measurebase.h"
-#include "chordlist.h"
-#include "mscore.h"
-
 #include "masterscore.h"
+#include "measure.h"
+#include "measurebase.h"
+#include "part.h"
+#include "repeatlist.h"
+#include "score.h"
+#include "segment.h"
+#include "undo.h"
 
 #include "log.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 static void removeRepeatMarkings(Score* score)
 {
     // remove bar-level repeats
@@ -113,7 +78,7 @@ static void removeRepeatMarkings(Score* score)
     Segment* last = score->lastMeasure()->segments().last();
     if (last->segmentType() == SegmentType::EndBarLine) {
         auto els = last->elist();
-        for (uint i = 0; i < els.size(); i++) {
+        for (size_t i = 0; i < els.size(); i++) {
             if (!els[i]) {
                 continue;
             }

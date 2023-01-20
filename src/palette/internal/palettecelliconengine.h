@@ -28,7 +28,6 @@
 
 #include "modularity/ioc.h"
 #include "ipaletteconfiguration.h"
-#include "ui/iuiconfiguration.h"
 
 namespace mu::draw {
 class Painter;
@@ -38,7 +37,6 @@ namespace mu::palette {
 class PaletteCellIconEngine : public QIconEngine
 {
     INJECT_STATIC(palette, IPaletteConfiguration, configuration)
-    INJECT_STATIC(palette, ui::IUiConfiguration, uiConfiguration)
 
 public:
     explicit PaletteCellIconEngine(PaletteCellConstPtr cell, qreal extraMag = 1.0);
@@ -54,14 +52,15 @@ public:
         bool colorsInversionEnabled = false;
     };
 
-    static void paintPaletteElement(void* context, Ms::EngravingItem* element);
+    static void paintPaletteElement(void* context, mu::engraving::EngravingItem* element);
 
 private:
-    void paintCell(draw::Painter& painter, const RectF& rect, bool selected, bool current) const;
+    void paintCell(draw::Painter& painter, const RectF& rect, bool selected, bool current, qreal dpi) const;
     void paintBackground(draw::Painter& painter, const RectF& rect, bool selected, bool current) const;
-    void paintActionIcon(draw::Painter& painter, const RectF& rect, Ms::EngravingItem* element) const;
+    void paintActionIcon(draw::Painter& painter, const RectF& rect, mu::engraving::EngravingItem* element) const;
     qreal paintStaff(draw::Painter& painter, const RectF& rect, qreal spatium) const;
-    void paintScoreElement(draw::Painter& painter, Ms::EngravingItem* element, qreal spatium, bool alignToStaff) const;
+    void paintScoreElement(draw::Painter& painter, mu::engraving::EngravingItem* element, qreal spatium, bool alignToStaff,
+                           qreal dpi) const;
 
     PaletteCellConstPtr m_cell;
     qreal m_extraMag = 1.0;

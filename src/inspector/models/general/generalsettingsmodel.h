@@ -51,20 +51,23 @@ public:
     QObject* appearanceSettingsModel() const;
 
 public slots:
-    void setPlaybackProxyModel(PlaybackProxyModel* playbackProxyModel);
-    void setAppearanceSettingsModel(AppearanceSettingsModel* appearanceSettingsModel);
+    void setPlaybackProxyModel(mu::inspector::PlaybackProxyModel* playbackProxyModel);
+    void setAppearanceSettingsModel(mu::inspector::AppearanceSettingsModel* appearanceSettingsModel);
 
 signals:
     void playbackProxyModelChanged(QObject* playbackProxyModel);
     void appearanceSettingsModelChanged(QObject* appearanceSettingsModel);
 
-protected:
+private:
     void createProperties() override;
     void requestElements() override;
     void loadProperties() override;
     void resetProperties() override;
+    void onNotationChanged(const mu::engraving::PropertyIdSet& changedPropertyIdSet,
+                           const mu::engraving::StyleIdSet& changedStyleIdSet) override;
 
-private:
+    void loadProperties(const mu::engraving::PropertyIdSet& propertyIdSet);
+
     PropertyItem* m_isVisible = nullptr;
     PropertyItem* m_isAutoPlaceAllowed = nullptr;
     PropertyItem* m_isPlayable = nullptr;

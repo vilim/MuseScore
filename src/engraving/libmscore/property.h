@@ -23,12 +23,11 @@
 #ifndef __PROPERTY_H__
 #define __PROPERTY_H__
 
-#include <QVariant>
-#include <QString>
+#include "types/string.h"
 
-#include "property/propertyvalue.h"
+#include "types/propertyvalue.h"
 
-namespace Ms {
+namespace mu::engraving {
 class XmlReader;
 
 //------------------------------------------------------------------------
@@ -93,7 +92,7 @@ enum class Pid {
     HEAD_TYPE,
     HEAD_GROUP,
     VELO_TYPE,
-    VELO_OFFSET,
+    USER_VELOCITY,
     ARTICULATION_ANCHOR,
 
     DIRECTION,
@@ -101,7 +100,6 @@ enum class Pid {
     NO_STEM,
     SLUR_DIRECTION,
     LEADING_SPACE,
-    DISTRIBUTE,
     MIRROR_HEAD,
     HEAD_HAS_PARENTHESES,
     DOT_POSITION,
@@ -117,6 +115,7 @@ enum class Pid {
     FRET,
     STRING,
     GHOST,
+    DEAD,
     PLAY,
     TIMESIG_NOMINAL,
 
@@ -319,6 +318,7 @@ enum class Pid {
 
     FRAME_BG_COLOR,
     SIZE_SPATIUM_DEPENDENT,
+    TEXT_SIZE_SPATIUM_DEPENDENT, // for text component of textLine items
     ALIGN,
     TEXT_SCRIPT_ALIGN,
     SYSTEM_FLAG,
@@ -372,6 +372,7 @@ enum class Pid {
     ARPEGGIO_TYPE,
     CHORD_LINE_TYPE,
     CHORD_LINE_STRAIGHT,
+    CHORD_LINE_WAVY,
     TREMOLO_TYPE,
     TREMOLO_STYLE,
     HARMONY_TYPE,
@@ -392,19 +393,21 @@ enum class Pid {
     PLAY_TECH_TYPE,
     TEMPO_CHANGE_TYPE,
     TEMPO_EASING_METHOD,
+    TEMPO_CHANGE_FACTOR,
 
     END
 };
 
-extern mu::engraving::PropertyValue readProperty(Pid type, XmlReader& e);
-extern mu::engraving::PropertyValue propertyFromString(mu::engraving::P_TYPE type, QString value);
-extern QString propertyToString(Pid, const mu::engraving::PropertyValue& value, bool mscx);
-extern mu::engraving::P_TYPE propertyType(Pid);
+using PropertyIdSet = std::unordered_set<Pid>;
+
+extern PropertyValue readProperty(Pid type, XmlReader& e);
+extern PropertyValue propertyFromString(P_TYPE type, String value);
+extern String propertyToString(Pid, const PropertyValue& value, bool mscx);
+extern P_TYPE propertyType(Pid);
 extern const char* propertyName(Pid);
 extern bool propertyLink(Pid id);
-extern Pid propertyId(const QString& name);
-extern Pid propertyId(const QStringRef& name);
-extern QString propertyUserName(Pid);
-}     // namespace Ms
+extern Pid propertyId(const AsciiStringView& name);
+extern String propertyUserName(Pid);
+} // namespace mu::engraving
 
 #endif

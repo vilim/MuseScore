@@ -24,28 +24,25 @@
 
 #include "compat/scoreaccess.h"
 
-#include "factory.h"
-#include "part.h"
-#include "staff.h"
-#include "note.h"
 #include "chord.h"
-#include "rest.h"
 #include "durationtype.h"
-#include "measure.h"
-#include "segment.h"
+#include "factory.h"
 #include "instrtemplate.h"
 #include "keysig.h"
-#include "timesig.h"
 #include "masterscore.h"
+#include "measure.h"
+#include "note.h"
+#include "part.h"
+#include "segment.h"
+#include "staff.h"
+#include "timesig.h"
 
 #include "log.h"
 
 using namespace mu;
 using namespace mu::engraving;
 
-namespace Ms {
-extern MScore* mscore;
-
+namespace mu::engraving {
 //---------------------------------------------------------
 //   MCursor
 //---------------------------------------------------------
@@ -147,10 +144,10 @@ TimeSig* MCursor::addTimeSig(const Fraction& f)
 //   createScore
 //---------------------------------------------------------
 
-void MCursor::createScore(const QString& /*name*/)
+void MCursor::createScore(const String& /*name*/)
 {
     delete _score;
-    _score = mu::engraving::compat::ScoreAccess::createMasterScoreWithBaseStyle();
+    _score = compat::ScoreAccess::createMasterScoreWithBaseStyle();
     // TODO: set path/filename
     NOT_IMPLEMENTED;
     move(0, Fraction(0, 1));
@@ -170,14 +167,15 @@ void MCursor::move(int t, const Fraction& tick)
 //   addPart
 //---------------------------------------------------------
 
-void MCursor::addPart(const QString& instrument)
+void MCursor::addPart(const String& instrument)
 {
     Part* part   = new Part(_score);
     Staff* staff = Factory::createStaff(part);
     InstrumentTemplate* it = searchTemplate(instrument);
-    if (it == 0) {
-        ASSERT_X(QString::asprintf("Did not find instrument <%s>", qPrintable(instrument)));
+    IF_ASSERT_FAILED(it) {
+        return;
     }
+
     part->initFromInstrTemplate(it);
     staff->init(it, 0, 0);
     _score->appendPart(part);

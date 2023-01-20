@@ -32,11 +32,14 @@
 #include "actions/actionable.h"
 #include "actions/iactionsdispatcher.h"
 #include "multiinstances/imultiinstancesprovider.h"
-#include "cloud/iuploadingservice.h"
+#include "cloud/icloudprojectsservice.h"
+#include "cloud/iauthorizationservice.h"
 #include "playback/iplaybackcontroller.h"
 #include "print/iprintprovider.h"
 #include "inotationreadersregister.h"
 #include "isaveprojectscenario.h"
+#include "io/ifilesystem.h"
+#include "internal/iexportprojectscenario.h"
 
 #include "async/asyncable.h"
 
@@ -54,24 +57,29 @@ class ProjectActionsController : public IProjectFilesController, public QObject,
     INJECT(project, IPlatformRecentFilesController, platformRecentFilesController)
     INJECT(project, IProjectAutoSaver, projectAutoSaver)
     INJECT(project, ISaveProjectScenario, saveProjectScenario)
+    INJECT(project, IExportProjectScenario, exportProjectScenario)
 
     INJECT(project, actions::IActionsDispatcher, dispatcher)
     INJECT(project, framework::IInteractive, interactive)
     INJECT(project, context::IGlobalContext, globalContext)
     INJECT(project, mi::IMultiInstancesProvider, multiInstancesProvider)
-    INJECT(project, cloud::IUploadingService, uploadingService)
+    INJECT(project, cloud::IAuthorizationService, authorizationService)
+    INJECT(project, cloud::ICloudProjectsService, cloudProjectsService)
     INJECT(project, playback::IPlaybackController, playbackController)
     INJECT(project, print::IPrintProvider, printProvider)
+    INJECT(project, io::IFileSystem, fileSystem)
 
 public:
     void init();
 
-    bool isFileSupported(const io::path& path) const override;
-    Ret openProject(const io::path& projectPath) override;
+    bool canReceiveAction(const actions::ActionCode& code) const override;
+
+    bool isFileSupported(const io::path_t& path) const override;
+    Ret openProject(const io::path_t& projectPath) override;
     bool closeOpenedProject(bool quitApp = false) override;
-    bool isProjectOpened(const io::path& scorePath) const override;
+    bool isProjectOpened(const io::path_t& scorePath) const override;
     bool isAnyProjectOpened() const override;
-    bool saveProject(const io::path& path = io::path()) override;
+    bool saveProject(const io::path_t& path = io::path_t()) override;
 
 private:
     void setupConnections();
@@ -85,8 +93,14 @@ private:
     void openProject(const actions::ActionData& args);
     void newProject();
 
-    bool checkCanIgnoreError(const Ret& ret, const io::path& filePath);
+    bool checkCanIgnoreError(const Ret& ret, const String& projectName);
+    bool askIfUserAgreesToOpenProjectWithIncompatibleVersion(const std::string& errorText);
+    bool askIfUserAgreesToOpenCorruptedProject(const String& projectName, const std::string& errorText);
+    void warnProjectCannotBeOpened(const String& projectName, const std::string& errorText);
+
     framework::IInteractive::Button askAboutSavingScore(INotationProjectPtr project);
+
+    bool canSaveProject() const;
 
     void saveProjectAs();
     void saveProjectCopy();
@@ -95,8 +109,37 @@ private:
     void publish();
 
     bool saveProjectAt(const SaveLocation& saveLocation, SaveMode saveMode = SaveMode::Save);
-    bool saveProjectLocally(const io::path& path = io::path(), SaveMode saveMode = SaveMode::Save);
-    bool saveProjectToCloud(const SaveLocation::CloudInfo& info, SaveMode saveMode = SaveMode::Save);
+    bool saveProjectLocally(const io::path_t& path = io::path_t(), SaveMode saveMode = SaveMode::Save);
+    bool saveProjectToCloud(CloudProjectInfo info, SaveMode saveMode = SaveMode::Save);
+
+    struct AudioFile {
+        QString format;
+        QIODevice* device = nullptr;
+
+        AudioFile() {}
+
+        bool isValid() const
+        {
+            return !format.isEmpty() && device != nullptr;
+        }
+    };
+
+    Ret askAudioGenerationSettings() const;
+    RetVal<bool> needGenerateAudio(bool isPublic) const;
+    AudioFile exportMp3(const notation::INotationPtr notation) const;
+
+    void showUploadProgressDialog();
+    void closeUploadProgressDialog();
+
+    void uploadProject(const CloudProjectInfo& info, const AudioFile& audio, bool openEditUrl, bool publishMode);
+    void uploadAudio(const AudioFile& audio, const QUrl& sourceUrl, const QUrl& urlToOpen, bool isFirstSave);
+
+    void onProjectSuccessfullyUploaded(const QUrl& urlToOpen = QUrl(), bool isFirstSave = true);
+    void onProjectUploadFailed(const Ret& ret, bool publishMode);
+
+    void warnCloudIsNotAvailable();
+    void warnPublishIsNotAvailable();
+    void warnSaveIsNotAvailable();
 
     void importPdf();
 
@@ -106,21 +149,28 @@ private:
 
     void openProjectProperties();
 
-    io::path selectScoreOpeningFile();
-    io::path selectScoreSavingFile(const io::path& defaultFilePath, const QString& saveTitle);
+    io::path_t selectScoreOpeningFile();
+    io::path_t selectScoreSavingFile(const io::path_t& defaultFilePath, const QString& saveTitle);
 
-    Ret doOpenProject(const io::path& filePath);
+    Ret doOpenProject(const io::path_t& filePath);
 
     Ret openPageIfNeed(Uri pageUri);
 
     void exportScore();
     void printScore();
 
-    void prependToRecentScoreList(const io::path& filePath);
+    void prependToRecentScoreList(const io::path_t& filePath);
+    void removeFromRecentScoreList(const io::path_t& filePath);
 
     bool hasSelection() const;
 
     bool m_isProjectProcessing = false;
+    bool m_isProjectUploading = false;
+
+    framework::ProgressPtr m_uploadingProjectProgress = nullptr;
+    framework::ProgressPtr m_uploadingAudioProgress = nullptr;
+
+    int m_numberOfSavesToCloud = 0;
 };
 }
 

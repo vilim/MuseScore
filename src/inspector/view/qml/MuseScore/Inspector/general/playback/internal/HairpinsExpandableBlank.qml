@@ -47,28 +47,12 @@ ExpandableBlank {
 
         spacing: 12
 
-        DropdownPropertyView {
-            id: appliesToSection
-            titleText: qsTrc("inspector", "Applies to")
-            propertyItem: root.model ? root.model.scopeType : null
-
-            navigationName: "Hairpin Applies to"
-            navigationPanel: root.navigation.panel
-            navigationRowStart: root.navigation.row + 1
-
-            model: [
-                { text: qsTrc("inspector", "Staff"), value: Dynamic.SCOPE_STAFF },
-                { text: qsTrc("inspector", "Single instrument"), value: Dynamic.SCOPE_SINGLE_INSTRUMENT },
-                { text: qsTrc("inspector", "All instruments"), value: Dynamic.SCOPE_ALL_INSTRUMENTS }
-            ]
-        }
-
         SpinBoxPropertyView {
             id: velocityChangeSection
 
             navigationName: "Velocity change"
             navigationPanel: root.navigation.panel
-            navigationRowStart: appliesToSection.navigationRowEnd + 1
+            navigationRowStart: root.navigation.row + 1
 
             titleText: qsTrc("inspector", "Velocity change")
             propertyItem: root.model ? root.model.velocityChange : null
@@ -92,9 +76,9 @@ ExpandableBlank {
             model: [
                 { text: qsTrc("inspector", "Linear (default)"), value: Hairpin.VELOCITY_EASING_LINEAR },
                 { text: qsTrc("inspector", "Exponential"), value: Hairpin.VELOCITY_EASING_EXPONENTIAL },
-                { text: qsTrc("inspector", "Ease-in"), value: Hairpin.VELOCITY_EASING_IN },
-                { text: qsTrc("inspector", "Ease-out"), value: Hairpin.VELOCITY_EASING_OUT },
-                { text: qsTrc("inspector", "Ease-in and out"), value: Hairpin.VELOCITY_EASING_IN_OUT }
+                { text: qsTrc("inspector", "Ease in"), value: Hairpin.VELOCITY_EASING_IN },
+                { text: qsTrc("inspector", "Ease out"), value: Hairpin.VELOCITY_EASING_OUT },
+                { text: qsTrc("inspector", "Ease in and out"), value: Hairpin.VELOCITY_EASING_IN_OUT }
             ]
         }
     }

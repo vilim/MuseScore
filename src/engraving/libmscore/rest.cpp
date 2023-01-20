@@ -26,33 +26,32 @@
 #include <set>
 
 #include "containers.h"
-#include "style/style.h"
+#include "realfn.h"
+#include "translation.h"
+
 #include "rw/xml.h"
 
-#include "factory.h"
-#include "score.h"
-#include "utils.h"
-#include "tuplet.h"
-#include "stafftext.h"
+#include "actionicon.h"
 #include "articulation.h"
 #include "chord.h"
-#include "note.h"
+#include "deadslapped.h"
+#include "factory.h"
+#include "image.h"
 #include "measure.h"
 #include "measurerepeat.h"
-#include "undo.h"
-#include "staff.h"
-#include "harmony.h"
+#include "note.h"
+#include "score.h"
 #include "segment.h"
+#include "staff.h"
 #include "stafftype.h"
-#include "actionicon.h"
-#include "image.h"
+#include "undo.h"
 
 #include "log.h"
 
 using namespace mu;
 using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //    Rest
 //--------------------------------------------------------
@@ -98,6 +97,14 @@ Rest::Rest(const Rest& r, bool link)
     for (NoteDot* dot : r.m_dots) {
         add(Factory::copyNoteDot(*dot));
     }
+
+    if (r._deadSlapped) {
+        DeadSlapped* ndc = Factory::copyDeadSlapped(*r._deadSlapped);
+        add(ndc);
+        if (link) {
+            score()->undo(new Link(ndc, r._deadSlapped));
+        }
+    }
 }
 
 void Rest::hack_toRestType()
@@ -128,7 +135,7 @@ void Rest::draw(mu::draw::Painter* painter) const
 
 void Rest::setOffset(const mu::PointF& o)
 {
-    qreal _spatium = spatium();
+    double _spatium = spatium();
     int line = lrint(o.y() / _spatium);
 
     if (m_sym == SymId::restWhole && (line <= -2 || line >= 3)) {
@@ -159,7 +166,7 @@ mu::RectF Rest::drag(EditData& ed)
     RectF r(abbox());
 
     // Limit horizontal drag range
-    static const qreal xDragRange = spatium() * 5;
+    static const double xDragRange = spatium() * 5;
     if (fabs(s.x()) > xDragRange) {
         s.rx() = xDragRange * (s.x() < 0 ? -1.0 : 1.0);
     }
@@ -177,18 +184,18 @@ bool Rest::acceptDrop(EditData& data) const
 {
     EngravingItem* e = data.dropElement;
     ElementType type = e->type();
-    if (
-        (type == ElementType::ACTION_ICON && toActionIcon(e)->actionType() == ActionIconType::BEAM_START)
-        || (type == ElementType::ACTION_ICON && toActionIcon(e)->actionType() == ActionIconType::BEAM_MID)
+    if ((type == ElementType::ACTION_ICON && toActionIcon(e)->actionType() == ActionIconType::BEAM_AUTO)
         || (type == ElementType::ACTION_ICON && toActionIcon(e)->actionType() == ActionIconType::BEAM_NONE)
-        || (type == ElementType::ACTION_ICON && toActionIcon(e)->actionType() == ActionIconType::BEAM_BEGIN_32)
-        || (type == ElementType::ACTION_ICON && toActionIcon(e)->actionType() == ActionIconType::BEAM_BEGIN_64)
-        || (type == ElementType::ACTION_ICON && toActionIcon(e)->actionType() == ActionIconType::BEAM_AUTO)
+        || (type == ElementType::ACTION_ICON && toActionIcon(e)->actionType() == ActionIconType::BEAM_BREAK_LEFT)
+        || (type == ElementType::ACTION_ICON && toActionIcon(e)->actionType() == ActionIconType::BEAM_BREAK_INNER_8TH)
+        || (type == ElementType::ACTION_ICON && toActionIcon(e)->actionType() == ActionIconType::BEAM_BREAK_INNER_16TH)
+        || (type == ElementType::ACTION_ICON && toActionIcon(e)->actionType() == ActionIconType::BEAM_JOIN)
         || (type == ElementType::FERMATA)
         || (type == ElementType::CLEF)
         || (type == ElementType::KEYSIG)
         || (type == ElementType::TIMESIG)
         || (type == ElementType::SYSTEM_TEXT)
+        || (type == ElementType::TRIPLET_FEEL)
         || (type == ElementType::STAFF_TEXT)
         || (type == ElementType::PLAYTECH_ANNOTATION)
         || (type == ElementType::BAR_LINE)
@@ -336,9 +343,16 @@ void Rest::layout()
     for (EngravingItem* e : el()) {
         e->layout();
     }
-    qreal _spatium = spatium();
 
-    rxpos() = 0.0;
+    _skipDraw = false;
+    if (_deadSlapped) {
+        _skipDraw = true;
+        return;
+    }
+
+    double _spatium = spatium();
+
+    setPosX(0.0);
     const StaffType* stt = staffType();
     if (stt && stt->isTabStaff()) {
         // if rests are shown and note values are shown as duration symbols
@@ -376,17 +390,17 @@ void Rest::layout()
 
     m_dotline = Rest::getDotline(durationType().type());
 
-    qreal yOff       = offset().y();
+    double yOff       = offset().y();
     const Staff* stf = staff();
     const StaffType* st = stf ? stf->staffTypeForElement(this) : 0;
-    qreal lineDist = st ? st->lineDistance().val() : 1.0;
+    double lineDist = st ? st->lineDistance().val() : 1.0;
     int userLine   = yOff == 0.0 ? 0 : lrint(yOff / (lineDist * _spatium));
     int lines      = st ? st->lines() : 5;
     int lineOffset = computeLineOffset(lines);
 
     int yo;
     m_sym = getSymbol(durationType().type(), lineOffset / 2 + userLine, lines, &yo);
-    rypos() = (qreal(yo) + qreal(lineOffset) * .5) * lineDist * _spatium;
+    setPosY((double(yo) + double(lineOffset) * .5) * lineDist * _spatium);
     if (!shouldNotBeDrawn()) {
         setbbox(symBbox(m_sym));
     }
@@ -400,9 +414,9 @@ void Rest::layout()
 void Rest::layoutDots()
 {
     checkDots();
-    qreal x = symWidth(m_sym) + score()->styleMM(Sid::dotNoteDistance) * mag();
-    qreal dx = score()->styleMM(Sid::dotDotDistance) * mag();
-    qreal y = m_dotline * spatium() * .5;
+    double x = symWidth(m_sym) + score()->styleMM(Sid::dotNoteDistance) * mag();
+    double dx = score()->styleMM(Sid::dotDotDistance) * mag();
+    double y = m_dotline * spatium() * .5;
     for (NoteDot* dot : m_dots) {
         dot->layout();
         dot->setPos(x, y);
@@ -543,7 +557,7 @@ int Rest::computeLineOffset(int lines)
         int line = up ? 10 : -10;
 
         // For compatibility reasons apply automatic collision avoidance only if y-offset is unchanged
-        if (qFuzzyIsNull(offset().y()) && autoplace()) {
+        if (RealIsNull(offset().y()) && autoplace()) {
             track_idx_t firstTrack = staffIdx() * 4;
             int extraOffsetForFewLines = lines < 5 ? 2 : 0;
             bool isMeasureRest = durationType().type() == DurationType::V_MEASURE;
@@ -690,7 +704,7 @@ int Rest::computeLineOffset(int lines)
 //   upPos
 //---------------------------------------------------------
 
-qreal Rest::upPos() const
+double Rest::upPos() const
 {
     return symBbox(m_sym).y();
 }
@@ -699,7 +713,7 @@ qreal Rest::upPos() const
 //   downPos
 //---------------------------------------------------------
 
-qreal Rest::downPos() const
+double Rest::downPos() const
 {
     return symBbox(m_sym).y() + symHeight(m_sym);
 }
@@ -738,9 +752,9 @@ void Rest::setTrack(track_idx_t val)
 //   mag
 //---------------------------------------------------------
 
-qreal Rest::mag() const
+double Rest::mag() const
 {
-    qreal m = staff() ? staff()->staffMag(this) : 1.0;
+    double m = staff() ? staff()->staffMag(this) : 1.0;
     if (isSmall()) {
         m *= score()->styleD(Sid::smallNoteMag);
     }
@@ -753,7 +767,7 @@ qreal Rest::mag() const
 
 int Rest::upLine() const
 {
-    qreal _spatium = spatium();
+    double _spatium = spatium();
     return lrint((pos().y() + bbox().top() + _spatium) * 2 / _spatium);
 }
 
@@ -763,7 +777,7 @@ int Rest::upLine() const
 
 int Rest::downLine() const
 {
-    qreal _spatium = spatium();
+    double _spatium = spatium();
     return lrint((pos().y() + bbox().top() + _spatium) * 2 / _spatium);
 }
 
@@ -798,7 +812,7 @@ PointF Rest::stemPosBeam() const
 //   stemPosX
 //---------------------------------------------------------
 
-qreal Rest::stemPosX() const
+double Rest::stemPosX() const
 {
     if (_up) {
         return bbox().right();
@@ -811,7 +825,7 @@ qreal Rest::stemPosX() const
 //   rightEdge
 //---------------------------------------------------------
 
-qreal Rest::rightEdge() const
+double Rest::rightEdge() const
 {
     return x() + width();
 }
@@ -834,11 +848,11 @@ void Rest::setAccent(bool flag)
     undoChangeProperty(Pid::SMALL, flag);
     if (voice() % 2 == 0) {
         if (flag) {
-            qreal yOffset = -(bbox().bottom());
+            double yOffset = -(bbox().bottom());
             if (durationType() >= DurationType::V_HALF) {
                 yOffset -= staff()->spatium(tick()) * 0.5;
             }
-            rypos() += yOffset;
+            movePosY(yOffset);
         }
     }
 }
@@ -847,22 +861,28 @@ void Rest::setAccent(bool flag)
 //   accessibleInfo
 //---------------------------------------------------------
 
-QString Rest::accessibleInfo() const
+String Rest::accessibleInfo() const
 {
-    QString voice = QObject::tr("Voice: %1").arg(QString::number(track() % VOICES + 1));
-    return QObject::tr("%1; Duration: %2; %3").arg(EngravingItem::accessibleInfo(), durationUserName(), voice);
+    String voice = mtrc("engraving", "Voice: %1").arg(track() % VOICES + 1);
+    return mtrc("engraving", "%1; Duration: %2; %3").arg(EngravingItem::accessibleInfo(), durationUserName(), voice);
 }
 
 //---------------------------------------------------------
 //   screenReaderInfo
 //---------------------------------------------------------
 
-QString Rest::screenReaderInfo() const
+String Rest::screenReaderInfo() const
 {
     Measure* m = measure();
     bool voices = m ? m->hasVoices(staffIdx()) : false;
-    QString voice = voices ? QObject::tr("Voice: %1").arg(QString::number(track() % VOICES + 1)) : "";
-    return QString("%1 %2 %3").arg(EngravingItem::accessibleInfo(), durationUserName(), voice);
+    String voice = voices ? (u"; " + mtrc("engraving", "Voice: %1").arg(track() % VOICES + 1)) : u"";
+    String crossStaff;
+    if (staffMove() < 0) {
+        crossStaff = u"; " + mtrc("engraving", "Cross-staff above");
+    } else if (staffMove() > 0) {
+        crossStaff = u"; " + mtrc("engraving", "Cross-staff below");
+    }
+    return String(u"%1 %2%3%4").arg(EngravingItem::accessibleInfo(), durationUserName(), crossStaff, voice);
 }
 
 //---------------------------------------------------------
@@ -881,6 +901,9 @@ void Rest::add(EngravingItem* e)
         m_dots.push_back(toNoteDot(e));
         e->added();
         break;
+    case ElementType::DEAD_SLAPPED:
+        _deadSlapped = toDeadSlapped(e);
+    // fallthrough
     case ElementType::SYMBOL:
     case ElementType::IMAGE:
         el().push_back(e);
@@ -903,6 +926,9 @@ void Rest::remove(EngravingItem* e)
         m_dots.pop_back();
         e->removed();
         break;
+    case ElementType::DEAD_SLAPPED:
+        _deadSlapped = nullptr;
+    // fallthrough
     case ElementType::SYMBOL:
     case ElementType::IMAGE:
         if (!el().remove(e)) {
@@ -927,7 +953,7 @@ void Rest::write(XmlWriter& xml) const
         return;
     }
     writeBeam(xml);
-    xml.startObject(this);
+    xml.startElement(this);
     writeStyledProperties(xml);
     ChordRest::writeProperties(xml);
     el().write(xml);
@@ -944,7 +970,7 @@ void Rest::write(XmlWriter& xml) const
             dot->write(xml);
         }
     }
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -954,7 +980,7 @@ void Rest::write(XmlWriter& xml) const
 void Rest::read(XmlReader& e)
 {
     while (e.readNextStartElement()) {
-        const QStringRef& tag(e.name());
+        const AsciiStringView tag(e.name());
         if (tag == "Symbol") {
             Symbol* s = new Symbol(this);
             s->setTrack(track());
@@ -985,7 +1011,7 @@ void Rest::read(XmlReader& e)
 //   localSpatiumChanged
 //---------------------------------------------------------
 
-void Rest::localSpatiumChanged(qreal oldValue, qreal newValue)
+void Rest::localSpatiumChanged(double oldValue, double newValue)
 {
     ChordRest::localSpatiumChanged(oldValue, newValue);
     for (EngravingItem* e : m_dots) {
@@ -1105,7 +1131,7 @@ Shape Rest::shape() const
         shape.add(ChordRest::shape());
         shape.add(bbox(), this);
         for (NoteDot* dot : m_dots) {
-            shape.add(symBbox(SymId::augmentationDot).translated(dot->pos()));
+            shape.add(symBbox(SymId::augmentationDot).translated(dot->pos()), dot);
         }
     }
     for (EngravingItem* e : el()) {
@@ -1124,7 +1150,7 @@ void Rest::editDrag(EditData& editData)
 {
     Segment* seg = segment();
 
-    if (editData.modifiers & Qt::ShiftModifier) {
+    if (editData.modifiers & ShiftModifier) {
         const Spatium deltaSp = Spatium(editData.delta.x() / spatium());
         seg->undoChangeProperty(Pid::LEADING_SPACE, seg->extraLeadingSpace() + deltaSp);
     } else {

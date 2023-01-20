@@ -56,6 +56,7 @@ import "tremolos"
 import "measurerepeats"
 import "tuplets"
 import "instrumentname"
+import "lyrics"
 
 Loader {
     id: root
@@ -104,6 +105,7 @@ Loader {
             case Inspector.TYPE_PALM_MUTE:
             case Inspector.TYPE_LET_RING:
             case Inspector.TYPE_VOLTA:
+            case Inspector.TYPE_GRADUAL_TEMPO_CHANGE:
             case Inspector.TYPE_TEXT_LINE: return lineComp
             case Inspector.TYPE_STAFF_TYPE_CHANGES: return staffTypeComp
             case Inspector.TYPE_TEXT_FRAME: return textFrameComp
@@ -123,6 +125,7 @@ Loader {
             case Inspector.TYPE_MEASURE_REPEAT: return measureRepeatComp
             case Inspector.TYPE_TUPLET: return tupletComp
             case Inspector.TYPE_INSTRUMENT_NAME: return instrumentNameComp
+            case Inspector.TYPE_LYRICS: return lyricsComp
             }
 
             return null
@@ -310,5 +313,10 @@ Loader {
     Component {
         id: instrumentNameComp
         InstrumentNameSettings {}
+    }
+
+    Component {
+        id: lyricsComp
+        LyricsSettings {}
     }
 }

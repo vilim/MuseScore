@@ -76,7 +76,6 @@
     <startBarlineSingle>0</startBarlineSingle>
     <startBarlineMultiple>1</startBarlineMultiple>
     <bracketWidth>0.45</bracketWidth>
-    <bracketDistance>0.1</bracketDistance>
     <akkoladeWidth>1.6</akkoladeWidth>
     <akkoladeBarDistance>0.4</akkoladeBarDistance>
     <dividerLeft>0</dividerLeft>
@@ -104,7 +103,6 @@
     <timesigBarlineDistance>0.5</timesigBarlineDistance>
     <stemWidth>0.13</stemWidth>
     <shortenStem>1</shortenStem>
-    <shortStemProgression>0.25</shortStemProgression>
     <shortestStem>2.25</shortestStem>
     <beginRepeatLeftMargin>1</beginRepeatLeftMargin>
     <minNoteDistance>0.25</minNoteDistance>
@@ -126,9 +124,9 @@
     <dotNoteDistance>0.35</dotNoteDistance>
     <dotRestDistance>0.25</dotRestDistance>
     <dotDotDistance>0.5</dotDotDistance>
-    <propertyDistanceHead>1</propertyDistanceHead>
-    <propertyDistanceStem>1.8</propertyDistanceStem>
-    <propertyDistance>1</propertyDistance>
+    <propertyDistanceHead>0.5</propertyDistanceHead>
+    <propertyDistanceStem>0.5</propertyDistanceStem>
+    <propertyDistance>0.5</propertyDistance>
     <articulationMag>1</articulationMag>
     <articulationPosAbove x="0" y="0"/>
     <articulationAnchorDefault>2</articulationAnchorDefault>
@@ -193,7 +191,6 @@
     <harmonyPlacement>0</harmonyPlacement>
     <romanNumeralPlacement>1</romanNumeralPlacement>
     <nashvilleNumberPlacement>0</nashvilleNumberPlacement>
-    <harmonyPlay>1</harmonyPlay>
     <harmonyVoiceLiteral>1</harmonyVoiceLiteral>
     <harmonyVoicing>0</harmonyVoicing>
     <harmonyDuration>0</harmonyDuration>

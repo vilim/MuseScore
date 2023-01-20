@@ -24,6 +24,7 @@
 
 #include <QWindow>
 #include <QTimer>
+#include <QKeyEvent>
 
 #include "vsttypes.h"
 #include "internal/vstplugin.h"
@@ -34,6 +35,21 @@
 using namespace mu::vst;
 using namespace Steinberg;
 
+::Steinberg::uint32 PLUGIN_API AbstractVstEditorView::addRef()
+{
+    return ::Steinberg::FUnknownPrivate::atomicAdd(__funknownRefCount, 1);
+}
+
+::Steinberg::uint32 PLUGIN_API AbstractVstEditorView::release()
+{
+    if (::Steinberg::FUnknownPrivate::atomicAdd(__funknownRefCount, -1) == 0) {
+        return 0;
+    }
+    return __funknownRefCount;
+}
+
+IMPLEMENT_QUERYINTERFACE(AbstractVstEditorView, IPlugFrame, IPlugFrame::iid)
+
 AbstractVstEditorView::AbstractVstEditorView(QWidget* parent)
     : TopLevelDialog(parent)
 {
@@ -43,18 +59,36 @@ AbstractVstEditorView::AbstractVstEditorView(QWidget* parent)
 
 AbstractVstEditorView::~AbstractVstEditorView()
 {
+    deinit();
+}
+
+void AbstractVstEditorView::deinit()
+{
     if (m_view) {
+        m_view->setFrame(nullptr);
         m_view->removed();
+        m_view = nullptr;
     }
 
     if (m_pluginPtr) {
         m_pluginPtr->loadingCompleted().resetOnNotify(this);
+        m_pluginPtr->refreshConfig();
+        m_pluginPtr = nullptr;
     }
 }
 
 tresult AbstractVstEditorView::resizeView(IPlugView* view, ViewRect* newSize)
 {
+    view->checkSizeConstraint(newSize);
+
+    //! NOTE: newSize already includes the UI scaling on Windows, so we have to remove it before setting the fixed size.
+    //! Otherwise, the user will get an extremely large window and won't be able to resize it
+#ifdef Q_OS_WIN
+    setFixedSize(newSize->getWidth() / m_scalingFactor, newSize->getHeight() / m_scalingFactor);
+#else
     setFixedSize(newSize->getWidth(), newSize->getHeight());
+#endif
+
     view->onSize(newSize);
 
     update();
@@ -81,11 +115,14 @@ void AbstractVstEditorView::wrapPluginView()
 
 void AbstractVstEditorView::attachView(VstPluginPtr pluginPtr)
 {
-    if (!pluginPtr || !pluginPtr->view()) {
+    if (!pluginPtr) {
         return;
     }
 
-    m_view = pluginPtr->view();
+    m_view = pluginPtr->createView();
+    if (!m_view) {
+        return;
+    }
 
     if (m_view->isPlatformTypeSupported(currentPlatformUiType()) != Steinberg::kResultTrue) {
         return;
@@ -101,7 +138,7 @@ void AbstractVstEditorView::attachView(VstPluginPtr pluginPtr)
         return;
     }
 
-    FUnknownPtr<IPlugingContentScaleHandler> scalingHandler(m_view);
+    FUnknownPtr<IPluginContentScaleHandler> scalingHandler(m_view);
     if (scalingHandler) {
         scalingHandler->setContentScaleFactor(m_scalingFactor);
     }
@@ -131,11 +168,34 @@ void AbstractVstEditorView::moveViewToMainWindowCenter()
     move(x, y);
 }
 
-void AbstractVstEditorView::showEvent(QShowEvent* event)
+void AbstractVstEditorView::showEvent(QShowEvent* ev)
 {
     moveViewToMainWindowCenter();
 
-    QDialog::showEvent(event);
+    TopLevelDialog::showEvent(ev);
+}
+
+void AbstractVstEditorView::closeEvent(QCloseEvent* ev)
+{
+    deinit();
+
+    TopLevelDialog::closeEvent(ev);
+}
+
+bool AbstractVstEditorView::event(QEvent* ev)
+{
+    if (ev && ev->spontaneous() && ev->type() == QEvent::ShortcutOverride) {
+        if (QKeyEvent* keyEvent = dynamic_cast<QKeyEvent*>(ev)) {
+            int key = keyEvent->key();
+
+            if (key == 0 || key == static_cast<int>(Qt::Key_unknown)) {
+                keyEvent->accept();
+                return true;
+            }
+        }
+    }
+
+    return TopLevelDialog::event(ev);
 }
 
 FIDString AbstractVstEditorView::currentPlatformUiType() const

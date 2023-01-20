@@ -113,7 +113,6 @@ FocusScope {
             navigation.name: "LearnSearch"
             navigation.panel: navSearchPanel
             navigation.order: 1
-            accessible.name: qsTrc("learn", "Learn search")
 
             onSearchTextChanged: {
                 pageModel.setSearchText(searchText)
@@ -134,8 +133,9 @@ FocusScope {
         function pageIndex(pageName) {
             switch (pageName) {
             case "get-started": return 0
-            case "advanced": return 1
-            case "classes": return 2
+            //! NOTE: see https://github.com/musescore/MuseScore/issues/14886
+            //case "advanced": return 1
+            case "classes": return 1
             }
 
             return 0
@@ -151,7 +151,7 @@ FocusScope {
             section: navSec
             direction: NavigationPanel.Horizontal
             order: 2
-            accessible.name: qsTrc("learn", "Learn tabs")
+            accessible.name: qsTrc("learn", "Learn tab bar")
             enabled: tabBar.enabled && tabBar.visible
 
             onNavigationEvent: function(event) {
@@ -169,6 +169,8 @@ FocusScope {
             navigation.column: 1
         }
 
+        //! NOTE: see https://github.com/musescore/MuseScore/issues/14886
+        /*
         StyledTabButton {
             text: qsTrc("learn", "Advanced")
 
@@ -176,6 +178,7 @@ FocusScope {
             navigation.panel: navTabPanel
             navigation.column: 2
         }
+        */
 
         StyledTabButton {
             text: qsTrc("learn", "Classes")
@@ -213,6 +216,9 @@ FocusScope {
             }
         }
 
+
+        //! NOTE: see https://github.com/musescore/MuseScore/issues/14886
+        /*
         Playlist {
             id: advancedComp
 
@@ -230,6 +236,7 @@ FocusScope {
                 pageModel.openVideo(videoId)
             }
         }
+        */
 
         ClassesPage {
             id: classesComp

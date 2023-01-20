@@ -22,7 +22,7 @@
 #include "abpaintprovider.h"
 
 #include "log.h"
-#include "engraving/infrastructure/draw/painter.h"
+#include "draw/painter.h"
 
 static const QColor REMOVED_COLOR("#cc0000");
 static const QColor ADDED_COLOR("#009900");
@@ -99,19 +99,19 @@ void AbPaintProvider::paintData(draw::IPaintProviderPtr provider, const draw::Dr
             }
 
             for (const DrawText& t : d.texts) {
-                provider->drawText(t.pos, t.text);
-            }
-
-            for (const DrawRectText& t : d.rectTexts) {
-                provider->drawText(t.rect, t.flags, t.text);
+                if (t.mode == DrawText::Point) {
+                    provider->drawText(t.rect.topLeft(), t.text);
+                } else {
+                    provider->drawText(t.rect, t.flags, t.text);
+                }
             }
 
             for (const DrawPixmap& px : d.pixmaps) {
-                provider->drawPixmap(px.pos, px.pm);
-            }
-
-            for (const DrawTiledPixmap& px : d.tiledPixmap) {
-                provider->drawTiledPixmap(px.rect, px.pm, px.offset);
+                if (px.mode == DrawPixmap::Single) {
+                    provider->drawPixmap(px.rect.topLeft(), px.pm);
+                } else {
+                    provider->drawTiledPixmap(px.rect, px.pm, px.offset);
+                }
             }
         }
     }
@@ -120,13 +120,13 @@ void AbPaintProvider::paintData(draw::IPaintProviderPtr provider, const draw::Dr
 bool AbPaintProvider::endTarget(bool endDraw)
 {
     bool ok = BufferedPaintProvider::endTarget(endDraw);
-    if (ok && drawData().name == "notationview") {
+    if (ok && drawData()->name == "notationview") {
         m_notationViewDrawData = drawData();
     }
     return ok;
 }
 
-const mu::draw::DrawData& AbPaintProvider::notationViewDrawData() const
+const mu::draw::DrawDataPtr& AbPaintProvider::notationViewDrawData() const
 {
     return m_notationViewDrawData;
 }

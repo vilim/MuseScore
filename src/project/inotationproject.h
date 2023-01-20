@@ -25,12 +25,11 @@
 #include <memory>
 
 #include "io/path.h"
-#include "ret.h"
+#include "types/ret.h"
 
 #include "projecttypes.h"
 #include "notation/imasternotation.h"
 #include "iprojectaudiosettings.h"
-#include "iprojectviewsettings.h"
 
 namespace mu::project {
 class INotationProject
@@ -38,34 +37,38 @@ class INotationProject
 public:
     virtual ~INotationProject() = default;
 
-    virtual io::path path() const = 0;
-    virtual void setPath(const io::path& path) = 0;
+    virtual io::path_t path() const = 0;
+    virtual void setPath(const io::path_t& path) = 0;
     virtual async::Notification pathChanged() const = 0;
 
     virtual QString displayName() const = 0;
 
-    virtual Ret load(const io::path& path, const io::path& stylePath = io::path(), bool forceMode = false,
-                     const std::string& format = "") = 0;
+    virtual Ret load(const io::path_t& path,
+                     const io::path_t& stylePath = io::path_t(), bool forceMode = false, const std::string& format = "") = 0;
     virtual Ret createNew(const ProjectCreateOptions& projectInfo) = 0;
 
     virtual bool isCloudProject() const = 0;
+    virtual const CloudProjectInfo& cloudInfo() const = 0;
+    virtual void setCloudInfo(const CloudProjectInfo& info) = 0;
 
     virtual bool isNewlyCreated() const = 0;
     virtual void markAsNewlyCreated() = 0;
 
+    virtual bool isImported() const = 0;
+
     virtual void markAsUnsaved() = 0;
 
     virtual ValNt<bool> needSave() const = 0;
+    virtual bool canSave() const = 0;
 
-    virtual Ret save(const io::path& path = io::path(), SaveMode saveMode = SaveMode::Save) = 0;
-    virtual Ret writeToDevice(io::Device* device) = 0;
+    virtual Ret save(const io::path_t& path = io::path_t(), SaveMode saveMode = SaveMode::Save) = 0;
+    virtual Ret writeToDevice(QIODevice* device) = 0;
 
     virtual ProjectMeta metaInfo() const = 0;
     virtual void setMetaInfo(const ProjectMeta& meta, bool undoable = false) = 0;
 
     virtual notation::IMasterNotationPtr masterNotation() const = 0;
     virtual IProjectAudioSettingsPtr audioSettings() const = 0;
-    virtual IProjectViewSettingsPtr viewSettings() const = 0;
 };
 
 using INotationProjectPtr = std::shared_ptr<INotationProject>;

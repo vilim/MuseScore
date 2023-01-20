@@ -18,7 +18,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-
 # Main
 add_subdirectory(main)
 
@@ -94,22 +93,34 @@ if (BUILD_AUTOBOT_MODULE)
     add_subdirectory(autobot)
 endif()
 
+if (BUILD_UPDATE_MODULE)
+    add_subdirectory(update)
+endif (BUILD_UPDATE_MODULE)
+
 # Stubs
 add_subdirectory(stubs)
 
 if (BUILD_UNIT_TESTS)
-#    add_subdirectory(notation/tests) no tests at moment
-    add_subdirectory(project/tests)
-
     add_subdirectory(engraving/tests)
-    add_subdirectory(engraving/utests)
+
     add_subdirectory(importexport/bb/tests)
     add_subdirectory(importexport/braille/tests)
     add_subdirectory(importexport/bww/tests)
     add_subdirectory(importexport/capella/tests)
-#    add_subdirectory(importexport/guitarpro/tests)
+    add_subdirectory(importexport/guitarpro/tests)
     add_subdirectory(importexport/midi/tests)
     add_subdirectory(importexport/musicxml/tests)
+
+    #add_subdirectory(notation/tests) no tests at moment
+    add_subdirectory(project/tests)
+
+    if (BUILD_PLUGINS_MODULE)
+        add_subdirectory(plugins/tests)
+    endif()
+
+    if (BUILD_DIAGNOSTICS)
+        add_subdirectory(diagnostics/tests)
+    endif()
 endif(BUILD_UNIT_TESTS)
 
 if (OS_IS_WASM)

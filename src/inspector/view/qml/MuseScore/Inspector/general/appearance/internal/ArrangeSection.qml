@@ -29,10 +29,12 @@ Column {
 
     property NavigationPanel navigationPanel: null
     property int navigationRowStart: 0
-    property int navigationRowEnd: forwardsButton.navigation.row
+    property int navigationRowEnd: toBackButton.navigation.row
 
-    signal pushBackRequested()
-    signal pushFrontRequested()
+    signal pushBackwardsRequested()
+    signal pushForwardsRequested()
+    signal pushToBackRequested()
+    signal pushToFrontRequested()
 
     height: implicitHeight
     width: parent.width
@@ -55,35 +57,75 @@ Column {
             width: parent.width
 
             FlatButton {
+                id: forwardsButton
+                anchors.left: parent.left
+                anchors.right: parent.horizontalCenter
+                anchors.rightMargin: 4
+
+                navigation.name: "Forwards"
+                navigation.panel: root.navigationPanel
+                navigation.row: root.navigationRowStart + 1
+
+                text: qsTrc("inspector", "Forwards")
+
+                onClicked: {
+                    root.pushForwardsRequested()
+                }
+            }
+
+            FlatButton {
+                id: toFrontButton
+                anchors.left: parent.horizontalCenter
+                anchors.leftMargin: 4
+                anchors.right: parent.right
+
+                navigation.name: "To front"
+                navigation.panel: root.navigationPanel
+                navigation.row: forwardsButton.navigation.row + 1
+
+                text: qsTrc("inspector", "To front")
+
+                onClicked: {
+                    root.pushToFrontRequested()
+                }
+            }
+        }
+
+        Item {
+            height: childrenRect.height
+            width: parent.width
+
+            FlatButton {
+                id: backwardsButton
                 anchors.left: parent.left
                 anchors.right: parent.horizontalCenter
                 anchors.rightMargin: 4
 
                 navigation.name: "Backwards"
                 navigation.panel: root.navigationPanel
-                navigation.row: root.navigationRowStart + 1
+                navigation.row: toFrontButton.navigation.row + 1
 
                 text: qsTrc("inspector", "Backwards")
 
                 onClicked: {
-                    root.pushBackRequested()
+                    root.pushBackwardsRequested()
                 }
             }
 
             FlatButton {
-                id: forwardsButton
+                id: toBackButton
                 anchors.left: parent.horizontalCenter
                 anchors.leftMargin: 4
                 anchors.right: parent.right
 
-                navigation.name: "Forwards"
+                navigation.name: "To back"
                 navigation.panel: root.navigationPanel
-                navigation.row: root.navigationRowStart + 2
+                navigation.row: backwardsButton.navigation.row + 1
 
-                text: qsTrc("inspector", "Forwards")
+                text: qsTrc("inspector", "To back")
 
                 onClicked: {
-                    root.pushFrontRequested()
+                    root.pushToBackRequested()
                 }
             }
         }

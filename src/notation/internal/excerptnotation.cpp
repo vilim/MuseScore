@@ -22,42 +22,48 @@
 
 #include "excerptnotation.h"
 
-#include "log.h"
-
 #include "libmscore/excerpt.h"
+#include "libmscore/text.h"
+
+#include "log.h"
 
 using namespace mu::notation;
 
-ExcerptNotation::ExcerptNotation(Ms::Excerpt* excerpt)
+ExcerptNotation::ExcerptNotation(mu::engraving::Excerpt* excerpt)
     : Notation(), m_excerpt(excerpt)
 {
-    m_name = excerpt ? excerpt->name() : QString();
 }
 
 ExcerptNotation::~ExcerptNotation()
 {
+    //! NOTE: do not destroy the score here, because it may be stored in UndoStack
+    //! (after opening an excerpt via the Parts dialog and pressing ctrl + z)
     setScore(nullptr);
 }
 
-bool ExcerptNotation::isCreated() const
+void ExcerptNotation::init()
 {
-    return m_isCreated;
-}
-
-void ExcerptNotation::setIsCreated(bool created)
-{
-    m_isCreated = created;
-
-    if (!created) {
+    if (m_inited) {
         return;
     }
 
     setScore(m_excerpt->excerptScore());
-    setName(m_name);
 
     if (isEmpty()) {
         fillWithDefaultInfo();
     }
+
+    m_inited = true;
+}
+
+bool ExcerptNotation::isCustom() const
+{
+    return !m_excerpt->initialPartId().isValid();
+}
+
+bool ExcerptNotation::isEmpty() const
+{
+    return m_excerpt->parts().empty();
 }
 
 void ExcerptNotation::fillWithDefaultInfo()
@@ -68,68 +74,63 @@ void ExcerptNotation::fillWithDefaultInfo()
         return;
     }
 
-    Ms::Score* excerptScore = m_excerpt->excerptScore();
+    mu::engraving::Score* score = m_excerpt->excerptScore();
+    mu::engraving::MeasureBase* topVerticalFrame = score->first();
 
-    auto setText = [&excerptScore](TextStyleType textType, const QString& text) {
-        TextBase* textBox = excerptScore->getText(textType);
+    if (topVerticalFrame && topVerticalFrame->isVBox()) {
+        topVerticalFrame->undoUnlink();
+    }
 
-        if (!textBox) {
-            textBox = excerptScore->addText(textType, false /*addToAllScores*/);
+    auto setText = [&score](TextStyleType textType, const QString& text) {
+        TextBase* textItem = score->getText(textType);
+
+        if (!textItem) {
+            textItem = score->addText(textType, nullptr /*destinationElement*/, false /*addToAllScores*/);
         }
 
-        if (textBox) {
-            textBox->undoUnlink();
-            textBox->setPlainText(text);
+        if (textItem) {
+            textItem->undoUnlink();
+            textItem->setPlainText(text);
         }
     };
 
-    setText(TextStyleType::TITLE, qtrc("notation", "Title"));
-    setText(TextStyleType::COMPOSER, qtrc("notation", "Composer / arranger"));
-    setText(TextStyleType::SUBTITLE, "");
-    setText(TextStyleType::POET, "");
+    auto getText = [&score](TextStyleType textType, const QString& defaultText) {
+        if (mu::engraving::Text* t = score->getText(textType)) {
+            return t->plainText().toQString();
+        } else {
+            return defaultText;
+        }
+    };
 
-    excerptScore->doLayout();
+    setText(TextStyleType::TITLE, getText(TextStyleType::TITLE, ""));
+    setText(TextStyleType::COMPOSER, getText(TextStyleType::COMPOSER, ""));
+    setText(TextStyleType::SUBTITLE, getText(TextStyleType::SUBTITLE, ""));
+    setText(TextStyleType::POET, getText(TextStyleType::POET, ""));
 }
 
-Ms::Excerpt* ExcerptNotation::excerpt() const
+mu::engraving::Excerpt* ExcerptNotation::excerpt() const
 {
     return m_excerpt;
 }
 
-bool ExcerptNotation::isEmpty() const
-{
-    return m_excerpt ? m_excerpt->parts().empty() : true;
-}
-
 QString ExcerptNotation::name() const
 {
-    return m_excerpt ? m_excerpt->name() : m_name;
+    return m_excerpt->name().toQString();
 }
 
 void ExcerptNotation::setName(const QString& name)
 {
-    m_name = name;
-
-    if (!m_excerpt) {
-        return;
-    }
-
+    bool changed = name != this->name();
     m_excerpt->setName(name);
 
-    if (!score()) {
-        return;
+    if (changed) {
+        notifyAboutNotationChanged();
     }
+}
 
-    Ms::Text* excerptTitle = score()->getText(Ms::TextStyleType::INSTRUMENT_EXCERPT);
-    if (!excerptTitle) {
-        return;
-    }
-
-    excerptTitle->setPlainText(name);
-    score()->setMetaTag("partName", name);
-    score()->doLayout();
-
-    notifyAboutNotationChanged();
+mu::async::Notification ExcerptNotation::nameChanged() const
+{
+    return m_excerpt->nameChanged();
 }
 
 INotationPtr ExcerptNotation::notation()
@@ -139,10 +140,6 @@ INotationPtr ExcerptNotation::notation()
 
 IExcerptNotationPtr ExcerptNotation::clone() const
 {
-    if (!m_excerpt) {
-        return nullptr;
-    }
-
-    Ms::Excerpt* copy = new Ms::Excerpt(*m_excerpt);
+    mu::engraving::Excerpt* copy = new mu::engraving::Excerpt(*m_excerpt);
     return std::make_shared<ExcerptNotation>(copy);
 }

@@ -25,19 +25,18 @@
 #include <QQmlEngine>
 #include <QMetaEnum>
 
-#include "libmscore/masterscore.h"
+#include "libmscore/score.h"
 
 #include "log.h"
 
 using namespace mu::engraving;
 
-namespace Ms {
-namespace PluginAPI {
+namespace mu::plugins::api {
 //---------------------------------------------------------
 //   wrap
 //---------------------------------------------------------
 
-MStyle* wrap(Ms::MStyle* style, Ms::Score* score)
+MStyle* wrap(mu::engraving::MStyle* style, mu::engraving::Score* score)
 {
     MStyle* st = new MStyle(style, score);
     // All wrapper objects should belong to JavaScript code.
@@ -53,8 +52,9 @@ Sid MStyle::keyToSid(const QString& key)
 {
     static QMetaEnum sidEnum = QMetaEnum::fromType<Sid>();
 
+    QByteArray ba = key.toLatin1();
     bool ok;
-    int val = sidEnum.keyToValue(key.toLatin1().constData(), &ok);
+    int val = sidEnum.keyToValue(ba.constData(), &ok);
 
     if (ok) {
         return static_cast<Sid>(val);
@@ -100,11 +100,10 @@ void MStyle::setValue(const QString& key, QVariant value)
 
     if (_score) {
         // Style belongs to actual score: change style value in undoable way
-        _score->undoChangeStyleVal(sid, PropertyValue::fromQVariant(value, Ms::MStyle::valueType(sid)));
+        _score->undoChangeStyleVal(sid, PropertyValue::fromQVariant(value, mu::engraving::MStyle::valueType(sid)));
     } else {
         // Style is not bound to a score: change the value directly
-        _style->set(sid, PropertyValue::fromQVariant(value, Ms::MStyle::valueType(sid)));
+        _style->set(sid, PropertyValue::fromQVariant(value, mu::engraving::MStyle::valueType(sid)));
     }
 }
-} // namespace PluginAPI
-} // namespace Ms
+} // namespace mu::plugins::api

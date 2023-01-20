@@ -20,13 +20,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "score.h"
 #include "measurenumber.h"
+
 #include "measure.h"
+#include "score.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   measureNumberStyle
 //---------------------------------------------------------

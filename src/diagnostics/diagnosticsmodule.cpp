@@ -33,6 +33,9 @@
 #include "internal/diagnosticsactionscontroller.h"
 #include "internal/diagnosticspathsregister.h"
 #include "internal/engravingelementsprovider.h"
+#include "internal/savediagnosticfilesscenario.h"
+
+#include "internal/drawdata/engravingdrawprovider.h"
 
 #include "internal/crashhandler/crashhandler.h"
 
@@ -57,8 +60,8 @@
 using namespace mu::diagnostics;
 using namespace mu::modularity;
 
-static std::shared_ptr<DiagnosticsConfiguration> s_configuration = std::make_shared<DiagnosticsConfiguration>();
-static std::shared_ptr<DiagnosticsActionsController> s_actionsController = std::make_shared<DiagnosticsActionsController>();
+static std::shared_ptr<DiagnosticsConfiguration> s_configuration = {};
+static std::shared_ptr<DiagnosticsActionsController> s_actionsController = {};
 
 std::string DiagnosticsModule::moduleName() const
 {
@@ -67,8 +70,14 @@ std::string DiagnosticsModule::moduleName() const
 
 void DiagnosticsModule::registerExports()
 {
+    s_configuration = std::make_shared<DiagnosticsConfiguration>();
+    s_actionsController = std::make_shared<DiagnosticsActionsController>();
+
     ioc()->registerExport<IDiagnosticsPathsRegister>(moduleName(), new DiagnosticsPathsRegister());
-    ioc()->registerExport<EngravingElementsProvider>(moduleName(), new EngravingElementsProvider());
+    ioc()->registerExport<IEngravingElementsProvider>(moduleName(), new EngravingElementsProvider());
+    ioc()->registerExport<IEngravingDrawProvider>(moduleName(), new EngravingDrawProvider());
+    ioc()->registerExport<IDiagnosticsConfiguration>(moduleName(), s_configuration);
+    ioc()->registerExport<ISaveDiagnosticFilesScenario>(moduleName(), new SaveDiagnosticFilesScenario());
 }
 
 void DiagnosticsModule::resolveImports()
@@ -121,13 +130,13 @@ void DiagnosticsModule::onInit(const framework::IApplication::RunMode&)
     static CrashHandler s_crashHandler;
 
 #ifdef _MSC_VER
-    io::path handlerFile("crashpad_handler.exe");
+    io::path_t handlerFile("crashpad_handler.exe");
 #else
-    io::path handlerFile("crashpad_handler");
+    io::path_t handlerFile("crashpad_handler");
 #endif // _MSC_VER
 
-    io::path handlerPath = globalConf->appBinPath() + "/" + handlerFile;
-    io::path dumpsDir = globalConf->userAppDataPath() + "/logs/dumps";
+    io::path_t handlerPath = globalConf->appBinPath() + "/" + handlerFile;
+    io::path_t dumpsDir = globalConf->userAppDataPath() + "/logs/dumps";
     fileSystem()->makePath(dumpsDir);
     std::string serverUrl(CRASH_REPORT_URL);
 

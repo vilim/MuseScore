@@ -38,13 +38,15 @@
 #include "translation.h"
 
 using namespace mu::palette;
-using namespace Ms;
+using namespace mu::engraving;
 
 TimeDialog::TimeDialog(QWidget* parent)
     : QWidget(parent, Qt::WindowFlags(Qt::Dialog | Qt::Window))
 {
     setupUi(this);
     setWindowTitle(mu::qtrc("palette", "Time signatures"));
+
+    setWindowFlags(this->windowFlags() & ~Qt::WindowContextHelpButtonHint);
 
     QLayout* l = new QVBoxLayout();
     l->setContentsMargins(0, 0, 0, 0);

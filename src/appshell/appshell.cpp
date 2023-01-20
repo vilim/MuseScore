@@ -27,9 +27,13 @@
 #include <QApplication>
 #include <QQmlApplicationEngine>
 #include <QQuickWindow>
+#include <QStyleHints>
 #ifndef Q_OS_WASM
 #include <QThreadPool>
 #endif
+
+#include "view/internal/splashscreen.h"
+
 #include "view/dockwindow/docksetup.h"
 
 #include "modularity/ioc.h"
@@ -64,6 +68,12 @@ int AppShell::run(int argc, char** argv)
     qputenv("QT_STYLE_OVERRIDE", "Fusion");
     qputenv("QML_DISABLE_DISK_CACHE", "true");
 
+#ifdef Q_OS_LINUX
+    if (qEnvironmentVariable("QT_QPA_PLATFORM") != "offscreen") {
+        qputenv("QT_QPA_PLATFORMTHEME", "gtk3");
+    }
+#endif
+
     const char* appName;
     if (framework::Version::unstable()) {
         appName  = "MuseScore4Development";
@@ -83,11 +93,27 @@ int AppShell::run(int argc, char** argv)
 
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
 
+    //! NOTE: For unknown reasons, Linux scaling for 1 is defined as 1.003 in fractional scaling.
+    //!       Because of this, some elements are drawn with a shift on the score.
+    //!       Let's make a Linux hack and round values above 0.75(see RoundPreferFloor)
+#ifdef Q_OS_LINUX
+    QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::RoundPreferFloor);
+#elif defined(Q_OS_WIN)
+    QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
+#endif
+
+    QGuiApplication::styleHints()->setMousePressAndHoldInterval(250);
+
     QApplication app(argc, argv);
     QCoreApplication::setApplicationName(appName);
     QCoreApplication::setOrganizationName("MuseScore");
     QCoreApplication::setOrganizationDomain("musescore.org");
     QCoreApplication::setApplicationVersion(QString::fromStdString(framework::Version::fullVersion()));
+
+#if !defined(Q_OS_WIN) && !defined(Q_OS_DARWIN) && !defined(Q_OS_WASM)
+    // Any OS that uses Freedesktop.org Desktop Entry Specification (e.g. Linux, BSD)
+    QGuiApplication::setDesktopFileName("org.musescore.MuseScore" INSTSUFFIX ".desktop");
+#endif
 
     // ====================================================
     // Setup modules: Resources, Exports, Imports, UiTypes
@@ -117,6 +143,20 @@ int AppShell::run(int argc, char** argv)
     commandLine.parse(QCoreApplication::arguments());
     commandLine.apply();
     framework::IApplication::RunMode runMode = muapplication()->runMode();
+
+    // ====================================================
+    // Setup modules: onPreInit
+    // ====================================================
+    globalModule.onPreInit(runMode);
+    for (mu::modularity::IModuleSetup* m : m_modules) {
+        m->onPreInit(runMode);
+    }
+
+    SplashScreen* splashScreen = nullptr;
+    if (runMode == framework::IApplication::RunMode::Editor) {
+        splashScreen = new SplashScreen();
+        splashScreen->show();
+    }
 
     // ====================================================
     // Setup modules: onInit
@@ -151,17 +191,26 @@ int AppShell::run(int argc, char** argv)
     switch (runMode) {
     case framework::IApplication::RunMode::Converter: {
         // ====================================================
-        // Process Converter
+        // Process Diagnostic
         // ====================================================
-        auto task = commandLine.converterTask();
-        QMetaObject::invokeMethod(qApp, [this, task]() {
-                int code = processConverter(task);
-                qApp->exit(code);
-            }, Qt::QueuedConnection);
+        CommandLineController::Diagnostic diagnostic = commandLine.diagnostic();
+        if (diagnostic.type != CommandLineController::DiagnosticType::Undefined) {
+            QMetaObject::invokeMethod(qApp, [this, diagnostic]() {
+                    int code = processDiagnostic(diagnostic);
+                    qApp->exit(code);
+                }, Qt::QueuedConnection);
+        } else {
+            // ====================================================
+            // Process Converter
+            // ====================================================
+            CommandLineController::ConverterTask task = commandLine.converterTask();
+            QMetaObject::invokeMethod(qApp, [this, task]() {
+                    int code = processConverter(task);
+                    qApp->exit(code);
+                }, Qt::QueuedConnection);
+        }
     } break;
     case framework::IApplication::RunMode::Editor: {
-        QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
-
         // ====================================================
         // Setup Qml Engine
         // ====================================================
@@ -221,6 +270,11 @@ int AppShell::run(int argc, char** argv)
         QQuickWindow::setDefaultAlphaBuffer(true);
 
         engine->load(url);
+
+        if (splashScreen) {
+            splashScreen->close();
+            delete splashScreen;
+        }
     }
     }
 
@@ -271,7 +325,7 @@ int AppShell::run(int argc, char** argv)
 int AppShell::processConverter(const CommandLineController::ConverterTask& task)
 {
     Ret ret = make_ret(Ret::Code::Ok);
-    io::path stylePath = task.params[CommandLineController::ParamKey::StylePath].toString();
+    io::path_t stylePath = task.params[CommandLineController::ParamKey::StylePath].toString();
     bool forceMode = task.params[CommandLineController::ParamKey::ForceMode].toBool();
 
     switch (task.type) {
@@ -285,7 +339,7 @@ int AppShell::processConverter(const CommandLineController::ConverterTask& task)
         ret = converter()->fileConvert(task.inputFile, task.outputFile, stylePath, forceMode);
         break;
     case CommandLineController::ConvertType::ExportScoreMedia: {
-        io::path highlightConfigPath = task.params[CommandLineController::ParamKey::HighlightConfigPath].toString();
+        io::path_t highlightConfigPath = task.params[CommandLineController::ParamKey::HighlightConfigPath].toString();
         ret = converter()->exportScoreMedia(task.inputFile, task.outputFile, highlightConfigPath, stylePath, forceMode);
     } break;
     case CommandLineController::ConvertType::ExportScoreMeta:
@@ -308,6 +362,39 @@ int AppShell::processConverter(const CommandLineController::ConverterTask& task)
         std::string scoreSource = task.params[CommandLineController::ParamKey::ScoreSource].toString().toStdString();
         ret = converter()->updateSource(task.inputFile, scoreSource, forceMode);
     } break;
+    }
+
+    if (!ret) {
+        LOGE() << "failed convert, error: " << ret.toString();
+    }
+
+    return ret.code();
+}
+
+int AppShell::processDiagnostic(const CommandLineController::Diagnostic& task)
+{
+    if (!engravingDrawProvider()) {
+        return make_ret(Ret::Code::NotSupported);
+    }
+
+    Ret ret = make_ret(Ret::Code::Ok);
+
+    io::path_t input = task.input;
+    io::path_t output = task.output;
+
+    if (output.empty()) {
+        output = "./";
+    }
+
+    switch (task.type) {
+    case CommandLineController::DiagnosticType::GenDrawData:
+        ret = engravingDrawProvider()->genDrawData(input, output);
+        break;
+    case CommandLineController::DiagnosticType::DrawDataToPng:
+        ret = engravingDrawProvider()->drawDataToPng(input, output);
+        break;
+    default:
+        break;
     }
 
     if (!ret) {

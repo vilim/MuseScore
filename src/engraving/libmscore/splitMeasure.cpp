@@ -20,12 +20,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "score.h"
-#include "measure.h"
-#include "segment.h"
 #include "chordrest.h"
+#include "measure.h"
 #include "range.h"
-#include "tuplet.h"
+#include "score.h"
+#include "segment.h"
 #include "spanner.h"
 #include "tie.h"
 #include "undo.h"
@@ -33,7 +32,7 @@
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   cmdSplitMeasure
 //---------------------------------------------------------
@@ -93,7 +92,7 @@ void Score::splitMeasure(Segment* segment)
         }
     }
 
-    // Make sure ties are the beginning the split measure are restored.
+    // Make sure ties to the beginning of the split measure are restored.
     std::vector<Tie*> ties;
     for (size_t track = 0; track < ntracks(); track++) {
         Chord* chord = measure->findChord(stick, static_cast<int>(track));
@@ -156,7 +155,7 @@ void Score::splitMeasure(Segment* segment)
     m2->adjustToLen(ticks2, false);
     range.write(this, m1->tick());
 
-    // Restore ties the the beginning of the split measure.
+    // Restore ties to the beginning of the split measure.
     for (auto tie : ties) {
         tie->setEndNote(searchTieNote(tie->startNote()));
         undoAddElement(tie);

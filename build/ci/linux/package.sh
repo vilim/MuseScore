@@ -61,10 +61,10 @@ echo "PACKTYPE: $PACKTYPE"
 echo "INSTALL_DIR: $INSTALL_DIR"
 
 if [ "$BUILD_MODE" == "nightly_build" ]; then
-  BUILD_DATETIME=$(cat $ARTIFACTS_DIR/env/build_datetime.env)
+  BUILD_NUMBER=$(cat $ARTIFACTS_DIR/env/build_number.env)
   BUILD_BRANCH=$(cat $ARTIFACTS_DIR/env/build_branch.env)
   BUILD_REVISION=$(cat $ARTIFACTS_DIR/env/build_revision.env)
-  ARTIFACT_NAME=MuseScoreNightly-${BUILD_DATETIME}-${BUILD_BRANCH}-${BUILD_REVISION}-x86_64
+  ARTIFACT_NAME=MuseScoreNightly-${BUILD_NUMBER}-${BUILD_BRANCH}-${BUILD_REVISION}-x86_64
 else
   BUILD_VERSION=$(cat $ARTIFACTS_DIR/env/build_version.env)
   ARTIFACT_NAME=MuseScore-${BUILD_VERSION}-x86_64
@@ -87,12 +87,12 @@ if [ "$PACKTYPE" == "appimage" ]; then
     esac
 
     bash ./build/ci/linux/tools/make_appimage.sh "${INSTALL_DIR}" "${ARTIFACT_NAME}.AppImage"
-    mv "${BUILD_DIR}/${ARTIFACT_NAME}.AppImage" "${ARTIFACTS_DIR}/"
+    mv "${INSTALL_DIR}/../${ARTIFACT_NAME}.AppImage" "${ARTIFACTS_DIR}/"
     bash ./build/ci/tools/make_artifact_name_env.sh $ARTIFACT_NAME.AppImage
 
     if [ -v UPDATE_INFORMATION ]; then
         # zsync file contains data for automatic delta updates
-        mv "${BUILD_DIR}/${ARTIFACT_NAME}.AppImage.zsync" "${ARTIFACTS_DIR}/"
+        mv "${INSTALL_DIR}/../${ARTIFACT_NAME}.AppImage.zsync" "${ARTIFACTS_DIR}/"
     fi
 fi
 

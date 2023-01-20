@@ -29,6 +29,12 @@ FlatRadioButton {
     id: root
 
     property bool needSave: false
+    property bool isCloud: false
+
+    property alias contextMenuItems: contextMenuLoader.items
+
+    signal contextMenuItemsRequested()
+    signal handleContextMenuItem(string itemId)
 
     signal closeRequested()
 
@@ -48,6 +54,12 @@ FlatRadioButton {
             horizontalAlignment: Text.AlignLeft
 
             text: (root.needSave ? "*" : "") + root.text
+        }
+
+        StyledIconLabel {
+            visible: root.isCloud
+
+            iconCode: IconCode.CLOUD
         }
 
         FlatButton {
@@ -94,6 +106,27 @@ FlatRadioButton {
             navigationCtrl: root.navigation
             drawOutsideParent: false
             anchors.rightMargin: 1 // for separator
+        }
+
+
+        MouseArea {
+            id: rightClickArea
+            anchors.fill: parent
+
+            acceptedButtons: Qt.RightButton
+
+            onClicked: function(mouse) {
+                contextMenuItemsRequested()
+                contextMenuLoader.show(Qt.point(mouse.x, mouse.y))
+            }
+
+            ContextMenuLoader {
+                id: contextMenuLoader
+
+                onHandleMenuItem: function(itemId) {
+                    root.handleContextMenuItem(itemId)
+                }
+            }
         }
 
         states: [

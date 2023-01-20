@@ -44,7 +44,7 @@ Item {
 
         width: parent.width
 
-        spacing: 4
+        spacing: 12
 
         DynamicsExpandableBlank {
             id: dynamicSection
@@ -52,13 +52,6 @@ Item {
             navigation.row: root.navigationRowStart
 
             model: proxyModel ? proxyModel.modelByType(Inspector.TYPE_DYNAMIC) : null
-        }
-
-        HairpinsExpandableBlank {
-            navigation.panel: root.navigationPanel
-            navigation.row: dynamicSection.navigationRowEnd + 1
-
-            model: proxyModel ? proxyModel.modelByType(Inspector.TYPE_HAIRPIN) : null
         }
     }
 }

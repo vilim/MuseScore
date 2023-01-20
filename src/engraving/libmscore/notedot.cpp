@@ -21,15 +21,18 @@
  */
 
 #include "notedot.h"
+
 #include "rw/xml.h"
+
+#include "chord.h"
+#include "note.h"
+#include "rest.h"
 #include "score.h"
 #include "staff.h"
-#include "chord.h"
-#include "rest.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   NoteDot
 //---------------------------------------------------------
@@ -54,6 +57,8 @@ void NoteDot::draw(mu::draw::Painter* painter) const
 {
     TRACE_OBJ_DRAW;
     if (note() && note()->dotsHidden()) {     // don't draw dot if note is hidden
+        return;
+    } else if (rest() && rest()->isGap()) {  // don't draw dot for gap rests
         return;
     }
     Note* n = note();
@@ -94,9 +99,9 @@ void NoteDot::read(XmlReader& e)
 {
     while (e.readNextStartElement()) {
         if (e.name() == "name") {      // obsolete
-            e.readElementText();
+            e.readText();
         } else if (e.name() == "subtype") {     // obsolete
-            e.readElementText();
+            e.readText();
         } else if (!EngravingItem::readProperties(e)) {
             e.unknown();
         }
@@ -107,7 +112,7 @@ void NoteDot::read(XmlReader& e)
 //   mag
 //---------------------------------------------------------
 
-qreal NoteDot::mag() const
+double NoteDot::mag() const
 {
     return parentItem()->mag() * score()->styleD(Sid::dotMag);
 }

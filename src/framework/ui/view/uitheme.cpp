@@ -559,7 +559,7 @@ void UiTheme::drawPrimitive(QStyle::PrimitiveElement element, const QStyleOption
             drawRoundedRect(painter, option->rect, 1, NO_FILL, QPen(fontPrimaryColor(), navCtrlBorderWidth()));
         }
 
-        //! NOTE: need for removing frame focus recangle
+        //! NOTE: need for removing frame focus rectangle
     } break;
 
     // Indicator icons
@@ -796,6 +796,32 @@ QSize UiTheme::sizeFromContents(QStyle::ContentsType type, const QStyleOption* o
     }
 
     return proxyStyleSize;
+}
+
+QIcon UiTheme::standardIcon(QStyle::StandardPixmap standardIcon, const QStyleOption* option, const QWidget* widget) const
+{
+    switch (standardIcon) {
+    case SP_DialogOkButton:
+    case SP_DialogCancelButton:
+    case SP_DialogHelpButton:
+    case SP_DialogOpenButton:
+    case SP_DialogSaveButton:
+    case SP_DialogCloseButton:
+    case SP_DialogApplyButton:
+    case SP_DialogResetButton:
+    case SP_DialogDiscardButton:
+    case SP_DialogYesButton:
+    case SP_DialogNoButton:
+    case SP_DialogYesToAllButton:
+    case SP_DialogNoToAllButton:
+    case SP_DialogSaveAllButton:
+    case SP_DialogAbortButton:
+    case SP_DialogRetryButton:
+    case SP_DialogIgnoreButton:
+        return {};
+    default:
+        return QProxyStyle::standardIcon(standardIcon, option, widget);
+    }
 }
 
 int UiTheme::styleHint(QStyle::StyleHint hint, const QStyleOption* option, const QWidget* widget, QStyleHintReturn* returnData) const

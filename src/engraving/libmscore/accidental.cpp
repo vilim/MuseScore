@@ -22,24 +22,22 @@
 
 #include "accidental.h"
 
+#include "iengravingfont.h"
 #include "rw/xml.h"
 #include "types/symnames.h"
+#include "types/translatablestring.h"
 #include "types/typesconv.h"
 
-#include "note.h"
-#include "symbol.h"
-#include "score.h"
-#include "scorefont.h"
 #include "actionicon.h"
-#include "staff.h"
-#include "undo.h"
+#include "note.h"
+#include "score.h"
 
 #include "log.h"
 
 using namespace mu;
 using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   Acc
 //---------------------------------------------------------
@@ -52,7 +50,7 @@ struct Acc {
         : offset(o), centOffset(o2), sym(s) {}
 };
 
-// NOTE: keep this in sync with with AccidentalType enum in types.h, watch out for isMicrotonal()
+// NOTE: keep this in sync with AccidentalType enum in types.h, watch out for isMicrotonal()
 static Acc accList[] = {
     Acc(AccidentalVal::NATURAL,    0,   SymId::noSym),                  // NONE
     Acc(AccidentalVal::FLAT,       0,   SymId::accidentalFlat),         // FLAT
@@ -258,16 +256,16 @@ Accidental::Accidental(EngravingItem* parent)
 void Accidental::read(XmlReader& e)
 {
     while (e.readNextStartElement()) {
-        const QStringRef& tag(e.name());
+        const AsciiStringView tag(e.name());
         if (tag == "bracket") {
             int i = e.readInt();
             if (i == 0 || i == 1 || i == 2) {
                 _bracket = AccidentalBracket(i);
             }
         } else if (tag == "subtype") {
-            setSubtype(e.readElementText());
+            setSubtype(e.readAsciiText());
         } else if (tag == "role") {
-            _role = TConv::fromXml(e.readElementText(), AccidentalRole::AUTO);
+            _role = TConv::fromXml(e.readAsciiText(), AccidentalRole::AUTO);
         } else if (tag == "small") {
             m_isSmall = e.readInt();
         } else if (EngravingItem::readProperties(e)) {
@@ -283,22 +281,22 @@ void Accidental::read(XmlReader& e)
 
 void Accidental::write(XmlWriter& xml) const
 {
-    xml.startObject(this);
+    xml.startElement(this);
     writeProperty(xml, Pid::ACCIDENTAL_BRACKET);
     writeProperty(xml, Pid::ACCIDENTAL_ROLE);
     writeProperty(xml, Pid::SMALL);
     writeProperty(xml, Pid::ACCIDENTAL_TYPE);
     EngravingItem::writeProperties(xml);
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
 //   subTypeUserName
 //---------------------------------------------------------
 
-QString Accidental::subtypeUserName() const
+TranslatableString Accidental::subtypeUserName() const
 {
-    return SymNames::translatedUserNameForSymId(symbol());
+    return TranslatableString("engraving/sym", SymNames::userNameForSymId(symbol()));
 }
 
 //---------------------------------------------------------
@@ -324,7 +322,7 @@ AccidentalVal Accidental::subtype2value(AccidentalType st)
 //   subtype2name
 //---------------------------------------------------------
 
-const char* Accidental::subtype2name(AccidentalType st)
+AsciiStringView Accidental::subtype2name(AccidentalType st)
 {
     return SymNames::nameForSymId(accList[int(st)].sym);
 }
@@ -342,7 +340,7 @@ SymId Accidental::subtype2symbol(AccidentalType st)
 //   name2subtype
 //---------------------------------------------------------
 
-AccidentalType Accidental::name2subtype(const QString& tag)
+AccidentalType Accidental::name2subtype(const AsciiStringView& tag)
 {
     SymId symId = SymNames::symIdByName(tag);
     if (symId == SymId::noSym) {
@@ -363,7 +361,7 @@ AccidentalType Accidental::name2subtype(const QString& tag)
 //   setSubtype
 //---------------------------------------------------------
 
-void Accidental::setSubtype(const QString& tag)
+void Accidental::setSubtype(const AsciiStringView& tag)
 {
     setAccidentalType(name2subtype(tag));
 }
@@ -383,7 +381,7 @@ void Accidental::layout()
         return;
     }
 
-    qreal m = explicitParent() ? parentItem()->mag() : 1.0;
+    double m = explicitParent() ? parentItem()->mag() : 1.0;
     if (m_isSmall) {
         m *= score()->styleD(Sid::smallNoteMag);
     }
@@ -429,7 +427,7 @@ void Accidental::layoutSingleGlyphAccidental()
         default:
             break;
         }
-        if (!score()->scoreFont()->isValid(s)) {
+        if (!score()->engravingFont()->isValid(s)) {
             layoutMultiGlyphAccidental();
             return;
         }
@@ -443,9 +441,9 @@ void Accidental::layoutSingleGlyphAccidental()
 
 void Accidental::layoutMultiGlyphAccidental()
 {
-    qreal margin = score()->styleMM(Sid::bracketedAccidentalPadding);
+    double margin = score()->styleMM(Sid::bracketedAccidentalPadding);
     RectF r;
-    qreal x = 0.0;
+    double x = 0.0;
 
     // should always be true
     if (_bracket != AccidentalBracket::NONE) {
@@ -513,7 +511,7 @@ AccidentalType Accidental::value2subtype(AccidentalVal v)
     case AccidentalVal::FLAT2:   return AccidentalType::FLAT2;
     case AccidentalVal::FLAT3:   return AccidentalType::FLAT3;
     default:
-        ASSERT_X("value2subtype: illegal accidental val %d" + QString::number(int(v)));
+        ASSERT_X(u"value2subtype: illegal accidental val: " + String::number(int(v)));
     }
     return AccidentalType::NONE;
 }
@@ -532,7 +530,7 @@ void Accidental::draw(mu::draw::Painter* painter) const
 
     painter->setPen(curColor());
     for (const SymElement& e : el) {
-        score()->scoreFont()->draw(e.sym, painter, magS(), PointF(e.x, e.y));
+        score()->engravingFont()->draw(e.sym, painter, magS(), PointF(e.x, e.y));
     }
 }
 
@@ -649,23 +647,11 @@ bool Accidental::setProperty(Pid propertyId, const PropertyValue& v)
 }
 
 //---------------------------------------------------------
-//   propertyId
-//---------------------------------------------------------
-
-Pid Accidental::propertyId(const QStringRef& xmlName) const
-{
-    if (xmlName == propertyName(Pid::ACCIDENTAL_TYPE)) {
-        return Pid::ACCIDENTAL_TYPE;
-    }
-    return EngravingItem::propertyId(xmlName);
-}
-
-//---------------------------------------------------------
 //   accessibleInfo
 //---------------------------------------------------------
 
-QString Accidental::accessibleInfo() const
+String Accidental::accessibleInfo() const
 {
-    return QString("%1: %2").arg(EngravingItem::accessibleInfo(), Accidental::subtypeUserName());
+    return String(u"%1: %2").arg(EngravingItem::accessibleInfo(), translatedSubtypeUserName());
 }
 }

@@ -46,9 +46,9 @@
 
 #include "log.h"
 
+using namespace mu::iex::musedata;
 using namespace mu::engraving;
 
-namespace Ms {
 //---------------------------------------------------------
 //   musicalAttribute
 //---------------------------------------------------------
@@ -279,7 +279,7 @@ void MuseData::readNote(Part* part, const QString& s)
     if (pitch > 127) {
         pitch = 127;
     }
-    Fraction ticks = Fraction::fromTicks((s.midRef(5, 3).toInt() * Constant::division + _division / 2) / _division);
+    Fraction ticks = Fraction::fromTicks((s.midRef(5, 3).toInt() * Constants::division + _division / 2) / _division);
     Fraction tick  = curTick;
     curTick  += ticks;
 
@@ -479,7 +479,7 @@ QString MuseData::diacritical(QString s)
 
 void MuseData::readRest(Part* part, const QString& s)
 {
-    Fraction ticks = Fraction::fromTicks((s.midRef(5, 3).toInt() * Constant::division + _division / 2) / _division);
+    Fraction ticks = Fraction::fromTicks((s.midRef(5, 3).toInt() * Constants::division + _division / 2) / _division);
 
     Fraction tick  = curTick;
     curTick  += ticks;
@@ -523,7 +523,7 @@ void MuseData::readRest(Part* part, const QString& s)
 
 void MuseData::readBackup(const QString& s)
 {
-    Fraction ticks = Fraction::fromTicks((s.midRef(5, 3).toInt() * Constant::division + _division / 2) / _division);
+    Fraction ticks = Fraction::fromTicks((s.midRef(5, 3).toInt() * Constants::division + _division / 2) / _division);
     if (s[0] == 'b') {
         curTick  -= ticks;
     } else {
@@ -748,23 +748,4 @@ void MuseData::convert()
         Part* part = (score->parts())[pn];
         readPart(parts[pn], part);
     }
-}
-
-//---------------------------------------------------------
-//   importMuseData
-//    return true on success
-//---------------------------------------------------------
-
-Score::FileError importMuseData(MasterScore* score, const QString& name)
-{
-    if (!QFileInfo::exists(name)) {
-        return Score::FileError::FILE_NOT_FOUND;
-    }
-    MuseData md(score);
-    if (!md.read(name)) {
-        return Score::FileError::FILE_ERROR;
-    }
-    md.convert();
-    return Score::FileError::FILE_NO_ERROR;
-}
 }

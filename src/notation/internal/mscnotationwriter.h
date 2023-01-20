@@ -25,6 +25,8 @@
 
 #include "project/inotationwriter.h"
 
+#include "engraving/infrastructure/mscio.h"
+
 namespace mu::notation {
 class MscNotationWriter : public project::INotationWriter
 {
@@ -35,14 +37,10 @@ public:
     std::vector<UnitType> supportedUnitTypes() const override;
     bool supportsUnitType(UnitType unitType) const override;
 
-    Ret write(notation::INotationPtr notation, io::Device& device, const Options& options = Options()) override;
-    Ret writeList(const INotationPtrList& notations, io::Device& device, const Options& options = Options()) override;
-
-    void abort() override;
-    framework::ProgressChannel progress() const override;
+    Ret write(notation::INotationPtr notation, QIODevice& device, const Options& options = Options()) override;
+    Ret writeList(const INotationPtrList& notations, QIODevice& device, const Options& options = Options()) override;
 
 private:
-
     engraving::MscIoMode m_mode;
 };
 }

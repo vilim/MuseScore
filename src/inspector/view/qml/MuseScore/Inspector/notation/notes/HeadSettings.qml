@@ -126,14 +126,27 @@ FocusableItem {
 
                 spacing: 12
 
+                DropdownPropertyView {
+                    id: noteHeadSystemSection
+
+                    titleText: qsTrc("inspector", "Notehead system")
+                    propertyItem: root.model ? root.model.headSystem : null
+
+                    model: root.model.possibleHeadSystemTypes()
+
+                    navigationName: "NoteHeadSystemSection"
+                    navigationPanel: root.navigationPanel
+                    navigationRowStart: showItem.navigation.row + 1
+                }
+
                 NoteheadTypeSelector {
                     id: noteHeadTypeSection
-                    titleText: qsTrc("inspector", "Notehead type (visual only)")
+                    titleText: qsTrc("inspector", "Override visual duration")
                     propertyItem: root.model ? root.model.headType : null
 
                     navigationName: "NoteHeadTypeSection"
                     navigationPanel: root.navigationPanel
-                    navigationRowStart: showItem.navigation.row + 1
+                    navigationRowStart: noteHeadSystemSection.navigationRowEnd + 1
                 }
 
                 DirectionSection {
@@ -150,8 +163,7 @@ FocusableItem {
 
                 OffsetSection {
                     titleText: qsTrc("inspector", "Notehead offset")
-                    horizontalOffset: root.model ? root.model.horizontalOffset : null
-                    verticalOffset: root.model ? root.model.verticalOffset : null
+                    propertyItem: root.model ? root.model.offset : null
 
                     navigationName: "NoteHeadOffsetSection"
                     navigationPanel: root.navigationPanel

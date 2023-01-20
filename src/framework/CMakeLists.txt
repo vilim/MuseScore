@@ -19,6 +19,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #add_subdirectory(global)
+add_subdirectory(draw)
 add_subdirectory(ui)
 add_subdirectory(uicomponents)
 add_subdirectory(fonts)
@@ -46,6 +47,7 @@ endif(BUILD_MUSESAMPLER_MODULE)
 
 if (BUILD_UNIT_TESTS)
     add_subdirectory(global/tests)
+    add_subdirectory(draw/tests)
     add_subdirectory(mpe/tests)
     add_subdirectory(ui/tests)
     add_subdirectory(accessibility/tests)

@@ -21,8 +21,7 @@
  */
 #include "noteheadsettingsmodel.h"
 
-#include "note.h"
-#include "dataformatter.h"
+#include "engraving/types/types.h"
 
 #include "translation.h"
 
@@ -39,29 +38,23 @@ NoteheadSettingsModel::NoteheadSettingsModel(QObject* parent, IElementRepository
 
 void NoteheadSettingsModel::createProperties()
 {
-    m_isHeadHidden = buildPropertyItem(Ms::Pid::VISIBLE, [this](const Ms::Pid pid, const QVariant& isHeadHidden) {
+    m_isHeadHidden = buildPropertyItem(mu::engraving::Pid::VISIBLE, [this](const mu::engraving::Pid pid, const QVariant& isHeadHidden) {
         onPropertyValueChanged(pid, !isHeadHidden.toBool());
     });
 
-    m_isHeadSmall = buildPropertyItem(Ms::Pid::SMALL);
-    m_hasHeadParentheses = buildPropertyItem(Ms::Pid::HEAD_HAS_PARENTHESES);
-    m_headDirection = buildPropertyItem(Ms::Pid::MIRROR_HEAD);
-    m_headGroup = buildPropertyItem(Ms::Pid::HEAD_GROUP);
-    m_headType = buildPropertyItem(Ms::Pid::HEAD_TYPE);
-    m_dotPosition = buildPropertyItem(Ms::Pid::DOT_POSITION);
-
-    m_horizontalOffset = buildPropertyItem(Ms::Pid::OFFSET, [this](const Ms::Pid pid, const QVariant& newValue) {
-        onPropertyValueChanged(pid, QPointF(newValue.toDouble(), m_verticalOffset->value().toDouble()));
-    });
-
-    m_verticalOffset = buildPropertyItem(Ms::Pid::OFFSET, [this](const Ms::Pid pid, const QVariant& newValue) {
-        onPropertyValueChanged(pid, QPointF(m_horizontalOffset->value().toDouble(), newValue.toDouble()));
-    });
+    m_isHeadSmall = buildPropertyItem(mu::engraving::Pid::SMALL);
+    m_hasHeadParentheses = buildPropertyItem(mu::engraving::Pid::HEAD_HAS_PARENTHESES);
+    m_headDirection = buildPropertyItem(mu::engraving::Pid::MIRROR_HEAD);
+    m_headGroup = buildPropertyItem(mu::engraving::Pid::HEAD_GROUP);
+    m_headType = buildPropertyItem(mu::engraving::Pid::HEAD_TYPE);
+    m_headSystem = buildPropertyItem(mu::engraving::Pid::HEAD_SCHEME);
+    m_dotPosition = buildPropertyItem(mu::engraving::Pid::DOT_POSITION);
+    m_offset = buildPointFPropertyItem(mu::engraving::Pid::OFFSET);
 }
 
 void NoteheadSettingsModel::requestElements()
 {
-    m_elementList = m_repository->findElementsByType(Ms::ElementType::NOTEHEAD);
+    m_elementList = m_repository->findElementsByType(mu::engraving::ElementType::NOTEHEAD);
 }
 
 void NoteheadSettingsModel::loadProperties()
@@ -75,15 +68,9 @@ void NoteheadSettingsModel::loadProperties()
     loadPropertyItem(m_headDirection);
     loadPropertyItem(m_headGroup);
     loadPropertyItem(m_headType);
+    loadPropertyItem(m_headSystem);
     loadPropertyItem(m_dotPosition);
-
-    loadPropertyItem(m_horizontalOffset, [](const QVariant& elementPropertyValue) -> QVariant {
-        return DataFormatter::roundDouble(elementPropertyValue.value<QPointF>().x());
-    });
-
-    loadPropertyItem(m_verticalOffset, [](const QVariant& elementPropertyValue) -> QVariant {
-        return DataFormatter::roundDouble(elementPropertyValue.value<QPointF>().y());
-    });
+    loadPropertyItem(m_offset);
 }
 
 void NoteheadSettingsModel::resetProperties()
@@ -94,9 +81,9 @@ void NoteheadSettingsModel::resetProperties()
     m_headDirection->resetToDefault();
     m_headGroup->resetToDefault();
     m_headType->resetToDefault();
+    m_headSystem->resetToDefault();
     m_dotPosition->resetToDefault();
-    m_horizontalOffset->resetToDefault();
-    m_verticalOffset->resetToDefault();
+    m_offset->resetToDefault();
 }
 
 PropertyItem* NoteheadSettingsModel::isHeadHidden() const
@@ -129,17 +116,46 @@ PropertyItem* NoteheadSettingsModel::headType() const
     return m_headType;
 }
 
+PropertyItem* NoteheadSettingsModel::headSystem() const
+{
+    return m_headSystem;
+}
+
 PropertyItem* NoteheadSettingsModel::dotPosition() const
 {
     return m_dotPosition;
 }
 
-PropertyItem* NoteheadSettingsModel::horizontalOffset() const
+PropertyItem* NoteheadSettingsModel::offset() const
 {
-    return m_horizontalOffset;
+    return m_offset;
 }
 
-PropertyItem* NoteheadSettingsModel::verticalOffset() const
+QVariantList NoteheadSettingsModel::possibleHeadSystemTypes() const
 {
-    return m_verticalOffset;
+    QMap<mu::engraving::NoteHeadScheme, QString> types {
+        { mu::engraving::NoteHeadScheme::HEAD_AUTO,                    mu::qtrc("inspector", "Auto") },
+        { mu::engraving::NoteHeadScheme::HEAD_NORMAL,                  mu::qtrc("inspector", "Normal") },
+        { mu::engraving::NoteHeadScheme::HEAD_PITCHNAME,               mu::qtrc("inspector", "Pitch names") },
+        { mu::engraving::NoteHeadScheme::HEAD_PITCHNAME_GERMAN,        mu::qtrc("inspector", "German pitch names") },
+        { mu::engraving::NoteHeadScheme::HEAD_SOLFEGE,                 mu::qtrc("inspector", "Solfège movable do") },
+        { mu::engraving::NoteHeadScheme::HEAD_SOLFEGE_FIXED,           mu::qtrc("inspector", "Solfège fixed do") },
+        { mu::engraving::NoteHeadScheme::HEAD_SHAPE_NOTE_4,            mu::qtrc("inspector", "4-shape (Walker)") },
+        { mu::engraving::NoteHeadScheme::HEAD_SHAPE_NOTE_7_AIKIN,      mu::qtrc("inspector", "7-shape (Aikin)") },
+        { mu::engraving::NoteHeadScheme::HEAD_SHAPE_NOTE_7_FUNK,       mu::qtrc("inspector", "7-shape (Funk)") },
+        { mu::engraving::NoteHeadScheme::HEAD_SHAPE_NOTE_7_WALKER,     mu::qtrc("inspector", "7-shape (Walker)") },
+    };
+
+    QVariantList result;
+
+    for (mu::engraving::NoteHeadScheme type : types.keys()) {
+        QVariantMap obj;
+
+        obj["text"] = types[type];
+        obj["value"] = static_cast<int>(type);
+
+        result << obj;
+    }
+
+    return result;
 }

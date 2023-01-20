@@ -53,7 +53,7 @@ bool IpcSocket::connect(const QString& serverName)
         QObject::connect(m_socket, &QLocalSocket::errorOccurred, [this](QLocalSocket::LocalSocketError err) {
             //! NOTE If the server is down, then we will try to connect to another or create a server ourselves
             if (err == QLocalSocket::PeerClosedError) {
-                m_disconected.notify();
+                m_disconnected.notify();
             }
         });
 
@@ -85,9 +85,9 @@ bool IpcSocket::connect(const QString& serverName)
     return true;
 }
 
-mu::async::Notification IpcSocket::disconected()
+mu::async::Notification IpcSocket::disconnected()
 {
-    return m_disconected;
+    return m_disconnected;
 }
 
 bool IpcSocket::send(Msg msg)
@@ -131,6 +131,11 @@ void IpcSocket::onDataReceived(const QByteArray& data)
 
     if (receivedMsg.srcID == selfID()) {
         return;
+    }
+
+    if (receivedMsg.method == "METHOD_QUITED") {
+        m_instances.removeAll(receivedMsg.srcID);
+        m_instancesChanged.notify();
     }
 
     m_msgReceived.send(receivedMsg);

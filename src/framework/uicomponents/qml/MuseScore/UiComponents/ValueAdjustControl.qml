@@ -53,13 +53,20 @@ Column {
             iconCode: IconCode.SMALL_ARROW_UP
         }
 
+        onEnabledChanged: {
+            // If the button becomes disabled, the mouse area does not emit the
+            // `released` signal anymore, so we'll stop the repeat timer here.
+            if (!enabled) {
+                continuousIncreaseTimer.running = false
+            }
+        }
+
         MouseArea {
             id: increaseMouseArea
             anchors.fill: parent
 
             hoverEnabled: true
             preventStealing: true
-            pressAndHoldInterval: 200
 
             onClicked: { root.increaseButtonClicked() }
             onPressAndHold: { continuousIncreaseTimer.running = true }
@@ -111,13 +118,20 @@ Column {
             iconCode: IconCode.SMALL_ARROW_DOWN
         }
 
+        onEnabledChanged: {
+            // If the button becomes disabled, the mouse area does not emit the
+            // `released` signal anymore, so we'll stop the repeat timer here.
+            if (!enabled) {
+                continuousDecreaseTimer.running = false
+            }
+        }
+
         MouseArea {
             id: decreaseMouseArea
             anchors.fill: parent
 
             hoverEnabled: true
             preventStealing: true
-            pressAndHoldInterval: 200
 
             onClicked: { root.decreaseButtonClicked() }
             onPressAndHold: { continuousDecreaseTimer.running = true }

@@ -38,22 +38,23 @@ const ArticulationTypeSet& TremoloRenderer::supportedTypes()
     return types;
 }
 
-void TremoloRenderer::doRender(const Ms::EngravingItem* item, const mpe::ArticulationType preferredType, const RenderingContext& context,
+void TremoloRenderer::doRender(const EngravingItem* item, const mpe::ArticulationType preferredType,
+                               const RenderingContext& context,
                                mpe::PlaybackEventList& result)
 {
-    const Ms::Chord* chord = Ms::toChord(item);
+    const Chord* chord = toChord(item);
     IF_ASSERT_FAILED(chord) {
         return;
     }
 
-    const Ms::Tremolo* tremolo = chord->tremolo();
+    const Tremolo* tremolo = chord->tremolo();
     IF_ASSERT_FAILED(tremolo) {
         return;
     }
 
     const ArticulationAppliedData& articulationData = context.commonArticulations.at(preferredType);
 
-    duration_t stepDuration = durationFromTicks(context.beatsPerSecond.val, stepDurationTicksByType(preferredType));
+    duration_t stepDuration = durationFromTicks(context.beatsPerSecond.val, stepDurationTicks(chord, tremolo));
 
     if (stepDuration <= 0) {
         LOGE() << "Unable to render unsupported tremolo type";
@@ -63,17 +64,17 @@ void TremoloRenderer::doRender(const Ms::EngravingItem* item, const mpe::Articul
     int stepsCount = articulationData.meta.overallDuration / stepDuration;
 
     if (tremolo->twoNotes()) {
-        const Ms::Chord* firstTremoloChord = tremolo->chord1();
-        const Ms::Chord* secondTremoloChord = tremolo->chord2();
+        const Chord* firstTremoloChord = tremolo->chord1();
+        const Chord* secondTremoloChord = tremolo->chord2();
 
         IF_ASSERT_FAILED(firstTremoloChord && secondTremoloChord) {
             return;
         }
 
         for (int i = 0; i < stepsCount; ++i) {
-            const Ms::Chord* currentChord = firstTremoloChord;
+            const Chord* currentChord = firstTremoloChord;
 
-            if (i % 2 == 0) {
+            if (i % 2 != 0) {
                 currentChord = secondTremoloChord;
             }
 
@@ -88,30 +89,24 @@ void TremoloRenderer::doRender(const Ms::EngravingItem* item, const mpe::Articul
     }
 }
 
-int TremoloRenderer::stepDurationTicksByType(const mpe::ArticulationType& type)
+int TremoloRenderer::stepDurationTicks(const Chord* chord, const Tremolo* tremolo)
 {
-    static constexpr int QUAVER_NOTE_DURATION_TICKS = Constants::division / 2;
-    static constexpr int SEMI_QUAVER_NOTE_DURATION_TICKS = QUAVER_NOTE_DURATION_TICKS / 2;
-    static constexpr int DEMI_SEMI_QUAVER_NOTE_DURATION_TICKS = SEMI_QUAVER_NOTE_DURATION_TICKS / 2;
-    static constexpr int HEMI_SEMI_DEMI_QUAVER_NOTE_DURATION_TICKS = DEMI_SEMI_QUAVER_NOTE_DURATION_TICKS / 2;
-
-    switch (type) {
-    case ArticulationType::Tremolo8th: return QUAVER_NOTE_DURATION_TICKS;
-    case ArticulationType::Tremolo16th: return SEMI_QUAVER_NOTE_DURATION_TICKS;
-    case ArticulationType::Tremolo32nd: return DEMI_SEMI_QUAVER_NOTE_DURATION_TICKS;
-    case ArticulationType::Tremolo64th: return HEMI_SEMI_DEMI_QUAVER_NOTE_DURATION_TICKS;
-    default: return 0;
+    int ticks = Constants::division / (1 << (chord->beams() + tremolo->lines()));
+    if (ticks <= 0) {
+        return 1;
     }
+    return ticks * chord->timeStretchFactor();
 }
 
-void TremoloRenderer::buildAndAppendEvents(const Ms::Chord* chord, const ArticulationType type, const mpe::duration_t stepDuration,
+void TremoloRenderer::buildAndAppendEvents(const Chord* chord, const ArticulationType type,
+                                           const mpe::duration_t stepDuration,
                                            const mpe::timestamp_t timestampOffset, const RenderingContext& context,
                                            mpe::PlaybackEventList& result)
 {
     for (size_t noteIdx = 0; noteIdx < chord->notes().size(); ++noteIdx) {
-        const Ms::Note* note = chord->notes().at(noteIdx);
+        const Note* note = chord->notes().at(noteIdx);
 
-        if (!isNotePlayable(note)) {
+        if (!isNotePlayable(note, context.commonArticulations)) {
             continue;
         }
 

@@ -25,6 +25,7 @@
 #include "log.h"
 #include "ptrutils.h"
 
+#include "internal/audiobuffer.h"
 #include "internal/audiosanitizer.h"
 #include "audioerrors.h"
 
@@ -48,7 +49,7 @@ AudioEngine::~AudioEngine()
     ONLY_AUDIO_MAIN_OR_WORKER_THREAD;
 }
 
-mu::Ret AudioEngine::init(IAudioBufferPtr bufferPtr)
+mu::Ret AudioEngine::init(AudioBufferPtr bufferPtr)
 {
     ONLY_AUDIO_WORKER_THREAD;
 
@@ -63,7 +64,7 @@ mu::Ret AudioEngine::init(IAudioBufferPtr bufferPtr)
     m_mixer = std::make_shared<Mixer>();
 
     m_buffer = std::move(bufferPtr);
-    m_buffer->setSource(m_mixer->mixedSource());
+    setMode(RenderMode::RealTimeMode);
 
     m_inited = true;
 
@@ -112,7 +113,7 @@ void AudioEngine::setReadBufferSize(uint16_t readBufferSize)
         return;
     }
 
-    m_buffer->setMinSampleLag(readBufferSize);
+    m_buffer->setMinSamplesToReserve(readBufferSize);
 }
 
 void AudioEngine::setAudioChannelsCount(const audioch_t count)
@@ -124,6 +125,37 @@ void AudioEngine::setAudioChannelsCount(const audioch_t count)
     }
 
     m_mixer->setAudioChannelsCount(count);
+}
+
+RenderMode AudioEngine::mode() const
+{
+    ONLY_AUDIO_WORKER_THREAD;
+
+    return m_currentMode;
+}
+
+void AudioEngine::setMode(const RenderMode newMode)
+{
+    if (newMode == m_currentMode) {
+        return;
+    }
+
+    m_currentMode = newMode;
+
+    if (m_currentMode == RenderMode::RealTimeMode) {
+        m_buffer->setSource(m_mixer->mixedSource());
+    } else {
+        m_buffer->setSource(nullptr);
+    }
+
+    m_modeChanges.notify();
+}
+
+mu::async::Notification AudioEngine::modeChanged() const
+{
+    ONLY_AUDIO_WORKER_THREAD;
+
+    return m_modeChanges;
 }
 
 MixerPtr AudioEngine::mixer() const

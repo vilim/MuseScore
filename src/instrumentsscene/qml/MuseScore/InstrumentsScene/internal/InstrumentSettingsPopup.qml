@@ -76,7 +76,7 @@ StyledPopupView {
 
             currentText: settingsModel.instrumentName
 
-            onCurrentTextEdited: function(newTextValue) {
+            onTextEditingFinished: function(newTextValue) {
                 settingsModel.instrumentName = newTextValue
             }
         }
@@ -95,27 +95,8 @@ StyledPopupView {
 
             currentText: settingsModel.abbreviature
 
-            onCurrentTextEdited: function(newTextValue) {
+            onTextChanged: function(newTextValue) {
                 settingsModel.abbreviature = newTextValue
-            }
-        }
-
-        StyledTextLabel {
-            id: partNameLabel
-            text: qsTrc("instruments", "Part name")
-        }
-
-        TextInputField {
-            objectName: "PartNameField"
-
-            navigation.panel: root.navigationPanel
-            navigation.row: 3
-            navigation.accessible.name: partNameLabel.text + " " + currentText
-
-            currentText: settingsModel.partName
-
-            onCurrentTextEdited: function(newTextValue) {
-                settingsModel.partName = newTextValue
             }
         }
 
@@ -125,7 +106,7 @@ StyledPopupView {
             width: parent.width
 
             navigation.panel: root.navigationPanel
-            navigation.row: 4
+            navigation.row: 3
 
             text: qsTrc("instruments", "Replace instrument")
 

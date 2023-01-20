@@ -28,19 +28,28 @@
 
 #include "config.h"
 #include "settings.h"
+#include "version.h"
 #include "log.h"
 
 using namespace mu;
 using namespace mu::framework;
 
 static const Settings::Key BACKUP_KEY("global", "application/backup/subfolder");
+static const Settings::Key DEV_MODE_ENABLED_KEY("global", "application/devModeEnabled");
 
-io::path GlobalConfiguration::appBinPath() const
+static const std::string MUSESCORE_URL("https://www.musescore.org/");
+
+void GlobalConfiguration::init()
 {
-    return io::path(QCoreApplication::applicationDirPath());
+    settings()->setDefaultValue(DEV_MODE_ENABLED_KEY, Val(Version::unstable()));
 }
 
-io::path GlobalConfiguration::appDataPath() const
+io::path_t GlobalConfiguration::appBinPath() const
+{
+    return io::path_t(QCoreApplication::applicationDirPath());
+}
+
+io::path_t GlobalConfiguration::appDataPath() const
 {
     if (m_appDataPath.empty()) {
         m_appDataPath = resolveAppDataPath();
@@ -69,12 +78,12 @@ QString GlobalConfiguration::resolveAppDataPath() const
 #endif
 }
 
-io::path GlobalConfiguration::appConfigPath() const
+io::path_t GlobalConfiguration::appConfigPath() const
 {
     return QStandardPaths::writableLocation(QStandardPaths::ConfigLocation);
 }
 
-io::path GlobalConfiguration::userAppDataPath() const
+io::path_t GlobalConfiguration::userAppDataPath() const
 {
     if (m_userAppDataPath.empty()) {
         m_userAppDataPath = resolveUserAppDataPath();
@@ -85,9 +94,7 @@ io::path GlobalConfiguration::userAppDataPath() const
 QString GlobalConfiguration::resolveUserAppDataPath() const
 {
 #if defined(WIN_PORTABLE)
-    return QDir::cleanPath(QString("%1/../../../Data/settings")
-                           .arg(QCoreApplication::applicationDirPath())
-                           .arg(QCoreApplication::applicationName()));
+    return QDir::cleanPath(QString("%1/../../../Data/settings").arg(QCoreApplication::applicationDirPath()));
 #elif defined(Q_OS_WASM)
     return QString("/files/data");
 #else
@@ -95,20 +102,26 @@ QString GlobalConfiguration::resolveUserAppDataPath() const
 #endif
 }
 
-io::path GlobalConfiguration::userBackupPath() const
+io::path_t GlobalConfiguration::userBackupPath() const
 {
     return settings()->value(BACKUP_KEY).toString();
 }
 
-io::path GlobalConfiguration::userDataPath() const
+io::path_t GlobalConfiguration::userDataPath() const
 {
-    static io::path p = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/" + QCoreApplication::applicationName();
+    static io::path_t p = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/" + QCoreApplication::applicationName();
     return p;
 }
 
-io::path GlobalConfiguration::homePath() const
+io::path_t GlobalConfiguration::homePath() const
 {
-    static io::path p = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
+    static io::path_t p = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
+    return p;
+}
+
+io::path_t GlobalConfiguration::downloadsPath() const
+{
+    static io::path_t p = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
     return p;
 }
 
@@ -120,4 +133,19 @@ bool GlobalConfiguration::useFactorySettings() const
 bool GlobalConfiguration::enableExperimental() const
 {
     return false;
+}
+
+bool GlobalConfiguration::devModeEnabled() const
+{
+    return settings()->value(DEV_MODE_ENABLED_KEY).toBool();
+}
+
+void GlobalConfiguration::setDevModeEnabled(bool enabled)
+{
+    settings()->setSharedValue(DEV_MODE_ENABLED_KEY, Val(enabled));
+}
+
+std::string GlobalConfiguration::museScoreUrl() const
+{
+    return MUSESCORE_URL;
 }

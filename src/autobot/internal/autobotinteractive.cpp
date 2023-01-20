@@ -54,8 +54,14 @@ IInteractive::ButtonData AutobotInteractive::buttonData(Button b) const
     return m_real->buttonData(b);
 }
 
-IInteractive::Result AutobotInteractive::info(const std::string& title, const std::string& text, const ButtonDatas& buttons,
+IInteractive::Result AutobotInteractive::info(const std::string& title, const std::string& text, const Buttons& buttons,
                                               int defBtn, const Options& options) const
+{
+    return m_real->info(title, text, buttons, defBtn, options);
+}
+
+IInteractive::Result AutobotInteractive::info(const std::string& title, const Text& text, const ButtonDatas& buttons, int defBtn,
+                                              const Options& options) const
 {
     return m_real->info(title, text, buttons, defBtn, options);
 }
@@ -72,6 +78,13 @@ IInteractive::Result AutobotInteractive::warning(const std::string& title, const
     return m_real->warning(title, text, buttons, defBtn, options);
 }
 
+IInteractive::Result AutobotInteractive::warning(const std::string& title, const Text& text, const std::string& detailedText,
+                                                 const ButtonDatas& buttons, int defBtn,
+                                                 const Options& options) const
+{
+    return m_real->warning(title, text, detailedText, buttons, defBtn, options);
+}
+
 IInteractive::Result AutobotInteractive::error(const std::string& title, const std::string& text, const Buttons& buttons,
                                                const Button& def, const Options& options) const
 {
@@ -84,29 +97,46 @@ IInteractive::Result AutobotInteractive::error(const std::string& title, const T
     return m_real->error(title, text, buttons, defBtn, options);
 }
 
-io::path AutobotInteractive::selectOpeningFile(const QString& title, const io::path& dir, const QString& filter)
+IInteractive::Result AutobotInteractive::error(const std::string& title, const Text& text, const std::string& detailedText,
+                                               const ButtonDatas& buttons, int defBtn, const Options& options) const
+{
+    return m_real->error(title, text, detailedText, buttons, defBtn, options);
+}
+
+io::path_t AutobotInteractive::selectOpeningFile(const QString& title, const io::path_t& dir, const std::vector<std::string>& filter)
 {
     return m_real->selectOpeningFile(title, dir, filter);
 }
 
-io::path AutobotInteractive::selectSavingFile(const QString& title, const io::path& dir, const QString& filter,
-                                              bool confirmOverwrite)
+io::path_t AutobotInteractive::selectSavingFile(const QString& title, const io::path_t& dir, const std::vector<std::string>& filter,
+                                                bool confirmOverwrite)
 {
     // return m_real->selectSavingFile(title, dir, filter, confirmOverwrite);
-    LOGD() << title << " dir:" << dir << ", filter: " << filter << ", confirmOverwrite: " << confirmOverwrite;
+    QStringList filterList;
+    for (const std::string& fileFilter : filter) {
+        filterList << QString::fromStdString(fileFilter);
+    }
+
+    LOGD() << title << " dir:" << dir << ", filter: " << filterList << ", confirmOverwrite: " << confirmOverwrite;
     m_real->open("musescore://autobot/selectfile?sync=true&filePath=" + dir.toStdString());
     m_selectedFilePath = dir;
     return m_selectedFilePath;
 }
 
-io::path AutobotInteractive::selectDirectory(const QString& title, const io::path& dir)
+io::path_t AutobotInteractive::selectDirectory(const QString& title, const io::path_t& dir)
 {
     return m_real->selectDirectory(title, dir);
 }
 
-io::paths AutobotInteractive::selectMultipleDirectories(const QString& title, const io::path& dir, const io::paths& initialyDirectories)
+io::paths_t AutobotInteractive::selectMultipleDirectories(const QString& title, const io::path_t& dir,
+                                                          const io::paths_t& initialDirectories)
 {
-    return m_real->selectMultipleDirectories(title, dir, initialyDirectories);
+    return m_real->selectMultipleDirectories(title, dir, initialDirectories);
+}
+
+QColor AutobotInteractive::selectColor(const QColor& color, const QString& title)
+{
+    return m_real->selectColor(color, title);
 }
 
 RetVal<Val> AutobotInteractive::open(const std::string& uri) const
@@ -164,6 +194,11 @@ void AutobotInteractive::close(const UriQuery& uri)
     m_real->close(uri);
 }
 
+void AutobotInteractive::closeAllDialogs()
+{
+    m_real->closeAllDialogs();
+}
+
 ValCh<Uri> AutobotInteractive::currentUri() const
 {
     return m_real->currentUri();
@@ -184,12 +219,12 @@ Ret AutobotInteractive::openUrl(const QUrl& url) const
     return m_real->openUrl(url);
 }
 
-Ret AutobotInteractive::revealInFileBrowser(const io::path& filePath) const
+Ret AutobotInteractive::revealInFileBrowser(const io::path_t& filePath) const
 {
     return m_real->revealInFileBrowser(filePath);
 }
 
-io::path AutobotInteractive::selectedFilePath() const
+io::path_t AutobotInteractive::selectedFilePath() const
 {
     return m_selectedFilePath;
 }

@@ -57,9 +57,6 @@ public:
 
     virtual bool needAskAboutApplyingNewStyle() const = 0;
     virtual void setNeedAskAboutApplyingNewStyle(bool value) = 0;
-
-    virtual io::path styleFileImportPath() const = 0;
-    virtual void setStyleFileImportPath(const io::path& path) = 0;
 };
 }
 

@@ -22,8 +22,10 @@
 #ifndef MU_NOTATION_INOTATIONMIDIINPUT_H
 #define MU_NOTATION_INOTATIONMIDIINPUT_H
 
-#include "midi/miditypes.h"
 #include "async/notification.h"
+#include "midi/miditypes.h"
+
+#include "notationtypes.h"
 
 namespace mu::notation {
 class INotationMidiInput
@@ -31,8 +33,10 @@ class INotationMidiInput
 public:
     virtual ~INotationMidiInput() = default;
 
-    virtual void onMidiEventReceived(const midi::Event& e) = 0;
-    virtual async::Notification noteChanged() const = 0;
+    virtual void onMidiEventReceived(const midi::Event& event) = 0;
+    virtual async::Channel<std::vector<const Note*> > notesReceived() const = 0;
+
+    virtual void onRealtimeAdvance() = 0;
 };
 
 using INotationMidiInputPtr = std::shared_ptr<INotationMidiInput>;

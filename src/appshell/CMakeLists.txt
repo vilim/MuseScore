@@ -102,6 +102,8 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/view/internal/iappmenumodelhook.h
     ${CMAKE_CURRENT_LIST_DIR}/view/internal/maintoolbarmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/internal/maintoolbarmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/internal/splashscreen.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/internal/splashscreen.h
     ${DOCKWINDOW_SRC}
     )
 
@@ -116,6 +118,8 @@ if (OS_IS_MAC)
     set(MODULE_SRC ${MODULE_SRC}
         ${CMAKE_CURRENT_LIST_DIR}/view/internal/platform/macos/macosappmenumodelhook.mm
         ${CMAKE_CURRENT_LIST_DIR}/view/internal/platform/macos/macosappmenumodelhook.h
+        ${CMAKE_CURRENT_LIST_DIR}/view/internal/platform/macos/macosscrollinghook.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/view/internal/platform/macos/macosscrollinghook.h
     )
     set_source_files_properties(
         ${CMAKE_CURRENT_LIST_DIR}/view/internal/platform/macos/macosappmenumodelhook.mm

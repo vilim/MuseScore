@@ -25,11 +25,8 @@
 #include "containers.h"
 
 #include "tupletmap.h"
-#include "tiemap.h"
-#include "slur.h"
-#include "chordrest.h"
 
-namespace Ms {
+namespace mu::engraving {
 EngravingItem* ElementMap::findNew(EngravingItem* o) const
 {
     return mu::value(*this, o, nullptr);

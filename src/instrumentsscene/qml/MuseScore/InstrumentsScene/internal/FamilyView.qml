@@ -141,10 +141,6 @@ Item {
             navigation.row: 2 + model.index
             navigation.accessible.name: itemTitleLabel.text
 
-            onNavigationActived: {
-                item.clicked(null)
-            }
-
             StyledTextLabel {
                 id: itemTitleLabel
                 anchors.fill: parent

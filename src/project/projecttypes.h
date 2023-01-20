@@ -22,11 +22,15 @@
 #ifndef MU_PROJECT_PROJECTTYPES_H
 #define MU_PROJECT_PROJECTTYPES_H
 
+#include <variant>
+
 #include <QString>
+#include <QUrl>
 
 #include "io/path.h"
 #include "log.h"
 
+#include "cloud/cloudtypes.h"
 #include "notation/notationtypes.h"
 
 namespace mu::project {
@@ -38,7 +42,7 @@ struct ProjectCreateOptions
     QString lyricist;
     QString copyright;
 
-    io::path templatePath;
+    io::path_t templatePath;
 
     notation::ScoreCreateOptions scoreOptions;
 };
@@ -52,7 +56,6 @@ struct MigrationOptions
 
     bool isApplyLeland = true;
     bool isApplyEdwin = true;
-    bool isApplyAutoSpacing = true;
 
     bool isValid() const { return appVersion != 0; }
 };
@@ -73,34 +76,34 @@ enum class SaveLocationType
     Cloud
 };
 
-enum class CloudProjectVisibility {
-    Private,
-    Public
+struct CloudProjectInfo {
+    QUrl sourceUrl;
+    QString name;
+
+    cloud::Visibility visibility = cloud::Visibility::Private;
+
+    bool isValid() const
+    {
+        return !name.isEmpty();
+    }
 };
 
 struct SaveLocation
 {
-    struct LocalInfo {
-        io::path path;
-    };
-
-    struct CloudInfo {
-        // TODO(save-to-cloud)
-    };
-
     SaveLocationType type = SaveLocationType::Undefined;
-    std::variant<LocalInfo, CloudInfo> info;
+
+    std::variant<io::path_t, CloudProjectInfo> data;
 
     bool isLocal() const
     {
         return type == SaveLocationType::Local
-               && std::holds_alternative<LocalInfo>(info);
+               && std::holds_alternative<io::path_t>(data);
     }
 
     bool isCloud() const
     {
         return type == SaveLocationType::Cloud
-               && std::holds_alternative<CloudInfo>(info);
+               && std::holds_alternative<CloudProjectInfo>(data);
     }
 
     bool isValid() const
@@ -108,38 +111,38 @@ struct SaveLocation
         return isLocal() || isCloud();
     }
 
-    const LocalInfo& localInfo() const
+    const io::path_t& localPath() const
     {
         IF_ASSERT_FAILED(isLocal()) {
-            static LocalInfo null;
+            static io::path_t null;
             return null;
         }
 
-        return std::get<LocalInfo>(info);
+        return std::get<io::path_t>(data);
     }
 
-    const CloudInfo& cloudInfo() const
+    const CloudProjectInfo& cloudInfo() const
     {
         IF_ASSERT_FAILED(isCloud()) {
-            static CloudInfo null;
+            static CloudProjectInfo null;
             return null;
         }
 
-        return std::get<CloudInfo>(info);
+        return std::get<CloudProjectInfo>(data);
     }
 
     SaveLocation() = default;
 
-    SaveLocation(const LocalInfo& localInfo)
-        : type(SaveLocationType::Local), info(localInfo) {}
+    SaveLocation(const io::path_t& localPath)
+        : type(SaveLocationType::Local), data(localPath) {}
 
-    SaveLocation(const CloudInfo& cloudInfo)
-        : type(SaveLocationType::Cloud), info(cloudInfo) {}
+    SaveLocation(const CloudProjectInfo& cloudInfo)
+        : type(SaveLocationType::Cloud), data(cloudInfo) {}
 };
 
 struct ProjectMeta
 {
-    io::path filePath;
+    io::path_t filePath;
 
     QString title;
     QString subtitle;
@@ -160,7 +163,7 @@ struct ProjectMeta
 
     QVariantMap additionalTags;
 
-    io::path fileName(bool includingExtension = true) const
+    io::path_t fileName(bool includingExtension = true) const
     {
         return io::filename(filePath, includingExtension);
     }
@@ -168,6 +171,7 @@ struct ProjectMeta
     bool operator==(const ProjectMeta& other) const
     {
         bool equal = filePath == other.filePath;
+        equal &= title == other.title;
         equal &= subtitle == other.subtitle;
         equal &= composer == other.composer;
         equal &= lyricist == other.lyricist;
@@ -202,6 +206,21 @@ struct Template
 
 using Templates = QList<Template>;
 
+class GenerateAudioTimePeriod
+{
+    Q_GADGET
+
+public:
+    enum class Type {
+        Never = 0,
+        Always,
+        AfterCertainNumberOfSaves
+    };
+    Q_ENUM(Type)
+};
+
+using GenerateAudioTimePeriodType = GenerateAudioTimePeriod::Type;
+
 class Migration
 {
     Q_GADGET
@@ -210,9 +229,8 @@ public:
     enum class Type
     {
         Unknown,
-        Pre300,
-        Post300AndPre362,
-        Ver362
+        Pre_3_6,
+        Ver_3_6
     };
     Q_ENUM(Type)
 };
@@ -222,9 +240,8 @@ using MigrationType = Migration::Type;
 inline std::vector<MigrationType> allMigrationTypes()
 {
     static const std::vector<MigrationType> types {
-        MigrationType::Pre300,
-        MigrationType::Post300AndPre362,
-        MigrationType::Ver362
+        MigrationType::Pre_3_6,
+        MigrationType::Ver_3_6
     };
 
     return types;

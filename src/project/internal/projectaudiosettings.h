@@ -25,17 +25,19 @@
 #include <memory>
 #include <string>
 
-#include "../iprojectaudiosettings.h"
+#include "modularity/ioc.h"
+#include "playback/iplaybackconfiguration.h"
+#include "types/ret.h"
+#include "engraving/infrastructure/mscreader.h"
+#include "engraving/infrastructure/mscwriter.h"
 
-#include "ret.h"
-#include "engraving/infrastructure/io/mscreader.h"
-#include "engraving/infrastructure/io/mscwriter.h"
+#include "../iprojectaudiosettings.h"
 
 namespace mu::project {
 class ProjectAudioSettings : public IProjectAudioSettings
 {
+    INJECT_STATIC(project, playback::IPlaybackConfiguration, playbackConfig)
 public:
-
     audio::AudioOutputParams masterAudioOutputParams() const override;
     void setMasterAudioOutputParams(const audio::AudioOutputParams& params) override;
 
@@ -52,6 +54,9 @@ public:
     void removeTrackParams(const engraving::InstrumentTrackId& partId) override;
 
     mu::ValNt<bool> needSave() const override;
+
+    const playback::SoundProfileName& activeSoundProfile() const override;
+    void setActiveSoundProfile(const playback::SoundProfileName& profileName) override;
 
     Ret read(const engraving::MscReader& reader);
     Ret write(engraving::MscWriter& writer);
@@ -70,6 +75,7 @@ private:
     audio::AudioFxParams fxParamsFromJson(const QJsonObject& object) const;
     audio::AudioResourceMeta resourceMetaFromJson(const QJsonObject& object) const;
     audio::AudioUnitConfig unitConfigFromJson(const QJsonObject& object) const;
+    audio::AudioResourceAttributes attributesFromJson(const QJsonObject& object) const;
 
     QJsonObject inputParamsToJson(const audio::AudioInputParams& params) const;
     QJsonObject outputParamsToJson(const audio::AudioOutputParams& params) const;
@@ -78,6 +84,7 @@ private:
     QJsonObject fxParamsToJson(const audio::AudioFxParams& fxParams) const;
     QJsonObject resourceMetaToJson(const audio::AudioResourceMeta& meta) const;
     QJsonObject unitConfigToJson(const audio::AudioUnitConfig& config) const;
+    QJsonObject attributesToJson(const audio::AudioResourceAttributes& attributes) const;
 
     audio::AudioSourceType sourceTypeFromString(const QString& string) const;
     audio::AudioResourceType resourceTypeFromString(const QString& string) const;
@@ -99,6 +106,8 @@ private:
 
     bool m_needSave = false;
     async::Notification m_needSaveNotification;
+
+    mu::playback::SoundProfileName m_activeSoundProfileName;
 };
 
 using ProjectAudioSettingsPtr = std::shared_ptr<ProjectAudioSettings>;

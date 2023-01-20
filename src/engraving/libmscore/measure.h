@@ -29,31 +29,29 @@
 */
 
 #include "measurebase.h"
+
 #include "segmentlist.h"
 
 namespace mu::engraving::rw {
 class MeasureRW;
 }
 
-namespace Ms {
-class XmlWriter;
-class Beam;
-class Tuplet;
-class Staff;
-class Chord;
-class MeasureNumber;
-class MMRestRange;
-class ChordRest;
-class Score;
-class MuseScoreView;
-class System;
-class Note;
-class Spacer;
-class TieMap;
+namespace mu::engraving {
 class AccidentalState;
-class Spanner;
-class Part;
+class Chord;
+class ChordRest;
+class MMRestRange;
+class MeasureNumber;
 class MeasureRepeat;
+class Note;
+class Part;
+class Score;
+class Spacer;
+class Staff;
+class System;
+class TieMap;
+
+class XmlWriter;
 
 //---------------------------------------------------------
 //   MeasureNumberMode
@@ -137,6 +135,7 @@ private:
 
 class Measure final : public MeasureBase
 {
+    OBJECT_ALLOCATOR(engraving, Measure)
 public:
 
     ~Measure();
@@ -163,10 +162,10 @@ public:
     void add(EngravingItem*) override;
     void remove(EngravingItem*) override;
     void change(EngravingItem* o, EngravingItem* n) override;
-    void spatiumChanged(qreal oldValue, qreal newValue) override;
+    void spatiumChanged(double oldValue, double newValue) override;
 
     System* system() const { return toSystem(explicitParent()); }
-    bool hasVoices(staff_idx_t staffIdx, Fraction stick, Fraction len) const;
+    bool hasVoices(staff_idx_t staffIdx, Fraction stick, Fraction len, bool considerInvisible = false) const;
     bool hasVoices(staff_idx_t staffIdx) const;
     void setHasVoices(staff_idx_t staffIdx, bool v);
 
@@ -197,20 +196,20 @@ public:
     bool isIrregular() const { return m_timesig != _len; }
 
     int size() const { return m_segments.size(); }
-    Ms::Segment* first() const { return m_segments.first(); }
+    Segment* first() const { return m_segments.first(); }
     Segment* first(SegmentType t) const { return m_segments.first(t); }
     Segment* firstEnabled() const { return m_segments.first(ElementFlag::ENABLED); }
 
-    Ms::Segment* last() const { return m_segments.last(); }
+    Segment* last() const { return m_segments.last(); }
     Segment* lastEnabled() const { return m_segments.last(ElementFlag::ENABLED); }
     SegmentList& segments() { return m_segments; }
     const SegmentList& segments() const { return m_segments; }
 
-    qreal userStretch() const;
-    void setUserStretch(qreal v) { m_userStretch = v; }
+    double userStretch() const;
+    void setUserStretch(double v) { m_userStretch = v; }
 
-    void setLayoutStretch(qreal stretchCoeff) { m_layoutStretch = stretchCoeff; }
-    qreal layoutStretch() const { return m_layoutStretch; }
+    void setLayoutStretch(double stretchCoeff) { m_layoutStretch = stretchCoeff; }
+    double layoutStretch() const { return m_layoutStretch; }
 
     void layoutMeasureElements();
     Fraction computeTicks();
@@ -229,8 +228,8 @@ public:
     Fraction snap(const Fraction& tick, const mu::PointF p) const;
     Fraction snapNote(const Fraction& tick, const mu::PointF p, int staff) const;
 
-    Segment* searchSegment(qreal x, SegmentType st, track_idx_t strack, track_idx_t etrack, const Segment* preferredSegment = nullptr,
-                           qreal spacingFactor = 0.5) const;
+    Segment* searchSegment(double x, SegmentType st, track_idx_t strack, track_idx_t etrack, const Segment* preferredSegment = nullptr,
+                           double spacingFactor = 0.5) const;
 
     void insertStaff(Staff*, staff_idx_t staff);
     void insertMStaff(MStaff* staff, staff_idx_t idx);
@@ -243,7 +242,7 @@ public:
     void removeStaves(staff_idx_t s, staff_idx_t e);
     void insertStaves(staff_idx_t s, staff_idx_t e);
 
-    qreal tick2pos(Fraction) const;
+    double tick2pos(Fraction) const;
     Segment* tick2segment(const Fraction& tick, SegmentType st = SegmentType::ChordRest);
 
     void sortStaves(std::vector<staff_idx_t>& dst);
@@ -266,9 +265,11 @@ public:
 
     void connectTremolo();
 
-    qreal createEndBarLines(bool);
+    double createEndBarLines(bool);
     void barLinesSetSpan(Segment*);
     void setEndBarLineType(BarLineType val, track_idx_t track, bool visible = true, mu::draw::Color color = mu::draw::Color());
+
+    void createSystemBeginBarLine();
 
     void scanElements(void* data, void (* func)(void*, EngravingItem*), bool all=true) override;
     void createVoice(int track);
@@ -299,9 +300,9 @@ public:
     void setPlaybackCount(int val) { m_playbackCount = val; }
     mu::RectF staffabbox(staff_idx_t staffIdx) const;
 
-    mu::engraving::PropertyValue getProperty(Pid propertyId) const override;
-    bool setProperty(Pid propertyId, const mu::engraving::PropertyValue&) override;
-    mu::engraving::PropertyValue propertyDefault(Pid) const override;
+    PropertyValue getProperty(Pid propertyId) const override;
+    bool setProperty(Pid propertyId, const PropertyValue&) override;
+    PropertyValue propertyDefault(Pid) const override;
 
     bool hasMMRest() const { return m_mmRest != 0; }
     bool isMMRest() const { return m_mmRestCount > 0; }
@@ -314,6 +315,7 @@ public:
     Measure* mmRestLast() const;
 
     int measureRepeatCount(staff_idx_t staffIdx) const;
+    bool containsMeasureRepeat(const staff_idx_t staffIdxFrom, const staff_idx_t staffIdxTo) const;
     void setMeasureRepeatCount(int n, staff_idx_t staffIdx);
     bool isMeasureRepeatGroup(staff_idx_t staffIdx) const;
     bool isMeasureRepeatGroupWithNextM(staff_idx_t staffIdx) const;
@@ -327,7 +329,12 @@ public:
 
     EngravingItem* nextElementStaff(staff_idx_t staff);
     EngravingItem* prevElementStaff(staff_idx_t staff);
-    QString accessibleInfo() const override;
+
+    String accessibleInfo() const override;
+
+#ifndef ENGRAVING_NO_ACCESSIBILITY
+    AccessibleItemPtr createAccessible() override;
+#endif
 
     void addSystemHeader(bool firstSystem);
     void addSystemTrailer(Measure* nm);
@@ -338,10 +345,10 @@ public:
     BarLineType endBarLineType() const;
     bool endBarLineVisible() const;
     void triggerLayout() const override;
-    qreal basicStretch() const;
-    qreal basicWidth() const;
-    float durationStretch(Fraction curTicks, const Fraction minTicks) const;
-    void computeWidth(Fraction minTicks, qreal stretchCoeff);
+    double basicStretch() const;
+    double basicWidth() const;
+    void computeWidth(Fraction minTicks, Fraction maxTicks, double stretchCoeff);
+    void stretchToTargetWidth(double targetWidth);
     void checkHeader();
     void checkTrailer();
     void layoutStaffLines();
@@ -354,7 +361,7 @@ public:
     //! puts segments on the positions according to their length
     void layoutSegmentsInPracticeMode(const std::vector<int>& visibleParts);
 
-    qreal computeFirstSegmentXPosition(Segment* segment);
+    double computeFirstSegmentXPosition(Segment* segment);
 
     void layoutSegmentsWithDuration(const std::vector<int>& visibleParts);
 
@@ -362,13 +369,15 @@ public:
 
     Fraction quantumOfSegmentCell() const;
 
-    void stretchMeasureInPracticeMode(qreal stretch);
-    double squeezableSpace() const { return _squeezableSpace; }
+    void stretchMeasureInPracticeMode(double stretch);
+    double squeezableSpace() const { return _isWidthLocked ? 0.0 : _squeezableSpace; }
+
+    void respaceSegments();
 
 private:
     double _squeezableSpace = 0;
-    friend class mu::engraving::Factory;
-    friend class mu::engraving::rw::MeasureRW;
+    friend class Factory;
+    friend class rw::MeasureRW;
 
     Measure(System* parent = 0);
     Measure(const Measure&);
@@ -377,8 +386,8 @@ private:
     void push_front(Segment* e);
 
     void fillGap(const Fraction& pos, const Fraction& len, track_idx_t track, const Fraction& stretch, bool useGapRests = true);
-    void computeWidth(Segment* s, qreal x, bool isSystemHeader, Fraction minTicks, qreal stretchCoeff);
-    void setWidthToTargetValue(Segment* s, qreal x, bool isSystemHeader, Fraction minTicks, qreal stretchCoeff, qreal targetWidth);
+    void computeWidth(Segment* s, double x, bool isSystemHeader, Fraction minTicks, Fraction maxTicks, double stretchCoeff);
+    double computeMinMeasureWidth() const;
 
     MStaff* mstaff(staff_idx_t staffIndex) const;
 
@@ -386,7 +395,7 @@ private:
     SegmentList m_segments;
     Measure* m_mmRest;         // multi measure rest which replaces a measure range
 
-    qreal m_userStretch;
+    double m_userStretch;
 
     Fraction m_timesig;
 
@@ -407,5 +416,5 @@ private:
     double m_layoutStretch = 1.0;
     bool _isWidthLocked = false;
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

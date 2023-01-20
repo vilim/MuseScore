@@ -46,29 +46,35 @@ struct LayoutOptions
     bool showVBox = true;
 
     // from style
-    qreal loWidth = 0;
-    qreal loHeight = 0;
+    double loWidth = 0;
+    double loHeight = 0;
     bool firstSystemIndent = true;
 
-    qreal maxFretShiftAbove = 0;
-    qreal maxFretShiftBelow = 0;
+    double maxChordShiftAbove = 0;
+    double maxChordShiftBelow = 0;
 
-    Ms::VerticalAlignRange verticalAlignRange = Ms::VerticalAlignRange::SEGMENT;
+    double maxFretShiftAbove = 0;
+    double maxFretShiftBelow = 0;
+
+    VerticalAlignRange verticalAlignRange = VerticalAlignRange::SEGMENT;
 
     bool isMode(LayoutMode m) const { return mode == m; }
     bool isLinearMode() const { return mode == LayoutMode::LINE || mode == LayoutMode::HORIZONTAL_FIXED; }
 
-    void updateFromStyle(const Ms::MStyle& style)
+    void updateFromStyle(const MStyle& style)
     {
-        loWidth = style.styleD(Ms::Sid::pageWidth) * Ms::DPI;
-        loHeight = style.styleD(Ms::Sid::pageHeight) * Ms::DPI;
+        loWidth = style.styleD(Sid::pageWidth) * DPI;
+        loHeight = style.styleD(Sid::pageHeight) * DPI;
 
-        firstSystemIndent = style.styleB(Ms::Sid::enableIndentationOnFirstSystem);
+        firstSystemIndent = style.styleB(Sid::enableIndentationOnFirstSystem);
 
-        maxFretShiftAbove = style.styleMM(Ms::Sid::maxFretShiftAbove);
-        maxFretShiftBelow = style.styleMM(Ms::Sid::maxFretShiftBelow);
+        maxChordShiftAbove = style.styleMM(Sid::maxChordShiftAbove);
+        maxChordShiftBelow = style.styleMM(Sid::maxChordShiftBelow);
 
-        verticalAlignRange = Ms::VerticalAlignRange(style.styleI(Ms::Sid::autoplaceVerticalAlignRange));
+        maxFretShiftAbove = style.styleMM(Sid::maxFretShiftAbove);
+        maxFretShiftBelow = style.styleMM(Sid::maxFretShiftBelow);
+
+        verticalAlignRange = VerticalAlignRange(style.styleI(Sid::autoplaceVerticalAlignRange));
     }
 };
 }
